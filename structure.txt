@@ -1,0 +1,29 @@
+flutter_app:
+|   pubspec.yaml
+|   structure.txt
+|   
++---.github
+|   \---workflows
+|           build-apk.yml
+|           
+\---lib
+    |   constants.dart
+    |   main.dart
+    |   
+    +---models
+    |       car.dart
+    |       diagnostic.dart
+    |       
+    +---providers
+    |       auth_provider.dart
+    |       
+    +---screens
+    |       history_screen.dart
+    |       home_screen.dart
+    |       login_screen.dart
+    |       result_screen.dart
+    |       shop_screen.dart
+    |       
+    \---services
+            api_service.dart
+            
