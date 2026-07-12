@@ -22,6 +22,27 @@ jobs:
           flutter create --org com.smartmechanic --project-name smart_mechanic_app temp_app
           cp -r lib temp_app/
           cp pubspec.yaml temp_app/
+
+      - name: Fix Kotlin version conflict
+        run: |
+          # افزایش نسخهٔ Kotlin در build.gradle پروژه (سطح ریشه)
+          sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.8.10'/" temp_app/android/build.gradle
+          # در صورت وجود ext.kotlin_version در فایل دیگر یا نداشتن آن، اضافه می‌کنیم
+          if ! grep -q "ext.kotlin_version" temp_app/android/build.gradle; then
+            echo "ext.kotlin_version = '1.8.10'" >> temp_app/android/build.gradle
+          fi
+          # همچنین برای جلوگیری از تداخل، resolutionStrategy اجباری در app/build.gradle اضافه می‌کنیم
+          echo "
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.10'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.10'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.10'
+              }
+          }" >> temp_app/android/app/build.gradle
+
+      - name: Get dependencies
+        run: |
           cd temp_app
           flutter pub get
 
