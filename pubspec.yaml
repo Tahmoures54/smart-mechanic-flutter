@@ -1,217 +1,58 @@
-name: Build Flutter APK & Test
+name: smart_mechanic
+description: Smart Mechanic - AI car diagnostics
+publish_to: 'none'
+version: 1.0.0+1
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+environment:
+  sdk: '^3.4.0'
 
-jobs:
-  # --- جاب بیلد و تست اندروید ---
-  build-android:
-    name: Build & Test Android
-    runs-on: ubuntu-latest
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # State management
+  provider: ^6.1.1
 
-      - name: Setup Java SDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+  # Local storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  shared_preferences: ^2.2.0
+  flutter_secure_storage: ^9.0.0
 
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
-          cache: true
+  # Networking
+  http: ^1.1.0
 
-      # 1️⃣ درج محدودیت SDK در pubspec.yaml اصلی پروژه
-      - name: Ensure SDK constraint in main pubspec.yaml
-        run: |
-          python3 -c "
-          import re
-          env_key = 'environment:'
-          sdk_line = \"  sdk: '^3.4.0'\"
-          with open('pubspec.yaml', 'r') as f:
-              content = f.read()
-          if env_key not in content:
-              content += f'\n{env_key}\n{sdk_line}\n'
-          else:
-              lines = content.splitlines(keepends=True)
-              out = []
-              i = 0
-              while i < len(lines):
-                  line = lines[i]
-                  out.append(line)
-                  if line.strip() == env_key:
-                      j = i + 1
-                      found = False
-                      while j < len(lines) and (lines[j].startswith(' ') or lines[j].startswith('\t') or lines[j].strip() == ''):
-                          if re.match(r'\s+sdk:', lines[j]):
-                              found = True
-                              break
-                          j += 1
-                      if not found:
-                          out.append(sdk_line + '\n')
-                  i += 1
-              content = ''.join(out)
-          with open('pubspec.yaml', 'w') as f:
-              f.write(content)
-          print('✅ Main pubspec.yaml updated')
-          "
+  # Audio & Speech
+  record: ^5.0.1
+  flutter_sound: ^9.2.5
+  speech_to_text: ^6.4.0
+  flutter_tts: ^4.0.0
+  fft: ^1.0.0 # برای تحلیل فرکانسی
 
-      - name: Install dependencies (main project)
-        run: flutter pub get
+  # Maps & Location
+  google_maps_flutter: ^2.5.0
+  google_places_flutter: ^2.0.0
+  geolocator: ^10.1.0
 
-      # 2️⃣ ساخت پروژه موقت (طبق نیاز workflow شما)
-      - name: Create temporary Flutter project
-        run: flutter create --org com.smartmechanic --project-name smart_mechanic_app temp_app
+  # UI & Utilities
+  google_fonts: ^6.1.0
+  flutter_markdown: ^0.6.0
+  share_plus: ^7.1.0
+  webview_flutter: ^4.4.1
+  permission_handler: ^11.0.0
+  path_provider: ^2.1.1
+  intl: ^0.18.0
 
-      # 3️⃣ درج محدودیت SDK در pubspec.yaml پروژهٔ موقت
-      - name: Ensure SDK constraint in temp_app/pubspec.yaml
-        run: |
-          python3 -c "
-          import re
-          target = 'temp_app/pubspec.yaml'
-          env_key = 'environment:'
-          sdk_line = \"  sdk: '^3.4.0'\"
-          with open(target, 'r') as f:
-              content = f.read()
-          if env_key not in content:
-              content += f'\n{env_key}\n{sdk_line}\n'
-          else:
-              lines = content.splitlines(keepends=True)
-              out = []
-              i = 0
-              while i < len(lines):
-                  line = lines[i]
-                  out.append(line)
-                  if line.strip() == env_key:
-                      j = i + 1
-                      found = False
-                      while j < len(lines) and (lines[j].startswith(' ') or lines[j].startswith('\t') or lines[j].strip() == ''):
-                          if re.match(r'\s+sdk:', lines[j]):
-                              found = True
-                              break
-                          j += 1
-                      if not found:
-                          out.append(sdk_line + '\n')
-                  i += 1
-              content = ''.join(out)
-          with open(target, 'w') as f:
-              f.write(content)
-          print('✅ temp_app/pubspec.yaml updated')
-          "
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  build_runner: ^2.4.0
+  hive_generator: ^2.0.1
 
-      # 4️⃣ کارهایی که لازم است در temp_app انجام دهید (مثلاً تست یا اجرای pub get)
-      - name: Get dependencies in temp_app
-        run: cd temp_app && flutter pub get
-
-      # (در اینجا می‌توانید دستورات دلخواه دیگر را روی temp_app اجرا کنید)
-
-      # --- ادامه بیلد اصلی پروژه ---
-      - name: Verify formatting (main project)
-        run: dart format --output=none --set-exit-if-changed .
-
-      - name: Analyze code (main project)
-        run: flutter analyze
-
-      - name: Run tests (main project)
-        run: flutter test
-
-      - name: Build APK Debug
-        run: flutter build apk --debug
-      
-      - name: Build APK Release
-        run: |
-          flutter build apk \
-            --release \
-            --obfuscate \
-            --split-debug-info=build/symbols \
-            --split-per-abi
-      
-      - name: Upload APK Debug Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-
-      - name: Upload APK Release Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-splits
-          path: build/app/outputs/flutter-apk/app-*-release.apk
-
-      - name: Upload Debug Symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-symbols
-          path: build/symbols
-
-  # --- جاب بیلد iOS (بدون temp_app، فقط برای بیلد اصلی) ---
-  build-ios:
-    name: Build iOS
-    runs-on: macos-latest
-    if: github.event_name == 'push'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
-          cache: true
-
-      - name: Ensure SDK constraint in pubspec.yaml
-        run: |
-          python3 -c "
-          import re
-          env_key = 'environment:'
-          sdk_line = \"  sdk: '^3.4.0'\"
-          with open('pubspec.yaml', 'r') as f:
-              content = f.read()
-          if env_key not in content:
-              content += f'\n{env_key}\n{sdk_line}\n'
-          else:
-              lines = content.splitlines(keepends=True)
-              out = []
-              i = 0
-              while i < len(lines):
-                  line = lines[i]
-                  out.append(line)
-                  if line.strip() == env_key:
-                      j = i + 1
-                      found = False
-                      while j < len(lines) and (lines[j].startswith(' ') or lines[j].startswith('\t') or lines[j].strip() == ''):
-                          if re.match(r'\s+sdk:', lines[j]):
-                              found = True
-                              break
-                          j += 1
-                      if not found:
-                          out.append(sdk_line + '\n')
-                  i += 1
-              content = ''.join(out)
-          with open('pubspec.yaml', 'w') as f:
-              f.write(content)
-          print('✅ pubspec.yaml updated')
-          "
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build iOS App (No Codesign)
-        run: flutter build ios --release --no-codesign
-
-      - name: Upload iOS Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: build/ios/iphoneos/Runner.app
+flutter:
+  uses-material-design: true
+ 
+       
