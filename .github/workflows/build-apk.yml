@@ -33,17 +33,15 @@ jobs:
         with:
           cache: true
 
-      # ایجاد خودکار پوشهٔ android (و سایر پلتفرم‌های لازم) بدون تغییر کدهای موجود
       - name: Create Android project files if missing
         run: |
           if [ ! -d "android" ]; then
-            flutter create --platforms android .
+            flutter create --platforms android --project-name smart_mechanic .
           fi
 
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      # تنظیم نسخهٔ Kotlin (فقط در صورت وجود android)
       - name: Ensure Kotlin version compatibility
         if: hashFiles('android/build.gradle') != ''
         run: |
@@ -51,14 +49,12 @@ jobs:
           ROOT_BUILD="android/build.gradle"
           APP_BUILD="android/app/build.gradle"
 
-          # تنظیم ext.kotlin_version در ریشه
           if grep -q "ext.kotlin_version" "$ROOT_BUILD"; then
             sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '$KOTLIN_VERSION'/" "$ROOT_BUILD"
           else
             echo "ext.kotlin_version = '$KOTLIN_VERSION'" >> "$ROOT_BUILD"
           fi
 
-          # resolutionStrategy
           if ! grep -q "resolutionStrategy" "$APP_BUILD"; then
             echo "
             configurations.all {
