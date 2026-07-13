@@ -3,6 +3,6 @@ class Constants {
   // static const String baseUrl = 'http://10.0.2.2:3000'; // Android emulator
   // static const String baseUrl = 'http://localhost:3000'; // iOS simulator
 
-  // Production URL (Liara)
-  static const String baseUrl = 'https://priceless-mendeleev-c4xbcbwun.liara.run';
+  // Production URL (custom domain)
+  static const String baseUrl = 'https://smart-mec.ir';
 }
