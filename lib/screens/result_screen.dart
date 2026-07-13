@@ -1,16 +1,18 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:share_plus/share_plus.dart';
+// فرض بر این است که LatLng از پکیج گوگل مپس ایمپورت شده است
+import 'package:google_maps_flutter/google_maps_flutter.dart'; 
 import '../models/ai_response.dart';
 import '../models/audio_features.dart';
 import '../models/garage.dart';
-import '../widgets/audio_wave.dart'; // ویجت اختصاصی برای نمایش طیف فرکانس
+import '../widgets/audio_wave.dart';
 
 class ResultScreen extends StatelessWidget {
-  final String? resultText;                // نتیجهٔ متنی عیب‌یابی ساده
-  final AIResponse? aiResponse;            // پاسخ کامل هوش مصنوعی
-  final AudioFeatures? audioFeatures;       // ویژگی‌های صوتی (برای نمودار)
-  final List<Garage>? garages;              // لیست تعمیرگاه‌های نزدیک
+  final String? resultText;
+  final AIResponse? aiResponse;
+  final AudioFeatures? audioFeatures;
+  final List<Garage>? garages;
 
   const ResultScreen({
     super.key,
@@ -20,104 +22,117 @@ class ResultScreen extends StatelessWidget {
     this.garages,
   });
 
-  /// متن قابل اشتراک‌گذاری: اگر نتیجهٔ متنی موجود باشد همان، وگرنه از AIResponse ساخته می‌شود.
-  String get _shareText {
-    if (resultText != null) return resultText!;
+  /// متن قابل اشتراک‌گذاری
+  String? get _shareText {
+    if (resultText != null) return resultText;
     if (aiResponse != null) {
       return 'تشخیص: ${aiResponse!.diagnosis}\n'
           'درصد اطمینان: ${(aiResponse!.confidence * 100).toStringAsFixed(1)}%';
     }
-    return 'نتیجه‌ای برای اشتراک‌گذاری موجود نیست.';
+    return null; // اگر داده‌ای نیست، نال برمی‌گرداند
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasDataToShare = _shareText != null;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.orange,
+        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
         title: const Text('نتیجه عیب‌یابی'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () => Share.share(_shareText),
-          ),
+          if (hasDataToShare)
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: () => Share.share(_shareText!),
+            ),
         ],
       ),
-      body: resultText != null ? _buildMarkdownView() : _buildAIResultView(context),
+      // اگر resultText موجود بود، حالت متنی، در غیر این صورت حالت AI
+      body: resultText != null ? _buildMarkdownView(context) : _buildAIResultView(context),
     );
   }
 
-  /// نمایش نتیجهٔ متنی با Markdown (همان نسخهٔ اول)
-  Widget _buildMarkdownView() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Markdown(
-        data: resultText!,
-        styleSheet: MarkdownStyleSheet(
-          p: const TextStyle(color: Colors.white, fontSize: 16),
-          h1: const TextStyle(color: Colors.orange, fontSize: 22),
-          h2: const TextStyle(color: Colors.orange, fontSize: 20),
-          strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
-          code: const TextStyle(backgroundColor: Colors.grey),
-        ),
+  /// نمایش نتیجهٔ متنی با Markdown
+  Widget _buildMarkdownView(BuildContext context) {
+    final theme = Theme.of(context);
+    return Markdown(
+      data: resultText!,
+      styleSheet: MarkdownStyleSheet(
+        p: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16),
+        h1: TextStyle(color: theme.colorScheme.primary, fontSize: 22),
+        h2: TextStyle(color: theme.colorScheme.primary, fontSize: 20),
+        strong: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.secondary),
+        code: TextStyle(backgroundColor: theme.cardColor),
       ),
     );
   }
 
-  /// نمایش نتیجهٔ تحلیل هوش مصنوعی (نسخهٔ دوم)
+  /// نمایش نتیجهٔ تحلیل هوش مصنوعی
   Widget _buildAIResultView(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    // استفاده از متغیرهای محلی برای جلوگیری از استفاده مکرر از عملگر ! (Dart 3 Flow Analysis)
+    final ai = aiResponse;
+    final audio = audioFeatures;
+    final garageList = garages;
+    
+    final bool isEmpty = ai == null && audio == null && (garageList == null || garageList.isEmpty);
+
+    if (isEmpty) {
+      return Center(child: Text('نتیجه‌ای برای نمایش وجود ندارد.', style: theme.textTheme.bodyMedium));
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (aiResponse != null) ...[
-            Text('تشخیص هوش مصنوعی:', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white)),
+          if (ai != null) ...[
+            Text('تشخیص هوش مصنوعی:', style: theme.textTheme.headlineSmall?.copyWith(color: theme.textTheme.bodyLarge?.color)),
             const SizedBox(height: 8),
-            Text(aiResponse!.diagnosis, style: const TextStyle(fontSize: 18, color: Colors.white)),
+            Text(ai.diagnosis, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 18)),
             const SizedBox(height: 10),
             Text(
-              'میزان اطمینان: ${(aiResponse!.confidence * 100).toStringAsFixed(1)}%',
+              'میزان اطمینان: ${(ai.confidence * 100).toStringAsFixed(1)}%',
               style: TextStyle(
-                color: aiResponse!.confidence > 0.8 ? Colors.green : Colors.orange,
+                color: ai.confidence > 0.8 ? Colors.green : theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 20),
           ],
-          if (audioFeatures != null) ...[
-            Text('نمودار فرکانس موتور:', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+          if (audio != null) ...[
+            Text('نمودار فرکانس موتور:', style: theme.textTheme.titleLarge?.copyWith(color: theme.textTheme.bodyLarge?.color)),
             const SizedBox(height: 8),
-            AudioWave(spectrum: audioFeatures!.frequencySpectrum), // ویجت اختصاصی
+            AudioWave(spectrum: audio.frequencySpectrum),
             const SizedBox(height: 20),
           ],
-          if (garages != null && garages!.isNotEmpty) ...[
-            Text('تعمیرگاه‌های پیشنهاد شده:', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+          if (garageList != null && garageList.isNotEmpty) ...[
+            Text('تعمیرگاه‌های پیشنهاد شده:', style: theme.textTheme.titleLarge?.copyWith(color: theme.textTheme.bodyLarge?.color)),
             const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: garages!.length,
-              itemBuilder: (ctx, i) => ListTile(
-                title: Text(garages![i].name, style: const TextStyle(color: Colors.white)),
-                subtitle: Text('امتیاز: ${garages![i].rating}', style: const TextStyle(color: Colors.white70)),
-                onTap: () => _navigateToMap(context, garages![i].location),
-              ),
+            // استفاده از Column به جای ListView برای کارایی بهتر در لیست‌های کوتاه تو در تو
+            Column(
+              children: garageList.map((garage) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(garage.name, style: theme.textTheme.bodyLarge),
+                subtitle: Text('امتیاز: ${garage.rating ?? "بدون امتیاز"}', style: theme.textTheme.bodyMedium),
+                onTap: () => _navigateToMap(context, garage.location),
+              )).toList(),
             ),
           ],
-          if (aiResponse == null && audioFeatures == null && (garages == null || garages!.isEmpty))
-            const Center(child: Text('نتیجه‌ای برای نمایش وجود ندارد.', style: TextStyle(color: Colors.white70))),
         ],
       ),
     );
   }
 
-  /// هدایت به نقشه برای نمایش موقعیت تعمیرگاه (پیاده‌سازی واقعی بستگی به نقشه شما دارد)
-  void _navigateToMap(BuildContext context, dynamic location) {
+  /// هدایت به نقشه برای نمایش موقعیت تعمیرگاه
+  void _navigateToMap(BuildContext context, LatLng location) {
     // TODO: باز کردن نقشه با مختصات location
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('باز کردن نقشه...')),
+      SnackBar(content: Text('باز کردن نقشه در مختصات: ${location.latitude}, ${location.longitude}')),
     );
   }
 }
