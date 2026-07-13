@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -7,6 +7,7 @@ import 'login_screen.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'result_screen.dart';
+import 'record_screen.dart'; // فرض می‌کنیم این صفحه وجود دارد
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,15 +30,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadCars() async {
     try {
-      final cars = await ApiService().getCars();
+      final api = Provider.of<ApiService>(context, listen: false);
+      final cars = await api.getCars();
       setState(() {
         _cars = cars;
         if (cars.isNotEmpty) _selectedCar = cars.first;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در دریافت لیست خودروها: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا در دریافت لیست خودروها: $e')),
+        );
+      }
     }
   }
 
@@ -57,9 +61,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final result = await ApiService().diagnose(
+      final api = Provider.of<ApiService>(context, listen: false);
+      final result = await api.diagnoseByDescription(
         auth.token!,
-        _selectedCar!.id.toString(), // ارسال id به جای fullName
+        _selectedCar!.id, // id به‌عنوان carId
         _descController.text,
       );
       if (mounted) {
@@ -74,20 +79,26 @@ class _HomeScreenState extends State<HomeScreen> {
         _showNoCreditDialog();
       } else if (e.statusCode == 401) {
         auth.logout();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('نشست شما منقضی شده، لطفاً دوباره وارد شوید.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('نشست شما منقضی شده، لطفاً دوباره وارد شوید.')),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message)),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطای شبکه: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطای شبکه: $e')),
+        );
+      }
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _showNoCreditDialog() {
@@ -222,9 +233,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   : const Text('عیب‌یابی کن',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
             ),
+            const SizedBox(height: 12),
+            // دکمه ضبط صدا – از صفحه دوم
+            ElevatedButton.icon(
+              icon: const Icon(Icons.mic),
+              label: const Text('شروع ضبط صدا برای عیب‌یابی'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RecordScreen()),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 60),
+                textStyle: const TextStyle(fontSize: 16),
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.black,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-}
+}﻿
+    
+       
