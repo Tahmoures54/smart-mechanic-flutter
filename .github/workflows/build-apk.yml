@@ -39,32 +39,20 @@ jobs:
             flutter create --platforms android --project-name smart_mechanic .
           fi
 
+      # compileSdkVersion را به ۳۶ افزایش می‌دهیم تا با flutter_tts و flutter_sound سازگار شود
+      - name: Set compileSdkVersion to 36
+        run: sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Ensure Kotlin version compatibility
-        if: hashFiles('android/build.gradle') != ''
-        run: |
-          KOTLIN_VERSION="1.8.10"
-          ROOT_BUILD="android/build.gradle"
-          APP_BUILD="android/app/build.gradle"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-          if grep -q "ext.kotlin_version" "$ROOT_BUILD"; then
-            sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '$KOTLIN_VERSION'/" "$ROOT_BUILD"
-          else
-            echo "ext.kotlin_version = '$KOTLIN_VERSION'" >> "$ROOT_BUILD"
-          fi
-
-          if ! grep -q "resolutionStrategy" "$APP_BUILD"; then
-            echo "
-            configurations.all {
-                resolutionStrategy {
-                    force 'org.jetbrains.kotlin:kotlin-stdlib:$KOTLIN_VERSION'
-                    force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:$KOTLIN_VERSION'
-                    force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:$KOTLIN_VERSION'
-                }
-            }" >> "$APP_BUILD"
-          fi
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses
 
       - name: Build APK
         run: flutter build apk --release
