@@ -1,56 +1,63 @@
-name: smart_mechanic
-description: Smart Mechanic - AI car diagnostics
-publish_to: 'none'
-version: 1.0.0+1
+name: Build Flutter APK & Test
 
-environment:
-  sdk: '^3.4.0'
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
-dependencies:
-  flutter:
-    sdk: flutter
-  flutter_localizations:
-    sdk: flutter
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-  # State management
-  provider: ^6.1.1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # Local storage
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  shared_preferences: ^2.2.0
-  flutter_secure_storage: ^9.0.0
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+          cache: true # کش گرفتن برای سرعت بالا
 
-  # Networking
-  http: ^1.1.0
+      - name: Install dependencies
+        run: flutter pub get
 
-  # Audio & Speech
-  record: ^5.0.1
-  flutter_sound: ^9.2.5
-  speech_to_text: ^6.4.0
-  flutter_tts: ^4.0.0
-  fft: ^1.0.0 # برای تحلیل فرکانسی
+      # --- بخش تست (مهم) ---
+      - name: Run tests
+        run: flutter test
+      
+      # --- بخش بررسی قالب (Linting) ---
+      - name: Analyze code
+        run: flutter analyze
 
-  # Maps & Location
-  google_maps_flutter: ^2.5.0
-  google_places_flutter: ^2.0.0
-  geolocator: ^10.1.0
+      # --- بخش بیلد آندروید ---
+      - name: Build APK Debug
+        run: flutter build apk --debug
+      
+      - name: Build APK Release
+        run: |
+          flutter build apk \
+            --release \
+            --obfuscate \
+            --split-per-abi
+      
+      # --- آپلود فایل خروجی ---
+      - name: Upload APK Debug Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
 
-  # UI & Utilities
-  google_fonts: ^6.1.0
-  flutter_markdown: ^0.6.0
-  share_plus: ^7.1.0
-  webview_flutter: ^4.4.1
-  permission_handler: ^11.0.0
-  path_provider: ^2.1.1
-  intl: ^0.18.0
+      - name: Upload APK Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-splits
+          path: build/app/outputs/flutter-apk/
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.1
-  build_runner: ^2.4.0
-  hive_generator: ^2.0.1   # برای تولید کد Hive
-
-flutter:
-  uses-material-design: true
+      # --- بیلد iOS (اختیاری) ---
+      - name: Build iOS App
+        if: runner.os == 'macos'
+        run: flutter build ios --release --no-codesign
