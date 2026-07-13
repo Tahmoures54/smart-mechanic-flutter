@@ -39,9 +39,22 @@ jobs:
             flutter create --platforms android --project-name smart_mechanic .
           fi
 
-      # compileSdkVersion را به ۳۶ افزایش می‌دهیم تا با flutter_tts و flutter_sound سازگار شود
-      - name: Set compileSdkVersion to 36
-        run: sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
+      # ==========================================
+      # این بخش جدید اضافه شده است تا ارور کاتلین برطرف شود
+      - name: Fix Android build configurations (Kotlin & Gradle & SDK)
+        run: |
+          # 1. آپدیت نسخه Kotlin از 1.7.1 به 1.9.25
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.25"/' android/build.gradle
+          
+          # 2. آپدیت Android Gradle Plugin (AGP)
+          sed -i 's/com.android.tools.build:gradle:.*/com.android.tools.build:gradle:8.5.0/' android/build.gradle
+          
+          # 3. آپدیت خود Gradle Wrapper
+          sed -i 's/gradle-.*-all.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
+          
+          # 4. آپدیت compileSdkVersion (همان کد قبلی شما)
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
+      # ==========================================
 
       - name: Install Flutter dependencies
         run: flutter pub get
