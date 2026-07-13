@@ -18,7 +18,7 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: 'stable'
-          cache: true  # فعال‌سازی کش برای Flutter SDK
+          cache: true
 
       - name: Cache Dart packages
         uses: actions/cache@v4
@@ -33,9 +33,19 @@ jobs:
         with:
           cache: true
 
-      # (اختیاری) هماهنگ‌سازی نسخه Kotlin با نیازمندی‌های Flutter 3.22
-      # اگر پروژهٔ شما از قبل Kotlin 1.8.10 دارد، این بخش را حذف کنید.
+      # ایجاد خودکار پوشهٔ android (و سایر پلتفرم‌های لازم) بدون تغییر کدهای موجود
+      - name: Create Android project files if missing
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create --platforms android .
+          fi
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # تنظیم نسخهٔ Kotlin (فقط در صورت وجود android)
       - name: Ensure Kotlin version compatibility
+        if: hashFiles('android/build.gradle') != ''
         run: |
           KOTLIN_VERSION="1.8.10"
           ROOT_BUILD="android/build.gradle"
@@ -48,7 +58,7 @@ jobs:
             echo "ext.kotlin_version = '$KOTLIN_VERSION'" >> "$ROOT_BUILD"
           fi
 
-          # اضافه کردن resolutionStrategy برای جلوگیری از تداخل نسخه‌ها
+          # resolutionStrategy
           if ! grep -q "resolutionStrategy" "$APP_BUILD"; then
             echo "
             configurations.all {
@@ -60,9 +70,6 @@ jobs:
             }" >> "$APP_BUILD"
           fi
 
-      - name: Install Flutter dependencies
-        run: flutter pub get
-
       - name: Build APK
         run: flutter build apk --release
 
@@ -71,5 +78,3 @@ jobs:
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
-   
-     
