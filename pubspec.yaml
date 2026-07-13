@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17' # فلتر نسخه‌های جدید نیاز به جاوا ۱۷ دارند
+          java-version: '17'
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
@@ -30,12 +30,24 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # 🔧 گام جدید: اطمینان از وجود محدودیت SDK در pubspec.yaml
+      - name: Ensure SDK constraint in pubspec.yaml
+        run: |
+          # اگر بخش environment وجود ندارد، آن را با sdk: '^3.4.0' اضافه کن
+          if ! grep -q '^environment:' pubspec.yaml; then
+            echo -e "\nenvironment:\n  sdk: '^3.4.0'" >> pubspec.yaml
+          # اگر environment وجود دارد ولی sdk ندارد، خط sdk را اضافه کن
+          elif ! grep -q '^\s*sdk:' pubspec.yaml; then
+            sed -i '/^environment:/a\  sdk: '\''^3.4.0'\''' pubspec.yaml
+          fi
+          echo "📄 pubspec.yaml after modification:"
+          cat pubspec.yaml
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .
-        # اگر کدی فرمت نشده باشد، این استپ FAIL می‌شود تا توسعه‌دهنده کد را مرتب کند
 
       - name: Analyze code
         run: flutter analyze
@@ -43,7 +55,7 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      # --- بخش بیلد آندروید ---
+      # --- بخش بیلد اندروید ---
       - name: Build APK Debug
         run: flutter build apk --debug
       
@@ -66,21 +78,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release-splits
-          # فقط فایل‌های APK ریلیز آپلود می‌شوند (هر ۳ معماری)
           path: build/app/outputs/flutter-apk/app-*-release.apk
 
       - name: Upload Debug Symbols
         uses: actions/upload-artifact@v4
         with:
           name: debug-symbols
-          # آپلود فایل سمبول برای دیکد کردن کرش‌های اوبفوسکیت شده
           path: build/symbols
 
   # --- جاب بیلد iOS (مجزا چون نیاز به رانر مک دارد) ---
   build-ios:
     name: Build iOS
     runs-on: macos-latest
-    # برای صرفه‌جویی در منابع گیت‌هاب، فقط وقتی روی برنچ main پوش می‌شود اجرا شود
     if: github.event_name == 'push'
 
     steps:
@@ -94,6 +103,18 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # 🔧 گام جدید: اطمینان از وجود محدودیت SDK در pubspec.yaml
+      - name: Ensure SDK constraint in pubspec.yaml
+        run: |
+          if ! grep -q '^environment:' pubspec.yaml; then
+            echo -e "\nenvironment:\n  sdk: '^3.4.0'" >> pubspec.yaml
+          elif ! grep -q '^\s*sdk:' pubspec.yaml; then
+            sed -i '' '/^environment:/a\
+  sdk: '\''^3.4.0'\''' pubspec.yaml
+          fi
+          echo "📄 pubspec.yaml after modification:"
+          cat pubspec.yaml
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -105,3 +126,4 @@ jobs:
         with:
           name: ios-build
           path: build/ios/iphoneos/Runner.app
+    
