@@ -29,7 +29,6 @@ dependencies:
   flutter_sound: ^9.2.5
   speech_to_text: ^6.4.0
   flutter_tts: ^4.0.0
-  fft: ^0.2.0   # اصلاح شد – نسخه‌ی موجود در pub.dev
 
   # Maps & Location
   google_maps_flutter: ^2.5.0
