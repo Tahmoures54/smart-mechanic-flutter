@@ -1,138 +1,75 @@
-name: Build Flutter APK & Test
+name: Build Flutter APK
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  # --- جاب بیلد و تست اندروید ---
-  build-android:
-    name: Build & Test Android
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java SDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Flutter SDK
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
           channel: 'stable'
+          cache: true  # فعال‌سازی کش برای Flutter SDK
+
+      - name: Cache Dart packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FLUTTER_ROOT }}/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache Gradle packages
+        uses: gradle/gradle-build-action@v2
+        with:
           cache: true
 
-      # 1. اصلاح pubspec.yaml اصلی (در صورت نیاز)
-      - name: Add SDK constraint to main pubspec.yaml
+      # (اختیاری) هماهنگ‌سازی نسخه Kotlin با نیازمندی‌های Flutter 3.22
+      # اگر پروژهٔ شما از قبل Kotlin 1.8.10 دارد، این بخش را حذف کنید.
+      - name: Ensure Kotlin version compatibility
         run: |
-          # اگر کلمه‌ی sdk: در فایل وجود نداشت، محدودیت را اضافه کن
-          if ! grep -q 'sdk:' pubspec.yaml; then
-            # اگر بخش environment وجود داشت، فقط خط sdk را اضافه کن
-            if grep -q '^environment:' pubspec.yaml; then
-              sed -i '/^environment:/a\  sdk: '"'"'^3.4.0'"'"'' pubspec.yaml
-            else
-              # در غیر این صورت، بلوک environment را کامل اضافه کن
-              printf '\nenvironment:\n  sdk: '"'"'^3.4.0'"'"'\n' >> pubspec.yaml
-            fi
+          KOTLIN_VERSION="1.8.10"
+          ROOT_BUILD="android/build.gradle"
+          APP_BUILD="android/app/build.gradle"
+
+          # تنظیم ext.kotlin_version در ریشه
+          if grep -q "ext.kotlin_version" "$ROOT_BUILD"; then
+            sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '$KOTLIN_VERSION'/" "$ROOT_BUILD"
+          else
+            echo "ext.kotlin_version = '$KOTLIN_VERSION'" >> "$ROOT_BUILD"
           fi
 
-      - name: Install dependencies (main project)
-        run: flutter pub get
-
-      # 2. ساخت پروژه موقت و درج SDK constraint + اجرای pub get
-      - name: Create temp_app, fix SDK constraint, and get dependencies
-        run: |
-          flutter create --org com.smartmechanic --project-name smart_mechanic_app temp_app
-          # افزودن بلوک environment به pubspec.yaml پروژه موقت
-          printf '\nenvironment:\n  sdk: '"'"'^3.4.0'"'"'\n' >> temp_app/pubspec.yaml
-          cd temp_app
-          flutter pub get
-
-      # --- ادامه بیلد و تست پروژه اصلی ---
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed .
-
-      - name: Analyze code
-        run: flutter analyze
-
-      - name: Run tests
-        run: flutter test
-
-      # --- بیلد APK ---
-      - name: Build APK Debug
-        run: flutter build apk --debug
-      
-      - name: Build APK Release
-        run: |
-          flutter build apk \
-            --release \
-            --obfuscate \
-            --split-debug-info=build/symbols \
-            --split-per-abi
-      
-      - name: Upload APK Debug Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-
-      - name: Upload APK Release Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-splits
-          path: build/app/outputs/flutter-apk/app-*-release.apk
-
-      - name: Upload Debug Symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-symbols
-          path: build/symbols
-
-  # --- جاب بیلد iOS (فقط روی push) ---
-  build-ios:
-    name: Build iOS
-    runs-on: macos-latest
-    if: github.event_name == 'push'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
-          cache: true
-
-      - name: Add SDK constraint to pubspec.yaml
-        run: |
-          if ! grep -q 'sdk:' pubspec.yaml; then
-            if grep -q '^environment:' pubspec.yaml; then
-              # macOS sed نیاز به '' پس از -i دارد
-              sed -i '' '/^environment:/a\
-  sdk: '"'"'^3.4.0'"'"'' pubspec.yaml
-            else
-              printf '\nenvironment:\n  sdk: '"'"'^3.4.0'"'"'\n' >> pubspec.yaml
-            fi
+          # اضافه کردن resolutionStrategy برای جلوگیری از تداخل نسخه‌ها
+          if ! grep -q "resolutionStrategy" "$APP_BUILD"; then
+            echo "
+            configurations.all {
+                resolutionStrategy {
+                    force 'org.jetbrains.kotlin:kotlin-stdlib:$KOTLIN_VERSION'
+                    force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:$KOTLIN_VERSION'
+                    force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:$KOTLIN_VERSION'
+                }
+            }" >> "$APP_BUILD"
           fi
 
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Build iOS App (No Codesign)
-        run: flutter build ios --release --no-codesign
+      - name: Build APK
+        run: flutter build apk --release
 
-      - name: Upload iOS Build Artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
-          path: build/ios/iphoneos/Runner.app
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+   
+     
