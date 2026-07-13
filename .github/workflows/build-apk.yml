@@ -40,19 +40,19 @@ jobs:
           fi
 
       # ==========================================
-      # این بخش اصلاح شده - نسخه کاتلین به 2.0.21 ارتقا یافت
-      - name: Fix Android build configurations (Kotlin & Gradle & SDK)
+      # بخش اصلاح شده - تغییرات در settings.gradle و build.gradle
+      - name: Fix Android build configurations
         run: |
-          # 1. آپدیت نسخه Kotlin به 2.0.21 (الزامی برای flutter 3.22+)
-          sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '2.0.21'/" android/build.gradle
+          # 1. آپدیت Kotlin در فایل settings.gradle (مخصوص فلاتر 3.22 به بالا)
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.0.21" apply false/' android/settings.gradle
           
-          # 2. آپدیت Android Gradle Plugin (AGP)
-          sed -i 's/com.android.tools.build:gradle:.*/com.android.tools.build:gradle:8.5.0/' android/build.gradle
+          # 2. آپدیت Android Gradle Plugin در فایل settings.gradle
+          sed -i 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle
           
           # 3. آپدیت خود Gradle Wrapper
           sed -i 's/gradle-.*-all.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
           
-          # 4. آپدیت compileSdkVersion
+          # 4. آپدیت compileSdkVersion در فایل app/build.gradle
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
       # ==========================================
 
