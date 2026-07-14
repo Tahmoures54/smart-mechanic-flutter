@@ -3,9 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http; // برای http.Client
 import 'providers/auth_provider.dart';
-import 'providers/diagnostic_provider.dart';
-import 'providers/locale_provider.dart';
+// حذف import های diagnostic_provider و locale_provider (فایل ندارند)
 import 'services/audio_service.dart';
 import 'services/ai_diagnostic_service.dart';
 import 'services/map_service.dart';
@@ -27,12 +27,16 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..checkAuthStatus()),
-        ChangeNotifierProvider(create: (_) => LocaleProvider(LocaleProvider.getDeviceLocale())),
-        ChangeNotifierProvider(create: (_) => DiagnosticProvider()),
+        // حذف LocaleProvider و DiagnosticProvider
         Provider<AudioService>.value(value: audioService),
-        Provider<AIDiagnosticService>(create: (_) => AIDiagnosticService()),
-        // TODO: کنترلر واقعی نقشه را هنگام در دسترس بودن تزریق کنید
-        Provider<MapService>(create: (_) => MapService(/* GoogleMapController? */)),
+        Provider<AIDiagnosticService>(
+          // تأمین httpClient مورد نیاز
+          create: (_) => AIDiagnosticService(httpClient: http.Client()),
+        ),
+        Provider<MapService>(
+          // ارسال null برای کنترلر نقشه (تا زمان دریافت واقعی)
+          create: (_) => MapService(null),
+        ),
       ],
       child: const SmartMechanicApp(),
     ),
@@ -44,11 +48,17 @@ class SmartMechanicApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localeProvider = Provider.of<LocaleProvider>(context);
+    // تنظیمات مستقیم بومی‌سازی به‌جای LocaleProvider
+    const Locale defaultLocale = Locale('fa', 'IR');
+    const List<Locale> supportedLocales = [
+      Locale('fa', 'IR'),
+      Locale('en', 'US'),
+    ];
+
     return MaterialApp(
       title: 'مکانیک هوشمند',
-      locale: localeProvider.locale,
-      supportedLocales: LocaleProvider.supportedLocales,
+      locale: defaultLocale,
+      supportedLocales: supportedLocales,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
