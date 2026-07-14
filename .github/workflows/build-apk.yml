@@ -39,22 +39,24 @@ jobs:
             flutter create --platforms android --project-name smart_mechanic .
           fi
 
-      # ==========================================
-      # بخش اصلاح شده - تغییرات در settings.gradle و build.gradle
       - name: Fix Android build configurations
         run: |
-          # 1. آپدیت Kotlin در فایل settings.gradle (مخصوص فلاتر 3.22 به بالا)
+          # 1. آپدیت Kotlin (2.0.21 برای فلاتر 3.22)
           sed -i 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.0.21" apply false/' android/settings.gradle
           
-          # 2. آپدیت Android Gradle Plugin در فایل settings.gradle
+          # 2. آپدیت Android Gradle Plugin
           sed -i 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle
           
-          # 3. آپدیت خود Gradle Wrapper
+          # 3. آپدیت Gradle Wrapper به 8.7
           sed -i 's/gradle-.*-all.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
           
-          # 4. آپدیت compileSdkVersion در فایل app/build.gradle
+          # 4. تنظیم compileSdkVersion = 36
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
-      # ==========================================
+          
+          # 5. اضافه‌کردن ndkVersion در صورتی که وجود نداشته باشد
+          if ! grep -q "ndkVersion" android/app/build.gradle; then
+            sed -i '/compileSdkVersion 36/a \    ndkVersion "26.1.10909125"' android/app/build.gradle
+          fi
 
       - name: Install Flutter dependencies
         run: flutter pub get
