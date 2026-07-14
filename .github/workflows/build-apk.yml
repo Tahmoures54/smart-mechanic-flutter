@@ -28,11 +28,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      - name: Cache Gradle packages
-        uses: gradle/gradle-build-action@v2
-        with:
-          cache: true
-
       - name: Create Android project files if missing
         run: |
           if [ ! -d "android" ]; then
@@ -41,7 +36,7 @@ jobs:
 
       - name: Force Fix Android Configurations
         run: |
-          # 1. آپدیت Kotlin به 2.1.0 (برای رفع باگ کامپایلر در flutter_tts)
+          # 1. آپدیت Kotlin به 2.1.0 
           sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.1.0" apply false/' android/settings.gradle
           sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle
           
@@ -60,7 +55,12 @@ jobs:
             sed -i '/compileSdk = 36/a \    ndkVersion = "26.1.10909125"' android/app/build.gradle
           fi
 
-          # 5. تزریق دسترسی‌های میکروفون و اینترنت
+          # 5. همگام‌سازی جاوا و کاتلین روی نسخه 17 (حل خطای Inconsistent JVM-target)
+          sed -i -E 's/VERSION_1_8/VERSION_17/g' android/app/build.gradle
+          sed -i -E "s/jvmTarget = '1.8'/jvmTarget = '17'/g" android/app/build.gradle
+          sed -i -E 's/jvmTarget = "1.8"/jvmTarget = "17"/g' android/app/build.gradle
+
+          # 6. تزریق دسترسی‌های میکروفون و اینترنت
           if ! grep -q "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml; then
             sed -i '/<manifest /a \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
           fi
