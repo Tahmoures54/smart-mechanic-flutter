@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final _storage = const FlutterSecureStorage();
-  final ApiService _apiService = ApiService();
+  final ApiService apiService; // تزریق وابستگی به جای ساخت نمونه جدید
+
+  AuthProvider(this.apiService);
 
   String? _token;
   int _credits = 0;
@@ -26,12 +29,12 @@ class AuthProvider with ChangeNotifier {
   Future<void> fetchProfile() async {
     if (_token == null) return;
     try {
-      final profile = await _apiService.getProfile(_token!);
+      final profile = await apiService.getProfile(_token!);
       _credits = profile['credits'] ?? 0;
-      _isGolden = profile['isGolden'] ?? false;
+      // ایمن‌سازی نام کلید بین کمل‌کیس و اسنیک‌کیس
+      _isGolden = profile['isGolden'] == true || profile['is_golden'] == true;
       notifyListeners();
     } catch (e) {
-      // If unauthorized, logout
       if (e.toString().contains('401')) {
         await logout();
       }
@@ -39,10 +42,10 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> login(String phone, String code) async {
-    final res = await _apiService.verifyOtp(phone, code);
+    final res = await apiService.verifyOtp(phone, code);
     _token = res['token'];
-    _credits = res['credits'];
-    _isGolden = res['isGolden'];
+    _credits = res['credits'] ?? 0;
+    _isGolden = res['isGolden'] == true || res['is_golden'] == true;
     await _storage.write(key: 'jwt_token', value: _token);
     notifyListeners();
   }
@@ -52,6 +55,13 @@ class AuthProvider with ChangeNotifier {
     _credits = 0;
     _isGolden = false;
     await _storage.delete(key: 'jwt_token');
+    
+    // پاک کردن دیتای آفلاین کاربر قبلی (بسیار مهم برای امنیت)
+    try {
+      await Hive.box('diagnostics').clear();
+      await Hive.box('history').clear();
+    } catch (_) {}
+    
     notifyListeners();
   }
 }
