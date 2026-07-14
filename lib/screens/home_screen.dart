@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/api_service.dart'; // شامل ApiException نیز هست
+import '../services/api_service.dart';
 import '../models/car.dart';
 import 'login_screen.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'result_screen.dart';
-import 'record_screen.dart'; // صفحهٔ ضبط صدا
+import 'record_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,11 +22,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final _descController = TextEditingController();
   bool _isLoading = false;
   bool _isLoadingCars = true;
+  bool _hasCarLoadError = false; // برای مدیریت خطای اینترنت در لیست ماشین‌ها
 
   @override
   void initState() {
     super.initState();
-    // بارگذاری خودروها پس از ساخته شدن ویجت
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadCars());
   }
 
@@ -36,25 +36,31 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // بهبود ۱ و ۲: اضافه شدن مدیریت خطای دقیق‌تر و امکان تلاش مجدد
   Future<void> _loadCars() async {
-    setState(() => _isLoadingCars = true);
+    setState(() {
+      _isLoadingCars = true;
+      _hasCarLoadError = false;
+    });
+    
     try {
       final api = context.read<ApiService>();
       final cars = await api.getCars();
       if (!mounted) return;
+      
       setState(() {
         _cars = cars;
         if (cars.isNotEmpty) {
-          _selectedCar = cars.first;
-        } else {
-          _selectedCar = null;
+          // اگر ماشینی از قبل انتخاب نشده بود، اولی را انتخاب کن
+          _selectedCar ??= cars.first; 
         }
       });
     } catch (e) {
       debugPrint('Error loading cars: $e');
       if (mounted) {
+        setState(() => _hasCarLoadError = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطا در دریافت لیست خودروها. لطفاً بعداً تلاش کنید.')),
+          const SnackBar(content: Text('خطا در دریافت لیست خودروها. اتصال اینترنت را بررسی کنید.')),
         );
       }
     } finally {
@@ -62,78 +68,101 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // بهبود ۳ و ۶: مدیریت صحیح Context بعد از Async و مدیریت خطای fetchProfile
   Future<void> _diagnose() async {
-    // بستن کیبورد برای دیدن بهتر نتیجه یا لودینگ (بهبود UX)
     FocusManager.instance.primaryFocus?.unfocus();
 
+    // ذخیره متغیرها قبل از عملیات async برای جلوگیری از خطای BuildContext
     final auth = context.read<AuthProvider>();
+    final api = context.read<ApiService>();
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (!auth.isAuthenticated) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      navigator.push(MaterialPageRoute(builder: (_) => const LoginScreen()));
       return;
     }
 
     if (_selectedCar == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('لطفاً ابتدا خودروی خود را انتخاب کنید.')),
       );
       return;
     }
 
-    // اعتبارسنجی دقیق تر طول متن
     if (_descController.text.trim().length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('لطفاً شرح خرابی را کامل‌تر (حداقل ۱۰ حرف) بنویسید.')),
       );
       return;
     }
 
     setState(() => _isLoading = true);
+    
     try {
-      final api = context.read<ApiService>();
       final result = await api.diagnose(
         auth.token!,
         _selectedCar!.id,
         _descController.text.trim(),
       );
 
+      // بهبود ۶: مدیریت خطای آپدیت پروفایل در پس‌زمینه
+      try {
+        await auth.fetchProfile();
+      } catch (e) {
+        debugPrint('Failed to refresh profile: $e');
+        // نیازی به متوقف کردن کاربر نیست، فقط پروفایل آپدیت نشده است
+      }
+
       if (!mounted) return;
-
-      // به‌روزرسانی موجودی اعتبار پس از تشخیص
-      auth.fetchProfile();
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ResultScreen(resultText: result),
-        ),
-      );
+      navigator.push(MaterialPageRoute(
+        builder: (_) => ResultScreen(resultText: result),
+      ));
+      
     } on ApiException catch (e) {
-      if (!mounted) return;
       if (e.statusCode == 402) {
         _showNoCreditDialog();
       } else if (e.statusCode == 401) {
         auth.logout();
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('نشست شما منقضی شده، لطفاً دوباره وارد شوید.')),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
-      if (!mounted) return;
-      debugPrint('Diagnose error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('خطای شبکه. اتصال اینترنت خود را بررسی کنید.')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // بهبود ۷: بررسی‌های قبل از ورود به صفحه ضبط صدا
+  void _onVoiceRecordTap() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final auth = context.read<AuthProvider>();
+
+    if (!auth.isAuthenticated) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      return;
+    }
+
+    if (_selectedCar == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لطفاً قبل از ضبط صدا، مدل خودرو را انتخاب کنید.')),
+      );
+      return;
+    }
+
+    if (!auth.isGolden && auth.credits <= 0) {
+      _showNoCreditDialog();
+      return;
+    }
+
+    // هدایت به صفحه ضبط صدا (در صورت نیاز می‌توانید _selectedCar را هم به آن پاس دهید)
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const RecordScreen()));
   }
 
   void _showNoCreditDialog() {
@@ -142,25 +171,24 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: theme.dialogBackgroundColor,
-        title: Text('اعتبار ناکافی',
-            style: TextStyle(color: theme.textTheme.titleLarge?.color)),
-        content: Text('برای پرسش سوال، نیاز به خرید اعتبار دارید.',
+        title: Text('اعتبار ناکافی', style: TextStyle(color: theme.textTheme.titleLarge?.color)),
+        content: Text('برای پرسش سوال و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
             style: theme.textTheme.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('انصراف'),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.secondary,
+              foregroundColor: theme.colorScheme.onSecondary,
+            ),
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ShopScreen()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
             },
-            child: Text('فروشگاه',
-                style: TextStyle(color: theme.colorScheme.secondary)),
+            child: const Text('تهیه اعتبار'),
           ),
         ],
       ),
@@ -173,37 +201,34 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
 
     return GestureDetector(
-      // اگر کاربر جای خالی کلیک کرد کیبورد بسته شود
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
-          title: const Text('مکانیک هوشمند'),
+          title: const Text('مکانیک هوشمند', style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+          elevation: 0,
           actions: [
             if (auth.isAuthenticated)
               IconButton(
                 icon: const Icon(Icons.history),
-                tooltip: 'تاریخچه',
+                tooltip: 'تاریخچه عیب‌یابی',
                 onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                  context, MaterialPageRoute(builder: (_) => const HistoryScreen()),
                 ),
               )
             else
               TextButton(
                 onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  context, MaterialPageRoute(builder: (_) => const LoginScreen()),
                 ),
-                child: Text('ورود',
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold)),
+                child: Text('ورود / ثبت‌نام',
+                    style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
         body: RefreshIndicator(
+          color: theme.colorScheme.secondary,
           onRefresh: _loadCars,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -211,35 +236,32 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // کارت اعتبار / اشتراک
                 if (auth.isAuthenticated) _buildCreditCard(auth, theme),
                 const SizedBox(height: 20),
 
-                // بخش انتخاب خودرو
-                Text('خودروی خود را انتخاب کنید:',
-                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+                Text('۱. خودروی خود را انتخاب کنید:',
+                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 _buildCarSelector(theme),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // شرح خرابی
-                Text('شرح خرابی:',
-                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold)),
+                Text('۲. شرح خرابی را بنویسید:',
+                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 _buildDescriptionField(theme),
 
                 const SizedBox(height: 24),
 
-                // دکمهٔ عیب‌یابی متنی
                 ElevatedButton.icon(
                   icon: _isLoading 
                       ? const SizedBox.shrink() 
-                      : const Icon(Icons.build_circle_outlined),
+                      : const Icon(Icons.build_circle_outlined, size: 28),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 4,
                   ),
                   onPressed: _isLoading ? null : _diagnose,
                   label: _isLoading
@@ -247,46 +269,52 @@ class _HomeScreenState extends State<HomeScreen> {
                           height: 24, width: 24,
                           child: CircularProgressIndicator(color: theme.colorScheme.onSecondary, strokeWidth: 3),
                         )
-                      : Text('عیب‌یابی از طریق متن',
+                      : Text('عیب‌یابی هوشمند (متنی)',
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onSecondary)),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 
-                // خط جداکننده زیبا
                 Row(
                   children: [
-                    Expanded(child: Divider(color: theme.hintColor.withOpacity(0.3), thickness: 1)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('یا', style: TextStyle(color: theme.hintColor)),
+                    Expanded(child: Divider(color: theme.hintColor.withOpacity(0.2), thickness: 1.5)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: theme.cardColor,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: theme.hintColor.withOpacity(0.2))
+                      ),
+                      child: Text('یا روش دقیق‌تر', style: TextStyle(color: theme.colorScheme.secondary, fontWeight: FontWeight.bold)),
                     ),
-                    Expanded(child: Divider(color: theme.hintColor.withOpacity(0.3), thickness: 1)),
+                    Expanded(child: Divider(color: theme.hintColor.withOpacity(0.2), thickness: 1.5)),
                   ],
                 ),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // دکمهٔ ضبط صدا (غیرفعال در زمان لودینگ بالا)
+                // استفاده از اکشن جدید با بررسی‌های امنیتی
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.mic, size: 28),
-                  label: const Text('شروع ضبط صدای خودرو'),
-                  onPressed: _isLoading ? null : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RecordScreen()),
-                  ),
+                  icon: const Icon(Icons.mic_none_rounded, size: 30),
+                  label: const Text('شروع ضبط صدای موتور / خودرو'),
+                  onPressed: _isLoading ? null : _onVoiceRecordTap,
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 60),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    backgroundColor: theme.colorScheme.surfaceVariant, // رنگ متمایز نسبت به دکمه بالا
-                    foregroundColor: theme.colorScheme.onSurfaceVariant,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5)),
+                    minimumSize: const Size(double.infinity, 65),
+                    textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    backgroundColor: theme.scaffoldBackgroundColor, 
+                    foregroundColor: theme.colorScheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    side: BorderSide(color: theme.colorScheme.primary, width: 2),
+                    elevation: 0,
                   ),
                 ),
+
+                const SizedBox(height: 36),
+                _buildPromoSection(theme),
+                const SizedBox(height: 30),
               ],
             ),
           ),
@@ -295,19 +323,83 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPromoSection(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.colorScheme.primary.withOpacity(0.15), Colors.black87],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.3), width: 1.5),
+        boxShadow: [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.05), blurRadius: 20, spreadRadius: 5)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified_user_rounded, color: theme.colorScheme.secondary, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('چرا مکانیک هوشمند؟',
+                  style: TextStyle(color: theme.colorScheme.secondary, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد.',
+            style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.9), fontSize: 14, height: 1.6),
+          ),
+          const SizedBox(height: 24),
+          _buildPromoItem(theme, icon: Icons.savings_rounded, title: 'جلوگیری از هزینه‌های میلیونی', desc: 'با تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب میلیونی وارد کند.'),
+          const SizedBox(height: 16),
+          _buildPromoItem(theme, icon: Icons.shield_rounded, title: 'دست مکانیک‌های متقلب را بخوانید!', desc: 'قبل از مراجعه به تعمیرگاه، مشکل واقعی را بدانید تا قطعات سالم را تعویض نکنند.'),
+          const SizedBox(height: 16),
+          _buildPromoItem(theme, icon: Icons.timer_rounded, title: 'صرفه‌جویی در وقت', desc: 'بدون نیاز به گشتن در تعمیرگاه‌ها، در کمتر از ۱۰ ثانیه مشکل را پیدا کنید.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromoItem(ThemeData theme, {required IconData icon, required String title, required String desc}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: theme.cardColor.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: Colors.white70, size: 24),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+              const SizedBox(height: 4),
+              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, height: 1.4)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildCreditCard(AuthProvider auth, ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: auth.isGolden ? Colors.amber[800] : theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        gradient: LinearGradient(
+          colors: auth.isGolden ? [Colors.amber.shade700, Colors.orange.shade900] : [theme.cardColor, theme.cardColor.withOpacity(0.8)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: auth.isGolden ? Colors.amberAccent : theme.dividerColor, width: auth.isGolden ? 1.5 : 1),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -315,20 +407,22 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Row(
               children: [
-                Icon(
-                  auth.isGolden ? Icons.star : Icons.account_balance_wallet,
-                  color: auth.isGolden ? Colors.white : theme.colorScheme.secondary,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                  child: Icon(auth.isGolden ? Icons.workspace_premium_rounded : Icons.account_balance_wallet_rounded, color: Colors.white, size: 28),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    auth.isGolden
-                        ? 'اشتراک طلایی فعال است'
-                        : 'اعتبار شما: ${auth.credits} سوال',
-                    style: TextStyle(
-                      color: theme.textTheme.bodyLarge?.color,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(auth.isGolden ? 'اشتراک طلایی (نامحدود)' : 'موجودی اعتبار شما',
+                        style: TextStyle(color: auth.isGolden ? Colors.white : theme.textTheme.bodySmall?.color, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text(auth.isGolden ? 'فعال می‌باشد' : '${auth.credits} بار عیب‌یابی',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
                   ),
                 ),
               ],
@@ -337,14 +431,11 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!auth.isGolden)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.secondary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                backgroundColor: theme.colorScheme.secondary, foregroundColor: theme.colorScheme.onSecondary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 0,
               ),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ShopScreen()),
-              ),
-              child: const Text('ارتقا / خرید'),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopScreen())),
+              child: const Text('شارژ حساب', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
         ],
       ),
@@ -353,48 +444,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCarSelector(ThemeData theme) {
     if (_isLoadingCars) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(8.0),
-          child: CircularProgressIndicator(),
+      return Container(
+        height: 60, decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_hasCarLoadError) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.5))),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(child: Text('خطا در بارگذاری خودروها', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
+            TextButton.icon(
+              icon: const Icon(Icons.refresh, size: 18), label: const Text('تلاش مجدد'),
+              onPressed: _loadCars,
+            )
+          ],
         ),
       );
     }
 
     if (_cars.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Text(
-            'هیچ خودرویی یافت نشد.\nبرای بارگذاری مجدد، انگشت خود را به پایین بکشید.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: theme.hintColor),
-          ),
+      return Container(
+        padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
+        child: Text('هیچ خودرویی یافت نشد.\nبرای بارگذاری مجدد، صفحه را به پایین بکشید.',
+          textAlign: TextAlign.center, style: TextStyle(color: theme.hintColor),
         ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.5)),
-        borderRadius: BorderRadius.circular(12),
-        color: theme.cardColor,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(border: Border.all(color: theme.dividerColor), borderRadius: BorderRadius.circular(16), color: theme.cardColor),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Car>(
-          dropdownColor: theme.cardColor,
-          value: _selectedCar,
-          isExpanded: true,
-          icon: Icon(Icons.directions_car, color: theme.colorScheme.secondary),
+          dropdownColor: theme.scaffoldBackgroundColor, value: _selectedCar, isExpanded: true,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.secondary),
           hint: const Text('خودرویی انتخاب نشده'),
           items: _cars.map((car) {
             return DropdownMenuItem<Car>(
-              value: car,
-              child: Text(
-                car.fullName,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w500),
-              ),
+              value: car, child: Text(car.fullName, style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w600, fontSize: 15)),
             );
           }).toList(),
           onChanged: (val) => setState(() => _selectedCar = val),
@@ -405,21 +497,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDescriptionField(ThemeData theme) {
     return TextField(
-      controller: _descController,
-      maxLines: 5,
-      maxLength: 300, // محدودیت طول کاراکتر تا الکی دیتای سنگین سرور ارسال نشود
-      style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+      controller: _descController, maxLines: 4, maxLength: 300,
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color, height: 1.5),
       decoration: InputDecoration(
-        hintText: 'مثلاً: ماشین موقع استارت زدن در هوای سرد صدای تق تق میده...',
-        hintStyle: TextStyle(color: theme.hintColor),
-        filled: true,
-        fillColor: theme.cardColor,
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: theme.dividerColor)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: theme.colorScheme.secondary, width: 2)),
+        hintText: 'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین یه صدای تق تق میده و ریپ میزنه...',
+        hintStyle: TextStyle(color: theme.hintColor, fontSize: 14), filled: true, fillColor: theme.cardColor, contentPadding: const EdgeInsets.all(16),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
       ),
     );
   }
