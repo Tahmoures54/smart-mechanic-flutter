@@ -39,16 +39,16 @@ jobs:
             flutter create --platforms android --project-name smart_mechanic .
           fi
 
-      - name: Force Fix Android Configurations (Flutter 3.22 Syntax)
+      - name: Force Fix Android Configurations
         run: |
-          # 1. آپدیت Kotlin و Gradle Plugin
-          sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.0.21" apply false/' android/settings.gradle
+          # 1. آپدیت Kotlin به 2.1.0 (برای رفع باگ کامپایلر در flutter_tts)
+          sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.1.0" apply false/' android/settings.gradle
           sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle
           
           # 2. آپدیت Gradle Wrapper
           sed -i -E 's/gradle-[0-9\.]+-all\.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
           
-          # 3. جستجو و جایگزینی هوشمند SDK (حل قطعی مشکل)
+          # 3. جستجو و جایگزینی هوشمند SDK
           sed -i -E 's/^.*compileSdk.*$/    compileSdk = 36/g' android/app/build.gradle
           sed -i -E 's/^.*minSdk.*$/    minSdk = 24/g' android/app/build.gradle
           sed -i -E 's/^.*targetSdk.*$/    targetSdk = 36/g' android/app/build.gradle
