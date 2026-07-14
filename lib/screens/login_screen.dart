@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; // این خط برای رفع خطای TapGestureRecognizer اضافه شد
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _unfocus() => FocusScope.of(context).unfocus();
 
-  // نمایش گفتگوی سلب مسئولیت
   void _showDisclaimerDialog() {
     showDialog(
       context: context,
@@ -55,7 +54,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendOtp() async {
     _unfocus();
 
-    if (_phoneController.text.length < 10 || !_phoneController.text.startsWith('09')) {
+    // شماره موبایل در ایران باید دقیقاً ۱۱ رقم باشد
+    if (_phoneController.text.length != 11 || !_phoneController.text.startsWith('09')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لطفاً یک شماره موبایل معتبر (۱۱ رقمی) وارد کنید.')),
       );
@@ -65,9 +65,11 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await context.read<ApiService>().sendOtp(_phoneController.text);
+      if (!mounted) return; // جلوگیری از کرش فلاتر
       setState(() => _codeSent = true);
     } catch (e) {
       debugPrint('Send OTP Error: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('خطا در ارسال کد. لطفاً اینترنت خود را بررسی کرده و دوباره تلاش کنید.')),
       );
@@ -92,9 +94,11 @@ class _LoginScreenState extends State<LoginScreen> {
             _phoneController.text,
             _codeController.text,
           );
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      Navigator.pop(context);
     } catch (e) {
       debugPrint('Verify OTP Error: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('کد تایید اشتباه است یا منقضی شده است.')),
       );
@@ -124,28 +128,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _phoneController,
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                 keyboardType: TextInputType.phone,
+                maxLength: 11, // محدود کردن تایپ به 11 رقم
                 decoration: InputDecoration(
                   labelText: 'شماره موبایل',
                   labelStyle: TextStyle(color: primaryColor),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: primaryColor)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: primaryColor)),
+                  counterText: "", // مخفی کردن شمارنده زیر تکست فیلد
                 ),
               ),
               const SizedBox(height: 8),
-              // متن پذیرش شرایط
               RichText(
                 text: TextSpan(
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                   children: [
                     const TextSpan(text: 'با وارد کردن شماره و ادامه، '),
                     TextSpan(
-                      text: 'شرایط استفاده و سلب مسئولیت',
-                      style: TextStyle(
-                        color: primaryColor,
-                        decoration: TextDecoration.underline,
-                      ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = _showDisclaimerDialog,
+                      text: 'شرایط استفاده',
+                      style: TextStyle(color: primaryColor, decoration: TextDecoration.underline),
+                      recognizer: TapGestureRecognizer()..onTap = _showDisclaimerDialog,
                     ),
                     const TextSpan(text: ' را می‌پذیرم.'),
                   ],
@@ -159,11 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 onPressed: _isLoading ? null : _sendOtp,
                 child: _isLoading
-                    ? SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(color: theme.colorScheme.onPrimary),
-                      )
+                    ? SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: theme.colorScheme.onPrimary))
                     : Text('ارسال کد', style: TextStyle(color: theme.colorScheme.onPrimary)),
               ),
             ] else ...[
@@ -171,11 +168,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _codeController,
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                 keyboardType: TextInputType.number,
+                maxLength: 5, // معمولا کدها 5 رقمی هستند
                 decoration: InputDecoration(
                   labelText: 'کد تایید',
                   labelStyle: TextStyle(color: primaryColor),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: primaryColor)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: primaryColor)),
+                  counterText: "",
                 ),
               ),
               const SizedBox(height: 20),
@@ -186,11 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 onPressed: _isLoading ? null : _verifyOtp,
                 child: _isLoading
-                    ? SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(color: theme.colorScheme.onPrimary),
-                      )
+                    ? SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: theme.colorScheme.onPrimary))
                     : Text('ورود', style: TextStyle(color: theme.colorScheme.onPrimary)),
               ),
               const SizedBox(height: 12),
