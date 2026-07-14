@@ -23,12 +23,15 @@ class Diagnostic {
   });
 
   factory Diagnostic.fromJson(Map<String, dynamic> json) {
+    // بک‌اند ممکن است تاریخ را با کلیدهای مختلفی بفرستد
+    final String? dateString = json['timestamp'] ?? json['createdAt'] ?? json['created_at'];
+
     return Diagnostic(
       id: (json['id'] ?? '').toString(),
       carId: json['carId'] ?? '',
       car: json['car'] != null ? Car.fromJson(json['car']) : null,
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'])
+      timestamp: dateString != null 
+          ? DateTime.tryParse(dateString) ?? DateTime.now()
           : DateTime.now(),
       description: json['description'],
       result: json['result'],
