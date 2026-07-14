@@ -37,7 +37,9 @@ class ApiService {
   void _ensureSuccess(http.Response response, {String? defaultError}) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final data = _parseResponseBody(response);
-      final errorMessage = data is Map ? (data['error'] ?? defaultError ?? 'خطای ناشناخته') : (defaultError ?? 'خطای ناشناخته');
+      final errorMessage = data is Map
+          ? (data['error'] ?? defaultError ?? 'خطای ناشناخته')
+          : (defaultError ?? 'خطای ناشناخته');
       throw ApiException(response.statusCode, errorMessage.toString());
     }
   }
@@ -67,7 +69,6 @@ class ApiService {
   }
 
   /// تأیید کد OTP و دریافت توکن
-  /// پیشنهاد: به جای Map، یک Model اختصاصی (مثل AuthModel) برگردانید
   Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
     final response = await _httpClient
         .post(
@@ -82,7 +83,6 @@ class ApiService {
   }
 
   /// دریافت پروفایل کاربر (موجودی اعتبار و...)
-  /// پیشنهاد: به جای Map، یک UserModel برگردانید
   Future<Map<String, dynamic>> getProfile(String token) async {
     final response = await _httpClient
         .get(
@@ -111,7 +111,6 @@ class ApiService {
     _ensureSuccess(response, defaultError: 'خطا در عیب‌یابی');
     
     final data = _parseResponseBody(response) as Map<String, dynamic>;
-    // مدیریت ایمن کلید result
     if (data['result'] == null) {
       throw ApiException(500, 'سرور نتیجه عیب‌یابی را برنگرداند.');
     }
@@ -120,7 +119,6 @@ class ApiService {
 
   /// دریافت تاریخچهٔ عیب‌یابی‌های کاربر
   Future<List<Diagnostic>> getHistory(String token) async {
-    // استفاده صحیح از Uri برای مدیریت کوئری پارامترها
     final uri = Uri.parse('${Constants.baseUrl}/api/diagnose').replace(
       queryParameters: {'history': 'true'},
     );
@@ -155,4 +153,4 @@ class ApiService {
     }
     return data['paymentUrl'].toString();
   }
-}﻿
+}
