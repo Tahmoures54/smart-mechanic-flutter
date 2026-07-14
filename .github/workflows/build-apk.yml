@@ -50,9 +50,10 @@ jobs:
           # 3. آپدیت Gradle Wrapper به 8.7
           sed -i 's/gradle-.*-all.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
           
-          # 4. تنظیم compileSdkVersion و targetSdkVersion روی 36
+          # 4. تنظیم مقادیر SDK (حل مشکل اصلی خطای بیلد)
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
           sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/' android/app/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' android/app/build.gradle
           
           # 5. اضافه‌کردن ndkVersion
           if ! grep -q "ndkVersion" android/app/build.gradle; then
