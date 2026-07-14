@@ -28,7 +28,10 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()..checkAuthStatus()),
         Provider<AudioService>.value(value: audioService),
         Provider<AIDiagnosticService>(
-          create: (_) => AIDiagnosticService(httpClient: http.Client()),
+          create: (_) => AIDiagnosticService(
+            httpClient: http.Client(),
+            apiKey: '', // TODO: کلید API واقعی خود را اینجا قرار دهید
+          ),
         ),
         Provider<MapService>(
           create: (_) => MapService(null),
@@ -70,7 +73,7 @@ class SmartMechanicApp extends StatelessWidget {
         brightness: Brightness.dark,
         primaryColor: Colors.orange,
         scaffoldBackgroundColor: Colors.black,
-        colorScheme: ColorScheme.dark(
+        colorScheme: const ColorScheme.dark(
           primary: Colors.orange,
           secondary: Colors.amber,
         ),
@@ -83,3 +86,4 @@ class SmartMechanicApp extends StatelessWidget {
     );
   }
 }
+ 
