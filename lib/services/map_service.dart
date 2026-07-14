@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart'; // برای رفع خطای debugPrint اضافه شد
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:http/http.dart' as http;
 
 class Garage {
   final String name;
@@ -17,30 +18,53 @@ class Garage {
 }
 
 class PlacesService {
-  final GooglePlacesFlutter _placesClient;
+  final String apiKey;
+  final http.Client _httpClient;
 
-  PlacesService(this._placesClient);
+  // دریافت کلید API گوگل و کلاینت HTTP
+  PlacesService({required this.apiKey, http.Client? httpClient}) 
+      : _httpClient = httpClient ?? http.Client();
 
   Future<List<Garage>> findNearbyGarages(LatLng userLocation) async {
-    try {
-      final response = await _placesClient.nearbySearch(
-        LatLng(userLocation.latitude, userLocation.longitude),
-        radius: 500,
-        type: 'car_repair',
-      );
+    if (apiKey.isEmpty) {
+      debugPrint('Error: Google Maps API Key is missing.');
+      return [];
+    }
 
-      return response.results
-          .where((place) => place.name != null && place.name!.isNotEmpty)
-          .map((place) => Garage(
-                name: place.name!,
-                address: place.vicinity,
-                rating: place.rating,
-                location: LatLng(
-                  place.geometry.location.lat,
-                  place.geometry.location.lng,
-                ),
-              ))
-          .toList();
+    // آدرس مستقیم API گوگل برای پیدا کردن مکان‌های اطراف (تعمیرگاه‌ها)
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
+      '?location=${userLocation.latitude},${userLocation.longitude}'
+      '&radius=500'
+      '&type=car_repair'
+      '&key=$apiKey'
+    );
+
+    try {
+      final response = await _httpClient.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final results = data['results'] as List;
+
+        return results.where((place) {
+          return place['name'] != null && place['geometry']?['location'] != null;
+        }).map((place) {
+          final location = place['geometry']['location'];
+          return Garage(
+            name: place['name'],
+            address: place['vicinity'],
+            rating: (place['rating'] as num?)?.toDouble(),
+            location: LatLng(
+              location['lat'].toDouble(),
+              location['lng'].toDouble(),
+            ),
+          );
+        }).toList();
+      } else {
+        debugPrint('Google Places API Error: Status Code ${response.statusCode}');
+        return [];
+      }
     } catch (e) {
       debugPrint('Error fetching nearby garages: $e');
       rethrow;
