@@ -36,12 +36,14 @@ class _RecordScreenState extends State<RecordScreen> {
           _isProcessing = true;
         });
         
-        final filePath = await audioService.stopRecording();
-        if (filePath == null) {
+        // در کدهای جدید شما این متد یک File? برمی‌گرداند
+        final file = await audioService.stopRecording();
+        if (file == null) {
           throw Exception('فایل صوتی ذخیره نشد.');
         }
 
-        final AudioFeatures features = await soundAnalyzer.analyze(filePath);
+        // ارسال مسیر فایل به موتور تحلیل‌گر
+        final AudioFeatures features = await soundAnalyzer.analyze(file.path);
 
         if (!mounted) return;
         
