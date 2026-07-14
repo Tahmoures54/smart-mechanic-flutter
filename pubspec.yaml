@@ -53,3 +53,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# اجبار سرور به دانلود آخرین نسخه پلتفرم‌ها برای رفع خطای startStream
+dependency_overrides:
+  record_linux: ^0.8.2
+  record_platform_interface: ^1.4.0
