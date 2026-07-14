@@ -25,14 +25,12 @@ dependencies:
   http: ^1.1.0
 
   # Audio & Speech
-  record: ^5.0.5
   flutter_sound: ^9.2.5
   speech_to_text: ^6.4.0
   flutter_tts: ^4.0.0
 
   # Maps & Location
   google_maps_flutter: ^2.5.0
-  google_places_flutter: ^2.0.0
   geolocator: ^10.1.0
 
   # UI & Utilities
@@ -53,8 +51,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-# اجبار سرور به دانلود آخرین نسخه پلتفرم‌ها برای رفع خطای startStream
-dependency_overrides:
-  record_linux: ^0.8.2
-  record_platform_interface: ^1.4.0
