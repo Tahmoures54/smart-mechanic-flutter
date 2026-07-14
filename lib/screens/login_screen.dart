@@ -18,21 +18,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    // رفع نشتی حافظه
     _phoneController.dispose();
     _codeController.dispose();
     super.dispose();
   }
 
-  /// بستن کیبورد
-  void _unfocus() {
-    FocusScope.of(context).unfocus();
+  void _unfocus() => FocusScope.of(context).unfocus();
+
+  // نمایش گفتگوی سلب مسئولیت
+  void _showDisclaimerDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('شرایط استفاده و سلب مسئولیت'),
+        content: SingleChildScrollView(
+          child: Text(
+            'با استفاده از اپلیکیشن «مکانیک هوشمند»، شما تأیید می‌کنید که این برنامه صرفاً یک '
+            'ابزار کمکی و اطلاعاتی است و تشخیص‌های آن به هیچ وجه جایگزین نظر مکانیک متخصص نیست.\n\n'
+            'هرگونه اقدام، تعمیر یا خسارت ناشی از اعتماد به نتایج این برنامه کاملاً بر عهده کاربر است '
+            'و توسعه‌دهنده(گان) هیچ مسئولیتی در قبال آن ندارند.\n\n'
+            'برای اطلاعات بیشتر لطفاً فایل DISCLAIMER.md موجود در صفحه پروژه را مطالعه کنید.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('متوجه شدم'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _sendOtp() async {
     _unfocus();
-    
-    // اعتبارسنجی با بازخورد به کاربر
+
     if (_phoneController.text.length < 10 || !_phoneController.text.startsWith('09')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لطفاً یک شماره موبایل معتبر (۱۱ رقمی) وارد کنید.')),
@@ -42,7 +63,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // استفاده از Provider برای دریافت سرویس
       await context.read<ApiService>().sendOtp(_phoneController.text);
       setState(() => _codeSent = true);
     } catch (e) {
@@ -57,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _verifyOtp() async {
     _unfocus();
-    
+
     if (_codeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لطفاً کد تایید را وارد کنید.')),
@@ -71,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _phoneController.text,
             _codeController.text,
           );
-      if (mounted) Navigator.pop(context); // بستن صفحه بعد از ورود موفق
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       debugPrint('Verify OTP Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,11 +130,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: primaryColor)),
                 ),
               ),
+              const SizedBox(height: 8),
+              // متن پذیرش شرایط
+              RichText(
+                text: TextSpan(
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  children: [
+                    const TextSpan(text: 'با وارد کردن شماره و ادامه، '),
+                    TextSpan(
+                      text: 'شرایط استفاده و سلب مسئولیت',
+                      style: TextStyle(
+                        color: primaryColor,
+                        decoration: TextDecoration.underline,
+                      ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = _showDisclaimerDialog,
+                    ),
+                    const TextSpan(text: ' را می‌پذیرم.'),
+                  ],
+                ),
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
-                  minimumSize: const Size(double.infinity, 45), // دکمه تمام عرض
+                  minimumSize: const Size(double.infinity, 45),
                 ),
                 onPressed: _isLoading ? null : _sendOtp,
                 child: _isLoading
@@ -153,7 +193,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     : Text('ورود', style: TextStyle(color: theme.colorScheme.onPrimary)),
               ),
               const SizedBox(height: 12),
-              // دکمه بازگشت برای اصلاح شماره
               TextButton(
                 onPressed: _isLoading ? null : () => setState(() => _codeSent = false),
                 child: const Text('تغییر شماره موبایل'),
