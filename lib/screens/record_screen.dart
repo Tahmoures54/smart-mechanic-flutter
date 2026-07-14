@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
-// import '../models/audio_features.dart'; // غیرفعال شد تا با مدل داخل sound_analyzer تداخل نکند
+import '../models/audio_features.dart';
 import 'result_screen.dart';
 
 class RecordScreen extends StatefulWidget {
@@ -19,7 +19,6 @@ class _RecordScreenState extends State<RecordScreen> {
 
   @override
   void dispose() {
-    // اطمینان از توقف ضبط در صورت خروج ناگهانی
     if (_isRecording) {
       context.read<AudioService>().stopRecording(); // ignore: use_build_context_synchronously
     }
@@ -31,7 +30,6 @@ class _RecordScreenState extends State<RecordScreen> {
     final soundAnalyzer = context.read<SoundAnalyzer>();
 
     if (_isRecording) {
-      // توقف ضبط و تحلیل صدا
       try {
         setState(() {
           _isRecording = false;
@@ -43,12 +41,10 @@ class _RecordScreenState extends State<RecordScreen> {
           throw Exception('فایل صوتی ذخیره نشد.');
         }
 
-        // تحلیل صدا (حالا بدون خطا اجرا می‌شود چون متد به async تغییر یافت)
-        final features = await soundAnalyzer.analyze(filePath);
+        final AudioFeatures features = await soundAnalyzer.analyze(filePath);
 
         if (!mounted) return;
         
-        // هدایت به صفحه نتیجه با ویژگی‌های صوتی
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -67,7 +63,6 @@ class _RecordScreenState extends State<RecordScreen> {
         }
       }
     } else {
-      // شروع ضبط
       try {
         await audioService.startRecording();
         setState(() {
