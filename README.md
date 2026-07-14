@@ -1,0 +1,57 @@
+# 🚗 Smart Mechanic
+
+<div align="center">
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.4-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+[![Android](https://img.shields.io/badge/Android-API_36-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+**عیب‌یابی هوشمند خودرو با کمک هوش مصنوعی، تحلیل صدا و واقعیت افزوده**
+
+</div>
+
+---
+
+## 📸 پیش‌نمایش
+
+<p align="center">
+  <img src="screenshots/home.png" width="200" alt="صفحه اصلی"/>
+  <img src="screenshots/diagnose.png" width="200" alt="نتیجه عیب‌یابی"/>
+  <img src="screenshots/record.png" width="200" alt="ضبط صدا"/>
+  <img src="screenshots/map.png" width="200" alt="تعمیرگاه‌های نزدیک"/>
+</p>
+
+---
+
+## ✨ ویژگی‌های کلیدی
+
+- **🧠 عیب‌یابی با هوش مصنوعی**  
+  شرح مشکل خودرو را به‌صورت متنی وارد کنید تا مدل AI تشخیص دقیق، علل احتمالی و راه‌حل‌های پیشنهادی را ارائه دهد.
+
+- **🎤 ضبط و تحلیل صدای موتور**  
+  صدای موتور را ضبط کنید. ویژگی‌های صوتی مانند RMS، فرکانس غالب، مرکز طیف و نمودار فرکانس استخراج و برای تشخیص دقیق‌تر استفاده می‌شود.
+
+- **📍 یافتن تعمیرگاه‌های نزدیک**  
+  با استفاده از Google Places API، تعمیرگاه‌های اطراف شما نمایش داده می‌شوند و می‌توانید مستقیماً روی نقشه مشاهده کنید.
+
+- **🔐 احراز هویت با OTP**  
+  ورود و ثبت‌نام با شماره موبایل و کد یکبارمصرف (OTP) پیاده‌سازی شده است.
+
+- **💳 سیستم اعتبار و پرداخت**  
+  کاربران می‌توانند بسته‌های اعتباری خریداری کنند یا اشتراک طلایی را برای استفاده نامحدود فعال کنند.
+
+- **📋 تاریخچه عیب‌یابی‌ها**  
+  تمام تشخیص‌های قبلی شما ذخیره شده و قابل مرور هستند.
+
+- **🌙 تم تاریک و فونت وزیرمتن**  
+  طراحی مدرن با تم تاریک و فونت فارسی وزیرمتن برای تجربه کاربری بهتر.
+
+- **🔄 پشتیبانی از Pull-to-Refresh**  
+  در لیست‌ها و داده‌ها، با کشیدن انگشت به پایین، اطلاعات به‌روز می‌شوند.
+
+---
+
+## 🧱 معماری پروژه
+
+پروژه از **Provider** به عنوان مدیریت حالت و **Clean Architecture** ساده‌شده استفاده می‌کند. لایه‌ها:
