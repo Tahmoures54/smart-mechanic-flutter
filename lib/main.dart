@@ -22,10 +22,16 @@ void main() async {
   final audioService = AudioService();
   await audioService.init();
 
+  // ساخت یک نمونه واحد از ApiService برای استفاده در کل اپلیکیشن
+  final apiService = ApiService(httpClient: http.Client());
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..checkAuthStatus()),
+        Provider<ApiService>.value(value: apiService), // معرفی به کل اپ
+        // پاس دادن apiService به AuthProvider
+        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)..checkAuthStatus()),
+        
         Provider<AudioService>.value(value: audioService),
         Provider<AIDiagnosticService>(
           create: (_) => AIDiagnosticService(
@@ -35,9 +41,6 @@ void main() async {
         ),
         Provider<MapService>(
           create: (_) => MapService(null),
-        ),
-        Provider<ApiService>(
-          create: (_) => ApiService(httpClient: http.Client()),
         ),
         Provider<SoundAnalyzer>(
           create: (_) => SoundAnalyzer(),
@@ -85,5 +88,4 @@ class SmartMechanicApp extends StatelessWidget {
       home: const HomeScreen(),
     );
   }
-}
- 
+} 
