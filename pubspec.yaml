@@ -26,7 +26,6 @@ dependencies:
 
   # Audio & Speech
   record: ^5.0.5
-  fft: ^1.1.2
   flutter_sound: ^9.2.5
   speech_to_text: ^6.4.0
   flutter_tts: ^4.0.0
