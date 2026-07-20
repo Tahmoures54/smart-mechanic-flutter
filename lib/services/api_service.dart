@@ -19,11 +19,9 @@ class ApiService {
   final http.Client _httpClient;
   final Duration _timeout = const Duration(seconds: 15);
 
-  // تزریق وابستگی: برای تست‌پذیری و استفاده از Connection Pool
   ApiService({http.Client? httpClient}) 
       : _httpClient = httpClient ?? http.Client();
 
-  // هدرهای پیش‌فرض (Accept برای Next.js بسیار مهم است)
   Map<String, String> _getHeaders([String? token]) {
     final headers = {
       'Content-Type': 'application/json',
@@ -35,7 +33,6 @@ class ApiService {
     return headers;
   }
 
-  /// متد کمکی برای دیکد کردن ایمن بدنه پاسخ
   dynamic _parseResponseBody(http.Response response) {
     if (response.body.isEmpty) return {};
     try {
@@ -48,10 +45,12 @@ class ApiService {
     }
   }
 
-  /// متد متمرکز برای مدیریت خطاها
+  /// متد متمرکز برای بررسی موفقیت درخواست و استخراج پیام‌های خطای بک‌اَند ما
   void _ensureSuccess(http.Response response, {String? defaultError}) {
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final data = _parseResponseBody(response);
+    final data = _parseResponseBody(response);
+    
+    // اگر بک‌اَند صراحتاً گفت success: false است یا وضعیت HTTP ارور بود
+    if (response.statusCode >= 400 || (data is Map && data['success'] == false)) {
       final errorMessage = data is Map
           ? (data['error'] ?? data['message'] ?? defaultError ?? 'خطای سرور')
           : (defaultError ?? 'خطای ناشناخته از سمت سرور');
@@ -59,7 +58,6 @@ class ApiService {
     }
   }
 
-  /// متد محافظت‌شده برای جلوگیری از کرش کردن اپلیکیشن در صورت قطعی اینترنت
   Future<http.Response> _safeApiCall(Future<http.Response> Function() apiCall) async {
     try {
       return await apiCall();
@@ -77,17 +75,11 @@ class ApiService {
   // API ENDPOINTS
   // =====================================================================
 
-  /// دریافت لیست خودروها از فایل JSON عمومی سرور
-  /// از آنجا که فایل در پوشه public است، نیازی به پسوند /api ندارد
   Future<List<Car>> getCars() async {
-    // حذف کردن پیشوند /api برای خواندن مستقیم از پوشه public
     final publicBaseUrl = Constants.baseUrl.replaceAll('/api', '');
     
     final response = await _safeApiCall(() => _httpClient
-        .get(
-          Uri.parse('$publicBaseUrl/cars.json'),
-          headers: {'Accept': 'application/json'},
-        )
+        .get(Uri.parse('$publicBaseUrl/cars.json'), headers: {'Accept': 'application/json'})
         .timeout(_timeout));
 
     _ensureSuccess(response, defaultError: 'خطا در دریافت لیست خودروها');
@@ -100,7 +92,6 @@ class ApiService {
     return data.map((json) => Car.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  /// ارسال کد یکبارمصرف (OTP) به شماره موبایل
   Future<void> sendOtp(String phone) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
@@ -113,7 +104,6 @@ class ApiService {
     _ensureSuccess(response, defaultError: 'خطا در ارسال پیامک');
   }
 
-  /// تأیید کد OTP و دریافت توکن
   Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
@@ -127,20 +117,15 @@ class ApiService {
     return _parseResponseBody(response) as Map<String, dynamic>;
   }
 
-  /// دریافت پروفایل کاربر (موجودی اعتبار و...)
   Future<Map<String, dynamic>> getProfile(String token) async {
     final response = await _safeApiCall(() => _httpClient
-        .get(
-          Uri.parse(Constants.credits),
-          headers: _getHeaders(token),
-        )
+        .get(Uri.parse(Constants.credits), headers: _getHeaders(token))
         .timeout(_timeout));
 
     _ensureSuccess(response, defaultError: 'خطا در دریافت اطلاعات کاربری');
     return _parseResponseBody(response) as Map<String, dynamic>;
   }
 
-  /// ارسال شرح مشکل و دریافت نتیجهٔ عیب‌یابی
   Future<String> diagnose(String token, String carId, String description) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
@@ -153,28 +138,28 @@ class ApiService {
     _ensureSuccess(response, defaultError: 'خطا در عیب‌یابی ماشین');
     
     final data = _parseResponseBody(response) as Map<String, dynamic>;
-    if (data['result'] == null) {
-      throw ApiException(500, 'سرور نتیجه عیب‌یابی را برنگرداند.');
+    
+    // خواندن نتیجه از داخل آبجکت data که بک‌اند می‌فرستد ( { success: true, data: { result: "..." } } )
+    if (data['data'] != null && data['data']['result'] != null) {
+      return data['data']['result'].toString();
     }
-    return data['result'].toString();
+    
+    throw ApiException(500, 'سرور نتیجه عیب‌یابی را برنگرداند.');
   }
 
-  /// دریافت تاریخچهٔ عیب‌یابی‌های کاربر
   Future<List<Diagnostic>> getHistory(String token) async {
-    final uri = Uri.parse(Constants.diagnose).replace(
-      queryParameters: {'history': 'true'},
-    );
+    final uri = Uri.parse(Constants.diagnose).replace(queryParameters: {'history': 'true'});
 
     final response = await _safeApiCall(() => _httpClient
         .get(uri, headers: _getHeaders(token))
         .timeout(_timeout));
 
     _ensureSuccess(response, defaultError: 'خطا در دریافت تاریخچه');
+    // در فایل route.ts بک‌اَند، تاریخچه را مستقیماً آرایه فرستادیم
     final List<dynamic> data = _parseResponseBody(response);
     return data.map((json) => Diagnostic.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  /// دریافت لینک پرداخت برای خرید اعتبار
   Future<String> getPaymentUrl(String token, String productId) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
@@ -191,19 +176,5 @@ class ApiService {
       throw ApiException(500, 'لینک پرداخت از سرور دریافت نشد.');
     }
     return data['paymentUrl'].toString();
-  }
-
-  /// بررسی و صحت‌سنجی نهایی وضعیت خرید (متناسب با مسیر api/purchase/verify سرور شما)
-  Future<Map<String, dynamic>> verifyPayment(String token, String authority, String status) async {
-    final response = await _safeApiCall(() => _httpClient
-        .post(
-          Uri.parse(Constants.verifyPurchase),
-          headers: _getHeaders(token),
-          body: jsonEncode({'authority': authority, 'status': status}),
-        )
-        .timeout(_timeout));
-
-    _ensureSuccess(response, defaultError: 'خطا در تایید وضعیت تراکنش');
-    return _parseResponseBody(response) as Map<String, dynamic>;
   }
 }
