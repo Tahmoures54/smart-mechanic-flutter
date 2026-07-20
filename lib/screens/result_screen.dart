@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/audio_features.dart';
+// فرض بر این است که مدل‌ها در مسیر زیر هستند
+import '../services/ai_diagnostic_service.dart';
 
 class ResultScreen extends StatelessWidget {
   final String? resultText;
@@ -17,7 +18,7 @@ class ResultScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('نتیجه تحلیل هوشمند'),
+        title: const Text('نتیجه عیب‌یابی هوشمند'),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -26,15 +27,25 @@ class ResultScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (resultText != null) ...[
-              _buildSectionTitle(Icons.description_rounded, 'تشخیص نهایی', theme),
+              _buildSectionTitle(Icons.medical_information_rounded, 'تشخیص و راهکار نهایی', theme),
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 4,
+                shadowColor: theme.colorScheme.primary.withOpacity(0.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: SelectableText(
                     resultText!,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16, height: 1.6),
+                    textAlign: TextAlign.right, // راست‌چین کردن اجباری برای فارسی
+                    textDirection: TextDirection.rtl, // جهت متن فارسی
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 15, 
+                      height: 1.8, // فاصله خطوط برای خوانایی بهتر
+                      color: Colors.white.withOpacity(0.9)
+                    ),
                   ),
                 ),
               ),
@@ -42,7 +53,7 @@ class ResultScreen extends StatelessWidget {
             ],
 
             if (audioFeatures != null) ...[
-              _buildSectionTitle(Icons.analytics_rounded, 'داده‌های فنی موتور', theme),
+              _buildSectionTitle(Icons.analytics_rounded, 'داده‌های استخراج شده از موتور', theme),
               Card(
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -67,19 +78,23 @@ class ResultScreen extends StatelessWidget {
               Center(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 50),
-                  child: Text('نتیجه‌ای برای نمایش یافت نشد.', style: TextStyle(color: theme.hintColor)),
+                  child: Text('متاسفانه نتیجه‌ای از سرور دریافت نشد.', style: TextStyle(color: theme.hintColor)),
                 ),
               ),
             
             const SizedBox(height: 30),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.home_rounded),
+              label: const Text('بازگشت به صفحه اصلی', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: theme.colorScheme.onSecondary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('بازگشت به صفحه اصلی', style: TextStyle(fontSize: 16)),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -88,12 +103,12 @@ class ResultScreen extends StatelessWidget {
 
   Widget _buildSectionTitle(IconData icon, String title, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
       child: Row(
         children: [
-          Icon(icon, color: theme.colorScheme.primary, size: 22),
+          Icon(icon, color: theme.colorScheme.secondary, size: 24),
           const SizedBox(width: 8),
-          Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.secondary)),
         ],
       ),
     );
@@ -108,7 +123,7 @@ class ResultScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Text(label, style: theme.textTheme.bodyMedium),
           const Spacer(),
-          Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.secondary)),
+          Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.amber)),
         ],
       ),
     );
