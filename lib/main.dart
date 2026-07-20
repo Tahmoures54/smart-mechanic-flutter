@@ -12,7 +12,7 @@ import 'services/map_service.dart';
 import 'services/api_service.dart';
 import 'services/sound_analyzer.dart';
 import 'screens/home_screen.dart';
-import 'screens/login_screen.dart'; // فرض بر این است که این صفحه را دارید
+import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +24,7 @@ void main() async {
   final audioService = AudioService();
   await audioService.init();
 
-  // ساخت یک نمونه واحد از httpClient برای استفاده مشترک (بهینه‌سازی مصرف حافظه)
+  // ساخت یک نمونه واحد از httpClient برای استفاده مشترک
   final httpClient = http.Client();
 
   // ساخت نمونه واحد از ApiService
@@ -35,21 +35,19 @@ void main() async {
       providers: [
         Provider<ApiService>.value(value: apiService),
         
-        // پاس دادن apiService به AuthProvider و بررسی وضعیت لاگین
         ChangeNotifierProvider(
           create: (_) => AuthProvider(apiService)..checkAuthStatus(),
         ),
         
         Provider<AudioService>.value(value: audioService),
         
-        // نکته مهم: در حالت ایده‌آل این سرویس باید حذف شود و کارهای AI از طریق 
-        // بک‌اَند (apiService.diagnose) انجام شود تا امنیت حفظ گردد.
+        // 👇 این بخش اصلاح شد: حالا از معماری کاملا امن و جدید استفاده می‌کند 👇
         Provider<AIDiagnosticService>(
           create: (_) => AIDiagnosticService(
-            httpClient: httpClient, // استفاده از کلاینت مشترک
-            apiKey: '', // به شدت توصیه می‌شود این پردازش به بک‌اَند Next.js منتقل شود
+            apiService: apiService, // جایگزین httpClient و apiKey شد
           ),
         ),
+        // 👆 پایان اصلاح 👇
         
         Provider<MapService>(
           create: (_) => MapService(null),
@@ -81,7 +79,7 @@ class SmartMechanicApp extends StatelessWidget {
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate, // اضافه شد: برای جلوگیری از کرش انتخاب متن
+        GlobalCupertinoLocalizations.delegate, 
       ],
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -93,22 +91,18 @@ class SmartMechanicApp extends StatelessWidget {
           primary: Colors.orange,
           secondary: Colors.amber,
         ),
-        // فونت وزیرمتن برای خوانایی عالی زبان فارسی
         textTheme: GoogleFonts.vazirmatnTextTheme().apply(
           bodyColor: Colors.white,
           displayColor: Colors.white,
         ),
       ),
-      // منطق مسیریابی بر اساس وضعیت ورود
       home: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
-          // اگر در حال بررسی وضعیت ورود است (مثلا خواندن توکن از حافظه)
           if (authProvider.isLoading) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator(color: Colors.orange)),
             );
           }
-          // اگر لاگین بود به خانه برود، در غیر این صورت به صفحه ورود
           return authProvider.isAuthenticated 
               ? const HomeScreen() 
               : const LoginScreen(); 
