@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+
 import 'providers/auth_provider.dart';
 import 'services/audio_service.dart';
 import 'services/ai_diagnostic_service.dart';
@@ -11,6 +12,7 @@ import 'services/map_service.dart';
 import 'services/api_service.dart';
 import 'services/sound_analyzer.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart'; // فرض بر این است که این صفحه را دارید
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,23 +24,33 @@ void main() async {
   final audioService = AudioService();
   await audioService.init();
 
-  // ساخت یک نمونه واحد از ApiService برای استفاده در کل اپلیکیشن
-  final apiService = ApiService(httpClient: http.Client());
+  // ساخت یک نمونه واحد از httpClient برای استفاده مشترک (بهینه‌سازی مصرف حافظه)
+  final httpClient = http.Client();
+
+  // ساخت نمونه واحد از ApiService
+  final apiService = ApiService(httpClient: httpClient);
 
   runApp(
     MultiProvider(
       providers: [
-        Provider<ApiService>.value(value: apiService), // معرفی به کل اپ
-        // پاس دادن apiService به AuthProvider
-        ChangeNotifierProvider(create: (_) => AuthProvider(apiService)..checkAuthStatus()),
+        Provider<ApiService>.value(value: apiService),
+        
+        // پاس دادن apiService به AuthProvider و بررسی وضعیت لاگین
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(apiService)..checkAuthStatus(),
+        ),
         
         Provider<AudioService>.value(value: audioService),
+        
+        // نکته مهم: در حالت ایده‌آل این سرویس باید حذف شود و کارهای AI از طریق 
+        // بک‌اَند (apiService.diagnose) انجام شود تا امنیت حفظ گردد.
         Provider<AIDiagnosticService>(
           create: (_) => AIDiagnosticService(
-            httpClient: http.Client(),
-            apiKey: '', // TODO: کلید API واقعی خود را اینجا قرار دهید
+            httpClient: httpClient, // استفاده از کلاینت مشترک
+            apiKey: '', // به شدت توصیه می‌شود این پردازش به بک‌اَند Next.js منتقل شود
           ),
         ),
+        
         Provider<MapService>(
           create: (_) => MapService(null),
         ),
@@ -69,6 +81,7 @@ class SmartMechanicApp extends StatelessWidget {
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate, // اضافه شد: برای جلوگیری از کرش انتخاب متن
       ],
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -80,12 +93,27 @@ class SmartMechanicApp extends StatelessWidget {
           primary: Colors.orange,
           secondary: Colors.amber,
         ),
+        // فونت وزیرمتن برای خوانایی عالی زبان فارسی
         textTheme: GoogleFonts.vazirmatnTextTheme().apply(
           bodyColor: Colors.white,
           displayColor: Colors.white,
         ),
       ),
-      home: const HomeScreen(),
+      // منطق مسیریابی بر اساس وضعیت ورود
+      home: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
+          // اگر در حال بررسی وضعیت ورود است (مثلا خواندن توکن از حافظه)
+          if (authProvider.isLoading) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator(color: Colors.orange)),
+            );
+          }
+          // اگر لاگین بود به خانه برود، در غیر این صورت به صفحه ورود
+          return authProvider.isAuthenticated 
+              ? const HomeScreen() 
+              : const LoginScreen(); 
+        },
+      ),
     );
   }
-} 
+}
