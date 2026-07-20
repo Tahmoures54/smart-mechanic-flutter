@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
-import '../models/audio_features.dart';
+import '../services/ai_diagnostic_service.dart' as ai; // استفاده از سرویس امن جدید
+import '../providers/auth_provider.dart';
 import 'result_screen.dart';
 
 class RecordScreen extends StatefulWidget {
+  // ما باید بدانیم کاربر کدام ماشین را در صفحه اصلی انتخاب کرده بوده است
+  // اگر در این صفحه ماشین مشخص نیست، می‌توانیم در HomeScreen این را پاس بدهیم
+  // فعلاً آن را به عنوان یک شناسه فرضی '1' در نظر می‌گیریم (ایران‌خودرو)
   const RecordScreen({super.key});
 
   @override
@@ -52,6 +56,8 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
   Future<void> _toggleRecording() async {
     final audioService = context.read<AudioService>();
     final soundAnalyzer = context.read<SoundAnalyzer>();
+    final aiDiagnostic = context.read<ai.AIDiagnosticService>();
+    final authProvider = context.read<AuthProvider>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (_isRecording) {
@@ -62,22 +68,45 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
       });
 
       try {
+        // ۱. توقف ضبط و گرفتن فایل صوتی
         final file = await audioService.stopRecording();
         if (file == null) throw Exception('فایل صوتی ذخیره نشد.');
 
-        final AudioFeatures features = await soundAnalyzer.analyze(file.path);
+        // ۲. استخراج ویژگی‌های صوتی روی گوشی کاربر (بدون نیاز به اینترنت)
+        final features = await soundAnalyzer.analyze(file.path);
+        
+        // تبدیل مدل features قدیمی به مدل جدید (در صورت نیاز)
+        final aiFeatures = ai.AudioFeatures(
+          features.rms, 
+          features.dominantFrequency, 
+          features.zeroCrossingRate, 
+          features.spectralCentroid
+        );
+
+        // ۳. ارسال اطلاعات به سرور امن Next.js برای گرفتن نتیجه هوش مصنوعی
+        final result = await aiDiagnostic.diagnose(
+          token: authProvider.token!, 
+          carId: '1', // باید آیدی ماشینی که کاربر انتخاب کرده را پاس بدهیم
+          audioFeatures: aiFeatures,
+        );
+        
+        // آپدیت پروفایل کاربر (چون یک اعتبار کم شده است)
+        authProvider.fetchProfile();
 
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ResultScreen(resultText: 'تحلیل انجام شد.', audioFeatures: features),
+            builder: (_) => ResultScreen(
+              resultText: result, 
+              audioFeatures: aiFeatures
+            ),
           ),
         );
       } catch (e) {
         if (!mounted) return;
         setState(() => _isProcessing = false);
-        scaffoldMessenger.showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
+        scaffoldMessenger.showSnackBar(SnackBar(content: Text('خطا: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red));
       }
     } else {
       try {
@@ -128,7 +157,7 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
             const SizedBox(height: 30),
             Text(
               _isProcessing 
-                  ? 'در حال تحلیل هوشمند صدا...' 
+                  ? 'در حال ارسال و تحلیل هوشمند اطلاعات...' 
                   : (_isRecording ? 'در حال ضبط، گوشی را نزدیک موتور نگه دارید' : 'برای شروع تحلیل صوتی ضربه بزنید'),
               style: TextStyle(color: theme.hintColor, fontSize: 16),
             ),
