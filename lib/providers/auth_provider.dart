@@ -5,27 +5,25 @@ import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final _storage = const FlutterSecureStorage();
-  final ApiService apiService; // تزریق وابستگی به جای ساخت نمونه جدید
+  final ApiService apiService;
 
   AuthProvider(this.apiService);
 
   String? _token;
   int _credits = 0;
   bool _isGolden = false;
-  
-  // اضافه شد: برای مدیریت وضعیت لودینگ اولیه اپلیکیشن
   bool _isLoading = true; 
 
   bool get isAuthenticated => _token != null;
   int get credits => _credits;
   bool get isGolden => _isGolden;
   String? get token => _token;
-  bool get isLoading => _isLoading; // متصل به main.dart
+  bool get isLoading => _isLoading;
 
   /// بررسی وضعیت ورود در هنگام باز شدن اپلیکیشن
   Future<void> checkAuthStatus() async {
     _isLoading = true;
-    notifyListeners(); // نمایش اسپینر در UI
+    notifyListeners();
 
     try {
       _token = await _storage.read(key: 'jwt_token');
@@ -34,64 +32,69 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('خطا در خواندن توکن: $e');
+      _token = null;
     } finally {
       _isLoading = false;
-      notifyListeners(); // مخفی کردن اسپینر و هدایت به صفحه مناسب
+      notifyListeners();
     }
   }
 
-  /// دریافت اطلاعات پروفایل (موجودی و وضعیت کاربری)
+  /// دریافت اطلاعات پروفایل (هماهنگ با بک‌اَند Next.js)
   Future<void> fetchProfile() async {
     if (_token == null) return;
     try {
-      final profile = await apiService.getProfile(_token!);
-      _credits = profile['credits'] ?? 0;
-      // ایمن‌سازی نام کلید بین کمل‌کیس و اسنیک‌کیس
-      _isGolden = profile['isGolden'] == true || profile['is_golden'] == true;
-      notifyListeners();
+      final response = await apiService.getProfile(_token!);
+      
+      // بک‌اند اطلاعات را درون آبجکت data برمی‌گرداند
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'];
+        _credits = data['credits'] ?? 0;
+        _isGolden = data['isGolden'] == true || data['is_golden'] == true;
+        notifyListeners();
+      }
     } catch (e) {
-      // اگر توکن منقضی شده بود (خطای 401)، کاربر خودکار خارج می‌شود
       if (e.toString().contains('401')) {
         await logout();
+      } else {
+        debugPrint('خطا در دریافت پروفایل: $e');
       }
     }
   }
 
-  /// متد ارسال کد تایید (جهت یکپارچگی ارتباط با UI)
   Future<void> sendOtp(String phone) async {
     await apiService.sendOtp(phone);
   }
 
-  /// ورود، دریافت توکن و ذخیره امن آن
+  /// ورود و ذخیره توکن (هماهنگ با بک‌اَند Next.js)
   Future<void> login(String phone, String code) async {
     final res = await apiService.verifyOtp(phone, code);
     
-    _token = res['token'];
-    _credits = res['credits'] ?? 0;
-    _isGolden = res['isGolden'] == true || res['is_golden'] == true;
-    
-    if (_token != null) {
-      await _storage.write(key: 'jwt_token', value: _token!);
+    if (res['success'] == true) {
+      _token = res['token'];
+      
+      // خواندن اطلاعات از آبجکت user که سرور می‌فرستد
+      final user = res['user'] ?? {};
+      _credits = user['credits'] ?? 0;
+      _isGolden = user['isGolden'] == true || user['is_golden'] == true;
+      
+      if (_token != null) {
+        await _storage.write(key: 'jwt_token', value: _token!);
+      }
+      notifyListeners();
+    } else {
+      throw Exception(res['error'] ?? 'خطا در ورود');
     }
-    notifyListeners();
   }
 
-  /// خروج از حساب و پاکسازی کامل ردپای کاربر
   Future<void> logout() async {
     _token = null;
     _credits = 0;
     _isGolden = false;
     await _storage.delete(key: 'jwt_token');
     
-    // پاک کردن دیتای آفلاین کاربر قبلی (بسیار مهم برای امنیت)
     try {
-      // اضافه شد: بررسی باز بودن باکس قبل از پاک کردن برای جلوگیری از کرش
-      if (Hive.isBoxOpen('diagnostics')) {
-        await Hive.box('diagnostics').clear();
-      }
-      if (Hive.isBoxOpen('history')) {
-        await Hive.box('history').clear();
-      }
+      if (Hive.isBoxOpen('diagnostics')) await Hive.box('diagnostics').clear();
+      if (Hive.isBoxOpen('history')) await Hive.box('history').clear();
     } catch (e) {
       debugPrint('خطا در پاکسازی کش لوکال: $e');
     }
