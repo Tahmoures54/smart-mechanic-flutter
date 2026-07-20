@@ -3,15 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
-import '../services/ai_diagnostic_service.dart' as ai; // استفاده از سرویس امن جدید
-import '../providers/auth_provider.dart';
-import 'result_screen.dart';
+import 'chat_screen.dart'; // مسیر صفحه چت
 
 class RecordScreen extends StatefulWidget {
-  // ما باید بدانیم کاربر کدام ماشین را در صفحه اصلی انتخاب کرده بوده است
-  // اگر در این صفحه ماشین مشخص نیست، می‌توانیم در HomeScreen این را پاس بدهیم
-  // فعلاً آن را به عنوان یک شناسه فرضی '1' در نظر می‌گیریم (ایران‌خودرو)
-  const RecordScreen({super.key});
+  final String carName;
+  final String carId;
+
+  const RecordScreen({
+    super.key, 
+    required this.carName, 
+    required this.carId
+  });
 
   @override
   State<RecordScreen> createState() => _RecordScreenState();
@@ -56,8 +58,6 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
   Future<void> _toggleRecording() async {
     final audioService = context.read<AudioService>();
     final soundAnalyzer = context.read<SoundAnalyzer>();
-    final aiDiagnostic = context.read<ai.AIDiagnosticService>();
-    final authProvider = context.read<AuthProvider>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (_isRecording) {
@@ -68,38 +68,29 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
       });
 
       try {
-        // ۱. توقف ضبط و گرفتن فایل صوتی
         final file = await audioService.stopRecording();
         if (file == null) throw Exception('فایل صوتی ذخیره نشد.');
 
-        // ۲. استخراج ویژگی‌های صوتی روی گوشی کاربر (بدون نیاز به اینترنت)
+        // استخراج ویژگی‌های صوتی
         final features = await soundAnalyzer.analyze(file.path);
         
-        // تبدیل مدل features قدیمی به مدل جدید (در صورت نیاز)
-        final aiFeatures = ai.AudioFeatures(
-          features.rms, 
-          features.dominantFrequency, 
-          features.zeroCrossingRate, 
-          features.spectralCentroid
-        );
-
-        // ۳. ارسال اطلاعات به سرور امن Next.js برای گرفتن نتیجه هوش مصنوعی
-        final result = await aiDiagnostic.diagnose(
-          token: authProvider.token!, 
-          carId: '1', // باید آیدی ماشینی که کاربر انتخاب کرده را پاس بدهیم
-          audioFeatures: aiFeatures,
-        );
-        
-        // آپدیت پروفایل کاربر (چون یک اعتبار کم شده است)
-        authProvider.fetchProfile();
-
         if (!mounted) return;
+        
+        // 🚀 انتقال فوری به صفحه چت با دیتای صدا
+        // نکته: در صفحه چت، به محض باز شدن، پیام به سرور ارسال می‌شود
+        final voiceMessage = "من صدای موتور ماشین رو با گوشی ضبط کردم.\n"
+            "نتایج آنالیز صوتی نرم‌افزار اینه:\n"
+            "- قدرت صدا (RMS): ${features.rms.toStringAsFixed(3)}\n"
+            "- فرکانس غالب: ${features.dominantFrequency.toStringAsFixed(1)} هرتز\n"
+            "لطفاً بر اساس این اطلاعات بگو مشکل چیه؟";
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ResultScreen(
-              resultText: result, 
-              audioFeatures: aiFeatures
+            builder: (_) => ChatScreen(
+              carName: widget.carName,
+              carId: widget.carId,
+              initialUserMessage: voiceMessage,
             ),
           ),
         );
@@ -157,7 +148,7 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
             const SizedBox(height: 30),
             Text(
               _isProcessing 
-                  ? 'در حال ارسال و تحلیل هوشمند اطلاعات...' 
+                  ? 'در حال پردازش صدا...' 
                   : (_isRecording ? 'در حال ضبط، گوشی را نزدیک موتور نگه دارید' : 'برای شروع تحلیل صوتی ضربه بزنید'),
               style: TextStyle(color: theme.hintColor, fontSize: 16),
             ),
