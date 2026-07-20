@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
+import 'shop_screen.dart';
+import 'login_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String carName;
+  final String carId; // 👈 این خط اضافه شد تا ارور برطرف شود
   final String initialUserMessage;
-  final String aiResponse;
 
   const ChatScreen({
     super.key,
     required this.carName,
+    required this.carId, // 👈 این خط اضافه شد
     required this.initialUserMessage,
-    required this.aiResponse,
   });
 
   @override
@@ -20,35 +26,126 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
-  late List<Map<String, dynamic>> _messages;
+  final List<Map<String, dynamic>> _messages = [];
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
-    // بارگذاری چت‌های اولیه
-    _messages = [
-      {"isUser": true, "text": "ماشینم ${widget.carName} است.\nمشکل: ${widget.initialUserMessage}"},
-      {"isUser": false, "text": widget.aiResponse},
-    ];
+    _messages.add({
+      "isUser": true, 
+      "text": "ماشینم ${widget.carName} است.\nمشکل: ${widget.initialUserMessage}"
+    });
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchDiagnosis(widget.initialUserMessage);
+    });
+  }
+
+  Future<void> _fetchDiagnosis(String description) async {
+    setState(() => _isTyping = true);
+    _scrollToBottom();
+
+    final auth = context.read<AuthProvider>();
+    final api = context.read<ApiService>();
+
+    try {
+      final result = await api.diagnose(
+        auth.token!,
+        widget.carId, // 👈 حالا از carId به درستی استفاده می‌شود
+        description,
+      );
+
+      auth.fetchProfile();
+
+      if (!mounted) return;
+      setState(() {
+        _messages.add({"isUser": false, "text": result});
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.statusCode == 402) {
+        _showErrorSystemMessage('اعتبار شما کافی نیست. لطفاً حساب خود را شارژ کنید.');
+        _showNoCreditDialog();
+      } else if (e.statusCode == 401) {
+        auth.logout();
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      } else {
+        _showErrorSystemMessage(e.message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorSystemMessage('خطا در ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.');
+    } finally {
+      if (mounted) {
+        setState(() => _isTyping = false);
+        _scrollToBottom();
+      }
+    }
+  }
+
+  void _showErrorSystemMessage(String error) {
+    setState(() {
+      _messages.add({"isUser": false, "isError": true, "text": "⚠️ خطا: $error"});
+    });
   }
 
   void _sendMessage() {
-    if (_chatController.text.trim().isEmpty) return;
+    final text = _chatController.text.trim();
+    if (text.isEmpty) return;
     
-    // فعلا فقط پیام کاربر را به لیست اضافه می‌کنیم (برای پیاده‌سازی چت دوطرفه در آینده)
+    final auth = context.read<AuthProvider>();
+    
+    if (!auth.isGolden && auth.credits <= 0) {
+      _showNoCreditDialog();
+      return;
+    }
+
     setState(() {
-      _messages.add({"isUser": true, "text": _chatController.text.trim()});
-      _messages.add({"isUser": false, "text": "رفیق، فعلاً در این نسخه فقط تشخیص اولیه امکان‌پذیره. به زودی قابلیت چت پیوسته هم اضافه میشه! 🛠️"});
+      _messages.add({"isUser": true, "text": text});
       _chatController.clear();
     });
+    
+    _fetchDiagnosis(text);
+  }
 
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
+  }
+
+  void _showNoCreditDialog() {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.dialogBackgroundColor,
+        title: Text('اعتبار ناکافی', style: TextStyle(color: theme.textTheme.titleLarge?.color)),
+        content: Text('برای ادامه گفتگو و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
+            style: theme.textTheme.bodyMedium),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('انصراف')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.secondary,
+              foregroundColor: theme.colorScheme.onSecondary,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+            },
+            child: const Text('تهیه اعتبار'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -80,11 +177,13 @@ class _ChatScreenState extends State<ChatScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == _messages.length && _isTyping) {
+                  return _buildTypingIndicator(theme);
+                }
                 final msg = _messages[index];
-                final isUser = msg['isUser'];
-                return _buildChatBubble(msg['text'], isUser, theme);
+                return _buildChatBubble(msg['text'], msg['isUser'] == true, msg['isError'] == true, theme);
               },
             ),
           ),
@@ -94,15 +193,17 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildChatBubble(String text, bool isUser, ThemeData theme) {
+  Widget _buildChatBubble(String text, bool isUser, bool isError, ThemeData theme) {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
         decoration: BoxDecoration(
-          color: isUser ? theme.colorScheme.primary.withOpacity(0.2) : theme.cardColor,
+          color: isUser 
+              ? theme.colorScheme.primary.withOpacity(0.2) 
+              : (isError ? Colors.red.withOpacity(0.2) : theme.cardColor),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
@@ -110,13 +211,48 @@ class _ChatScreenState extends State<ChatScreen> {
             bottomRight: Radius.circular(isUser ? 0 : 20),
           ),
           border: Border.all(
-            color: isUser ? theme.colorScheme.primary.withOpacity(0.5) : theme.dividerColor,
+            color: isUser 
+                ? theme.colorScheme.primary.withOpacity(0.5) 
+                : (isError ? Colors.redAccent : theme.dividerColor),
           ),
         ),
-        child: SelectableText(
-          text,
-          style: TextStyle(height: 1.6, fontSize: 14, color: isUser ? Colors.white : Colors.white70),
-          textDirection: TextDirection.rtl,
+        child: isUser || isError
+            ? SelectableText(
+                text,
+                style: TextStyle(height: 1.6, fontSize: 14, color: isError ? Colors.redAccent : (isUser ? Colors.white : Colors.white70)),
+                textDirection: TextDirection.rtl,
+              )
+            : MarkdownBody(
+                data: text,
+                selectable: true,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(fontSize: 14, height: 1.6, color: Colors.white),
+                  h1: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber),
+                  h2: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                  listBullet: const TextStyle(color: Colors.orange),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator(ThemeData theme) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20), bottomRight: Radius.circular(20)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange)),
+            const SizedBox(width: 12),
+            Text('مکانیک هوشمند در حال بررسی...', style: TextStyle(color: theme.hintColor, fontSize: 12)),
+          ],
         ),
       ),
     );
@@ -134,8 +270,9 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: TextField(
               controller: _chatController,
+              enabled: !_isTyping,
               decoration: InputDecoration(
-                hintText: 'سوال دیگری دارید؟...',
+                hintText: _isTyping ? 'لطفاً صبر کنید...' : 'سوال دیگری دارید؟...',
                 filled: true,
                 fillColor: theme.cardColor,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -145,10 +282,10 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 8),
           CircleAvatar(
-            backgroundColor: theme.colorScheme.primary,
+            backgroundColor: _isTyping ? theme.disabledColor : theme.colorScheme.primary,
             child: IconButton(
               icon: const Icon(Icons.send_rounded, color: Colors.white),
-              onPressed: _sendMessage,
+              onPressed: _isTyping ? null : _sendMessage,
             ),
           ),
         ],
