@@ -6,7 +6,7 @@ import '../models/car.dart';
 import 'login_screen.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
-import 'chat_screen.dart'; // 👈 جایگزین result_screen شد
+import 'chat_screen.dart';
 import 'record_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,9 +20,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Car> _cars = [];
   Car? _selectedCar;
   final _descController = TextEditingController();
-  bool _isLoading = false;
+  
   bool _isLoadingCars = true;
-  bool _hasCarLoadError = false; 
+  bool _isRefreshing = false; // 👈 برای تشخیص اینکه رفرش است یا لود اولیه
+  bool _hasCarLoadError = false;
 
   @override
   void initState() {
@@ -36,9 +37,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _loadCars() async {
+  Future<void> _loadCars({bool isRefresh = false}) async {
     setState(() {
-      _isLoadingCars = true;
+      if (isRefresh) {
+        _isRefreshing = true;
+      } else {
+        _isLoadingCars = true;
+      }
       _hasCarLoadError = false;
     });
     
@@ -49,8 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
       
       setState(() {
         _cars = cars;
-        if (cars.isNotEmpty) {
-          _selectedCar ??= cars.first; 
+        if (cars.isNotEmpty && _selectedCar == null) {
+          _selectedCar = cars.first; 
         }
       });
     } catch (e) {
@@ -58,19 +63,23 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() => _hasCarLoadError = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطا در دریافت لیست خودروها. اتصال اینترنت را بررسی کنید.')),
+          const SnackBar(content: Text('خطا در دریافت لیست خودروها. اینترنت را بررسی کنید.')),
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoadingCars = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingCars = false;
+          _isRefreshing = false;
+        });
+      }
     }
   }
 
-  Future<void> _diagnose() async {
+  void _diagnose() {
     FocusManager.instance.primaryFocus?.unfocus();
 
     final auth = context.read<AuthProvider>();
-    final api = context.read<ApiService>();
     final navigator = Navigator.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -86,57 +95,29 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    if (_descController.text.trim().length < 10) {
+    // 👈 کاهش محدودیت به ۵ حرف تا کاربر اذیت نشود (مثلاً: ریپ زدن)
+    if (_descController.text.trim().length < 5) {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('لطفاً شرح خرابی را کامل‌تر (حداقل ۱۰ حرف) بنویسید.')),
+        const SnackBar(content: Text('لطفاً مشکل را کمی واضح‌تر بنویسید.')),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
-    
-    try {
-      final result = await api.diagnose(
-        auth.token!,
-        _selectedCar!.id,
-        _descController.text.trim(),
-      );
-
-      try {
-        await auth.fetchProfile();
-      } catch (e) {
-        debugPrint('Failed to refresh profile: $e');
-      }
-
-      if (!mounted) return;
-      
-      // 👈 انتقال به محیط جذاب چت به جای صفحه خشک Result
-      navigator.push(MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          carName: _selectedCar!.fullName,
-          initialUserMessage: _descController.text.trim(),
-          aiResponse: result,
-        ),
-      ));
-      
-    } on ApiException catch (e) {
-      if (e.statusCode == 402) {
-        _showNoCreditDialog();
-      } else if (e.statusCode == 401) {
-        auth.logout();
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('نشست شما منقضی شده، لطفاً دوباره وارد شوید.')),
-        );
-      } else {
-        scaffoldMessenger.showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } catch (e) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('خطای شبکه. اتصال اینترنت خود را بررسی کنید.')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (!auth.isGolden && auth.credits <= 0) {
+      _showNoCreditDialog();
+      return;
     }
+
+    final userMessage = _descController.text.trim();
+    _descController.clear();
+
+    navigator.push(MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        carName: _selectedCar!.fullName,
+        carId: _selectedCar!.id,
+        initialUserMessage: userMessage,
+      ),
+    ));
   }
 
   void _onVoiceRecordTap() {
@@ -160,21 +141,27 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const RecordScreen()));
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => RecordScreen(
+        carName: _selectedCar!.fullName,
+        carId: _selectedCar!.id,
+      ),
+    ));
   }
 
+  // 👈 دیالوگ امن شد (بررسی mounted قبل از هدایت به صفحه فروشگاه)
   void _showNoCreditDialog() {
     final theme = Theme.of(context);
-    showDialog(
+    showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: theme.dialogBackgroundColor,
         title: Text('اعتبار ناکافی', style: TextStyle(color: theme.textTheme.titleLarge?.color)),
-        content: Text('برای پرسش سوال و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
+        content: Text('برای ادامه گفتگو و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
             style: theme.textTheme.bodyMedium),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('انصراف'),
           ),
           ElevatedButton(
@@ -182,15 +169,16 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: theme.colorScheme.secondary,
               foregroundColor: theme.colorScheme.onSecondary,
             ),
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('تهیه اعتبار'),
           ),
         ],
       ),
-    );
+    ).then((goToShop) {
+      if (goToShop == true && mounted) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+      }
+    });
   }
 
   @override
@@ -220,21 +208,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () => Navigator.push(
                   context, MaterialPageRoute(builder: (_) => const LoginScreen()),
                 ),
-                child: Text('ورود / ثبت‌نام',
+                child: Text('ورود',
                     style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
         body: RefreshIndicator(
           color: theme.colorScheme.secondary,
-          onRefresh: _loadCars,
+          onRefresh: () => _loadCars(isRefresh: true),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 👈 نمایش کارت اعتبارات یا بنر ترغیب به لاگین
                 if (auth.isAuthenticated) 
                   _buildCreditCard(auth, theme)
                 else
@@ -245,6 +232,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text('۱. خودروی خود را انتخاب کنید:',
                     style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
+                
+                // 👈 حالا اگر کاربر رفرش کند، باکس ماشین غیب نمی‌شود!
                 _buildCarSelector(theme),
 
                 const SizedBox(height: 24),
@@ -257,22 +246,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 24),
 
                 ElevatedButton.icon(
-                  icon: _isLoading 
-                      ? const SizedBox.shrink() 
-                      : const Icon(Icons.build_circle_outlined, size: 28),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 28),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     elevation: 4,
                   ),
-                  onPressed: _isLoading ? null : _diagnose,
-                  label: _isLoading
-                      ? SizedBox(
-                          height: 24, width: 24,
-                          child: CircularProgressIndicator(color: theme.colorScheme.onSecondary, strokeWidth: 3),
-                        )
-                      : Text('عیب‌یابی هوشمند (متنی)',
+                  onPressed: _diagnose,
+                  label: Text('ارسال به مکانیک هوشمند',
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -302,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ElevatedButton.icon(
                   icon: const Icon(Icons.mic_none_rounded, size: 30),
                   label: const Text('شروع ضبط صدای موتور / خودرو'),
-                  onPressed: _isLoading ? null : _onVoiceRecordTap,
+                  onPressed: _onVoiceRecordTap,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 65),
                     textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
@@ -325,7 +307,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 👈 بنر خوش‌آمدگویی و ترغیب به لاگین برای کاربران مهمان
   Widget _buildGuestBanner(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -391,26 +372,11 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.9), fontSize: 14, height: 1.6),
           ),
           const SizedBox(height: 24),
-          _buildPromoItem(
-            theme, 
-            icon: Icons.savings_rounded, 
-            title: 'پیشگیری بهتر از تعمیر', 
-            desc: 'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب جدی و هزینه‌های میلیونی وارد کند.'
-          ),
+          _buildPromoItem(theme, icon: Icons.savings_rounded, title: 'پیشگیری بهتر از تعمیر', desc: 'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب جدی وارد کند.'),
           const SizedBox(height: 16),
-          _buildPromoItem(
-            theme, 
-            icon: Icons.handshake_rounded, 
-            title: 'دستیار هوشمند مکانیک شما', 
-            desc: 'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک خود در پیدا کردن سریع‌تر و اصولی‌تر مشکل کمک کنید.'
-          ),
+          _buildPromoItem(theme, icon: Icons.handshake_rounded, title: 'دستیار هوشمند مکانیک شما', desc: 'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک خود کمک کنید.'),
           const SizedBox(height: 16),
-          _buildPromoItem(
-            theme, 
-            icon: Icons.timer_rounded, 
-            title: 'صرفه‌جویی در زمان', 
-            desc: 'بدون سردرگمی، در کمتر از ۱۰ ثانیه ریشه مشکل را بررسی کنید و با اطلاعات کافی اقدام به تعمیر کنید.'
-          ),
+          _buildPromoItem(theme, icon: Icons.timer_rounded, title: 'صرفه‌جویی در زمان', desc: 'بدون سردرگمی، در کمتر از ۱۰ ثانیه ریشه مشکل را بررسی کنید.'),
         ],
       ),
     );
@@ -492,15 +458,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 👈 منطق نمایش باگ‌گیری شد تا در هنگام رفرش، لیست غیب نشود
   Widget _buildCarSelector(ThemeData theme) {
-    if (_isLoadingCars) {
+    if (_isLoadingCars && !_isRefreshing) {
       return Container(
         height: 60, decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_hasCarLoadError) {
+    if (_hasCarLoadError && _cars.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.5))),
@@ -510,14 +477,14 @@ class _HomeScreenState extends State<HomeScreen> {
             const Expanded(child: Text('خطا در بارگذاری خودروها', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
             TextButton.icon(
               icon: const Icon(Icons.refresh, size: 18), label: const Text('تلاش مجدد'),
-              onPressed: _loadCars,
+              onPressed: () => _loadCars(),
             )
           ],
         ),
       );
     }
 
-    if (_cars.isEmpty) {
+    if (_cars.isEmpty && !_isLoadingCars) {
       return Container(
         padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
         child: Text('هیچ خودرویی یافت نشد.\nبرای بارگذاری مجدد، صفحه را به پایین بکشید.',
@@ -550,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
       controller: _descController, maxLines: 4, maxLength: 300,
       style: TextStyle(color: theme.textTheme.bodyLarge?.color, height: 1.5),
       decoration: InputDecoration(
-        hintText: 'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین یه صدای تق تق میده و ریپ میزنه...',
+        hintText: 'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ میزنه...',
         hintStyle: TextStyle(color: theme.hintColor, fontSize: 14), filled: true, fillColor: theme.cardColor, contentPadding: const EdgeInsets.all(16),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
