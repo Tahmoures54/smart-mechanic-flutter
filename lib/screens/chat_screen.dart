@@ -8,13 +8,13 @@ import 'login_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String carName;
-  final String carId; // 👈 این خط اضافه شد تا ارور برطرف شود
+  final String carId;
   final String initialUserMessage;
 
   const ChatScreen({
     super.key,
     required this.carName,
-    required this.carId, // 👈 این خط اضافه شد
+    required this.carId,
     required this.initialUserMessage,
   });
 
@@ -52,7 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final result = await api.diagnose(
         auth.token!,
-        widget.carId, // 👈 حالا از carId به درستی استفاده می‌شود
+        widget.carId,
         description,
       );
 
@@ -88,6 +88,28 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add({"isUser": false, "isError": true, "text": "⚠️ خطا: $error"});
     });
+  }
+
+  // 👈 منطق جدید: پیدا کردن آخرین حرف کاربر و ارسال مجدد آن
+  void _retryLastRequest() {
+    if (_messages.isEmpty) return;
+    
+    // پاک کردن پیام ارور از لیست چت
+    setState(() {
+      _messages.removeLast();
+    });
+
+    // پیدا کردن آخرین پیامی که کاربر فرستاده بود
+    String lastUserMsg = widget.initialUserMessage;
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i]['isUser'] == true) {
+        lastUserMsg = _messages[i]['text'];
+        break;
+      }
+    }
+
+    // ارسال مجدد به هوش مصنوعی
+    _fetchDiagnosis(lastUserMsg);
   }
 
   void _sendMessage() {
@@ -182,8 +204,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (index == _messages.length && _isTyping) {
                   return _buildTypingIndicator(theme);
                 }
+                
                 final msg = _messages[index];
-                return _buildChatBubble(msg['text'], msg['isUser'] == true, msg['isError'] == true, theme);
+                final isLastMessage = index == _messages.length - 1; // بررسی اینکه آیا این آخرین پیام است؟
+
+                return _buildChatBubble(
+                  msg['text'], 
+                  msg['isUser'] == true, 
+                  msg['isError'] == true,
+                  isLastMessage, // ارسال وضعیت آخرین پیام برای نمایش دکمه تلاش مجدد
+                  theme
+                );
               },
             ),
           ),
@@ -193,7 +224,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildChatBubble(String text, bool isUser, bool isError, ThemeData theme) {
+  // 👈 اضافه شدن دکمه تلاش مجدد به صورت یکپارچه داخل حباب خطا
+  Widget _buildChatBubble(String text, bool isUser, bool isError, bool isLastMessage, ThemeData theme) {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -203,7 +235,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: isUser 
               ? theme.colorScheme.primary.withOpacity(0.2) 
-              : (isError ? Colors.red.withOpacity(0.2) : theme.cardColor),
+              : (isError ? Colors.red.withOpacity(0.15) : theme.cardColor),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
@@ -213,25 +245,50 @@ class _ChatScreenState extends State<ChatScreen> {
           border: Border.all(
             color: isUser 
                 ? theme.colorScheme.primary.withOpacity(0.5) 
-                : (isError ? Colors.redAccent : theme.dividerColor),
+                : (isError ? Colors.redAccent.withOpacity(0.5) : theme.dividerColor),
           ),
         ),
-        child: isUser || isError
-            ? SelectableText(
-                text,
-                style: TextStyle(height: 1.6, fontSize: 14, color: isError ? Colors.redAccent : (isUser ? Colors.white : Colors.white70)),
-                textDirection: TextDirection.rtl,
-              )
-            : MarkdownBody(
-                data: text,
-                selectable: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(fontSize: 14, height: 1.6, color: Colors.white),
-                  h1: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber),
-                  h2: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
-                  listBullet: const TextStyle(color: Colors.orange),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            isUser || isError
+                ? SelectableText(
+                    text,
+                    style: TextStyle(height: 1.6, fontSize: 14, color: isError ? Colors.redAccent : (isUser ? Colors.white : Colors.white70)),
+                    textDirection: TextDirection.rtl,
+                  )
+                : MarkdownBody(
+                    data: text,
+                    selectable: true,
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(fontSize: 14, height: 1.6, color: Colors.white),
+                      h1: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber),
+                      h2: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                      listBullet: const TextStyle(color: Colors.orange),
+                    ),
+                  ),
+            
+            // نمایش دکمه تلاش مجدد فقط اگر ارور بود و در انتهای لیست قرار داشت
+            if (isError && isLastMessage) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton.icon(
+                  onPressed: _retryLastRequest,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('تلاش مجدد'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent.withOpacity(0.2),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
+            ]
+          ],
+        ),
       ),
     );
   }
