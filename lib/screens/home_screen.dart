@@ -6,7 +6,7 @@ import '../models/car.dart';
 import 'login_screen.dart';
 import 'shop_screen.dart';
 import 'history_screen.dart';
-import 'result_screen.dart';
+import 'chat_screen.dart'; // 👈 جایگزین result_screen شد
 import 'record_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _descController = TextEditingController();
   bool _isLoading = false;
   bool _isLoadingCars = true;
-  bool _hasCarLoadError = false; // برای مدیریت خطای اینترنت در لیست ماشین‌ها
+  bool _hasCarLoadError = false; 
 
   @override
   void initState() {
@@ -36,7 +36,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // اضافه شدن مدیریت خطای دقیق‌تر و امکان تلاش مجدد
   Future<void> _loadCars() async {
     setState(() {
       _isLoadingCars = true;
@@ -51,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _cars = cars;
         if (cars.isNotEmpty) {
-          // اگر ماشینی از قبل انتخاب نشده بود، اولی را انتخاب کن
           _selectedCar ??= cars.first; 
         }
       });
@@ -68,11 +66,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // مدیریت صحیح Context بعد از Async و مدیریت خطای fetchProfile
   Future<void> _diagnose() async {
     FocusManager.instance.primaryFocus?.unfocus();
 
-    // ذخیره متغیرها قبل از عملیات async برای جلوگیری از خطای BuildContext
     final auth = context.read<AuthProvider>();
     final api = context.read<ApiService>();
     final navigator = Navigator.of(context);
@@ -106,17 +102,21 @@ class _HomeScreenState extends State<HomeScreen> {
         _descController.text.trim(),
       );
 
-      // مدیریت خطای آپدیت پروفایل در پس‌زمینه
       try {
         await auth.fetchProfile();
       } catch (e) {
         debugPrint('Failed to refresh profile: $e');
-        // نیازی به متوقف کردن کاربر نیست، فقط پروفایل آپدیت نشده است
       }
 
       if (!mounted) return;
+      
+      // 👈 انتقال به محیط جذاب چت به جای صفحه خشک Result
       navigator.push(MaterialPageRoute(
-        builder: (_) => ResultScreen(resultText: result),
+        builder: (_) => ChatScreen(
+          carName: _selectedCar!.fullName,
+          initialUserMessage: _descController.text.trim(),
+          aiResponse: result,
+        ),
       ));
       
     } on ApiException catch (e) {
@@ -139,7 +139,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // بررسی‌های قبل از ورود به صفحه ضبط صدا
   void _onVoiceRecordTap() {
     FocusManager.instance.primaryFocus?.unfocus();
     final auth = context.read<AuthProvider>();
@@ -235,7 +234,12 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (auth.isAuthenticated) _buildCreditCard(auth, theme),
+                // 👈 نمایش کارت اعتبارات یا بنر ترغیب به لاگین
+                if (auth.isAuthenticated) 
+                  _buildCreditCard(auth, theme)
+                else
+                  _buildGuestBanner(theme),
+                  
                 const SizedBox(height: 20),
 
                 Text('۱. خودروی خود را انتخاب کنید:',
@@ -317,6 +321,39 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // 👈 بنر خوش‌آمدگویی و ترغیب به لاگین برای کاربران مهمان
+  Widget _buildGuestBanner(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: theme.colorScheme.primary, size: 28),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'برای استفاده از هوش مصنوعی و دریافت ۱ اعتبار رایگان، وارد حساب کاربری خود شوید.',
+              style: TextStyle(fontSize: 13, height: 1.5),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+            style: TextButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary.withOpacity(0.15),
+              foregroundColor: theme.colorScheme.primary,
+            ),
+            child: const Text('ورود', style: TextStyle(fontWeight: FontWeight.bold)),
+          )
+        ],
       ),
     );
   }
