@@ -78,16 +78,25 @@ class ApiService {
   // =====================================================================
 
   /// دریافت لیست خودروها از فایل JSON عمومی سرور
+  /// از آنجا که فایل در پوشه public است، نیازی به پسوند /api ندارد
   Future<List<Car>> getCars() async {
+    // حذف کردن پیشوند /api برای خواندن مستقیم از پوشه public
+    final publicBaseUrl = Constants.baseUrl.replaceAll('/api', '');
+    
     final response = await _safeApiCall(() => _httpClient
         .get(
-          Uri.parse('${Constants.baseUrl}/cars.json'),
+          Uri.parse('$publicBaseUrl/cars.json'),
           headers: {'Accept': 'application/json'},
         )
         .timeout(_timeout));
 
     _ensureSuccess(response, defaultError: 'خطا در دریافت لیست خودروها');
-    final List<dynamic> data = _parseResponseBody(response);
+    
+    final decoded = _parseResponseBody(response);
+    final List<dynamic> data = decoded is Map && decoded.containsKey('cars') 
+        ? decoded['cars'] 
+        : decoded;
+
     return data.map((json) => Car.fromJson(json as Map<String, dynamic>)).toList();
   }
 
@@ -95,7 +104,7 @@ class ApiService {
   Future<void> sendOtp(String phone) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
-          Uri.parse('${Constants.baseUrl}/api/account'),
+          Uri.parse(Constants.account),
           headers: _getHeaders(),
           body: jsonEncode({'action': 'send', 'phone': phone}),
         )
@@ -108,7 +117,7 @@ class ApiService {
   Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
-          Uri.parse('${Constants.baseUrl}/api/account'),
+          Uri.parse(Constants.account),
           headers: _getHeaders(),
           body: jsonEncode({'action': 'verify', 'phone': phone, 'code': code}),
         )
@@ -122,7 +131,7 @@ class ApiService {
   Future<Map<String, dynamic>> getProfile(String token) async {
     final response = await _safeApiCall(() => _httpClient
         .get(
-          Uri.parse('${Constants.baseUrl}/api/account/credits'),
+          Uri.parse(Constants.credits),
           headers: _getHeaders(token),
         )
         .timeout(_timeout));
@@ -135,7 +144,7 @@ class ApiService {
   Future<String> diagnose(String token, String carId, String description) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
-          Uri.parse('${Constants.baseUrl}/api/diagnose'),
+          Uri.parse(Constants.diagnose),
           headers: _getHeaders(token),
           body: jsonEncode({'carId': carId, 'description': description}),
         )
@@ -152,7 +161,7 @@ class ApiService {
 
   /// دریافت تاریخچهٔ عیب‌یابی‌های کاربر
   Future<List<Diagnostic>> getHistory(String token) async {
-    final uri = Uri.parse('${Constants.baseUrl}/api/diagnose').replace(
+    final uri = Uri.parse(Constants.diagnose).replace(
       queryParameters: {'history': 'true'},
     );
 
@@ -165,11 +174,11 @@ class ApiService {
     return data.map((json) => Diagnostic.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  /// دریافت لینک پرداخت
+  /// دریافت لینک پرداخت برای خرید اعتبار
   Future<String> getPaymentUrl(String token, String productId) async {
     final response = await _safeApiCall(() => _httpClient
         .post(
-          Uri.parse('${Constants.baseUrl}/api/purchase'),
+          Uri.parse(Constants.purchase),
           headers: _getHeaders(token),
           body: jsonEncode({'productId': productId}),
         )
@@ -182,5 +191,19 @@ class ApiService {
       throw ApiException(500, 'لینک پرداخت از سرور دریافت نشد.');
     }
     return data['paymentUrl'].toString();
+  }
+
+  /// بررسی و صحت‌سنجی نهایی وضعیت خرید (متناسب با مسیر api/purchase/verify سرور شما)
+  Future<Map<String, dynamic>> verifyPayment(String token, String authority, String status) async {
+    final response = await _safeApiCall(() => _httpClient
+        .post(
+          Uri.parse(Constants.verifyPurchase),
+          headers: _getHeaders(token),
+          body: jsonEncode({'authority': authority, 'status': status}),
+        )
+        .timeout(_timeout));
+
+    _ensureSuccess(response, defaultError: 'خطا در تایید وضعیت تراکنش');
+    return _parseResponseBody(response) as Map<String, dynamic>;
   }
 }
