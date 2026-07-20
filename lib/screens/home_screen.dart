@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -19,13 +20,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Car> _cars = [];
   Car? _selectedCar;
+  
+  // کنترلرها
   final _descController = TextEditingController();
-  final _customCarController = TextEditingController(); // 👈 کنترلر برای تایپ دستی مدل ماشین
+  final _customCarController = TextEditingController(); 
+  final _yearController = TextEditingController(); // 👈 کنترلر سال ساخت
   
   bool _isLoadingCars = true;
   bool _isRefreshing = false;
   bool _hasCarLoadError = false;
-  bool _isCustomCar = false; // 👈 وضعیت اینکه آیا کاربر تایپ دستی را انتخاب کرده یا خیر
+  bool _isCustomCar = false; 
 
   @override
   void initState() {
@@ -37,16 +41,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _descController.dispose();
     _customCarController.dispose();
+    _yearController.dispose(); // 👈 حتما dispose شود
     super.dispose();
   }
 
   Future<void> _loadCars({bool isRefresh = false}) async {
     setState(() {
-      if (isRefresh) {
-        _isRefreshing = true;
-      } else {
-        _isLoadingCars = true;
-      }
+      if (isRefresh) _isRefreshing = true;
+      else _isLoadingCars = true;
       _hasCarLoadError = false;
     });
     
@@ -91,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // 👈 اعتبارسنجی ماشین (یا از لیست یا دستی)
     if (!_isCustomCar && _selectedCar == null) {
       scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('لطفاً ابتدا خودروی خود را انتخاب کنید.')),
@@ -118,20 +119,28 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // 👈 لاجیک هوشمند برای دور زدن بک‌اَند و ارسال ماشین کاستوم به هوش مصنوعی
+    // 👈 آماده‌سازی نام ماشین + سال ساخت برای هوش مصنوعی
     String actualCarId = '';
     String actualCarName = '';
     String userMessage = _descController.text.trim();
+    String carYear = _yearController.text.trim();
 
     if (_isCustomCar) {
       actualCarName = _customCarController.text.trim();
-      // برای اینکه سرور ارور ندهد، آیدی اولین ماشین لیست را می‌فرستیم
       actualCarId = _cars.isNotEmpty ? _cars.first.id : '1';
-      // اما در پیام، ماشین واقعی را به هوش مصنوعی گوشزد می‌کنیم
-      userMessage = "⚠️ نکته برای هوش مصنوعی: مدل ماشین من در سیستم نبود. مدل ماشین واقعی من «$actualCarName» است. لطفاً عیب‌یابی را دقیقاً بر اساس همین ماشین انجام بده.\n\nشرح مشکل: $userMessage";
+      
+      if (carYear.isNotEmpty) {
+        actualCarName = '$actualCarName مدل $carYear';
+      }
+
+      userMessage = "⚠️ نکته: مدل ماشین من در سیستم نبود. ماشین واقعی من «$actualCarName» است. لطفاً عیب‌یابی را دقیقاً بر اساس همین ماشین انجام بده.\n\nشرح مشکل: $userMessage";
     } else {
       actualCarName = _selectedCar!.fullName;
       actualCarId = _selectedCar!.id;
+      
+      if (carYear.isNotEmpty) {
+        actualCarName = '$actualCarName مدل $carYear';
+      }
     }
 
     _descController.clear();
@@ -173,8 +182,13 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    String carYear = _yearController.text.trim();
     String actualCarId = _isCustomCar ? (_cars.isNotEmpty ? _cars.first.id : '1') : _selectedCar!.id;
     String actualCarName = _isCustomCar ? _customCarController.text.trim() : _selectedCar!.fullName;
+
+    if (carYear.isNotEmpty) {
+      actualCarName = '$actualCarName مدل $carYear';
+    }
 
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => RecordScreen(
@@ -263,12 +277,44 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                 const SizedBox(height: 20),
 
-                Text('۱. خودروی خود را مشخص کنید:',
+                Text('۱. مشخصات خودروی خود را وارد کنید:',
                     style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 
-                // 👈 فراخوانی بخش انتخاب ماشین (لیست یا دستی)
-                _buildCarSelector(theme),
+                // 👈 قرار دادن دراپ‌داون ماشین و فیلد سال ساخت در کنار هم
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 7,
+                      child: _buildCarSelector(theme),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 3,
+                      child: _buildYearField(theme),
+                    ),
+                  ],
+                ),
+                
+                // دکمه تغییر حالت بین لیست و تایپ دستی
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isCustomCar = !_isCustomCar;
+                        if (!_isCustomCar) _customCarController.clear();
+                        else _selectedCar = null;
+                      });
+                    },
+                    icon: Icon(_isCustomCar ? Icons.arrow_back_rounded : Icons.search_off_rounded, size: 16),
+                    label: Text(_isCustomCar ? 'بازگشت به لیست خودروها' : 'خودروی من در لیست نیست'),
+                  ),
+                ),
+
+                // 👈 فراخوانی مشکلات رایج خودرو در صورت وجود
+                _buildCommonIssues(theme),
 
                 const SizedBox(height: 24),
 
@@ -337,6 +383,171 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // 👈 متد ساخت فیلد سال ساخت (کنار اسم ماشین)
+  Widget _buildYearField(ThemeData theme) {
+    return SizedBox(
+      height: 56, // هم‌اندازه با دراپ‌داون
+      child: TextField(
+        controller: _yearController,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly], // فقط عدد مجاز است
+        maxLength: 4,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold),
+        decoration: InputDecoration(
+          counterText: "", // پنهان کردن عدد 4/4 زیر باکس
+          hintText: 'مثلاً: 1403',
+          labelText: 'مدل (سال)',
+          labelStyle: TextStyle(fontSize: 13, color: theme.colorScheme.secondary, fontWeight: FontWeight.bold),
+          hintStyle: TextStyle(color: theme.hintColor, fontSize: 12),
+          filled: true,
+          fillColor: theme.cardColor,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: theme.dividerColor)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
+        ),
+      ),
+    );
+  }
+
+  // 👈 بخش خودرو: هندل کردن لیست بازشو یا فیلد تایپ دستی
+  Widget _buildCarSelector(ThemeData theme) {
+    if (_isCustomCar) {
+      return SizedBox(
+        height: 56,
+        child: TextField(
+          controller: _customCarController,
+          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+          decoration: InputDecoration(
+            hintText: 'مثال: تویوتا کمری',
+            hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
+            filled: true, 
+            fillColor: theme.cardColor,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
+          ),
+        ),
+      );
+    }
+
+    if (_isLoadingCars && !_isRefreshing) {
+      return Container(
+        height: 56, decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_hasCarLoadError && _cars.isEmpty) {
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.5))),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(child: Text('خطا در بارگذاری', style: TextStyle(color: Colors.redAccent, fontSize: 12))),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 18),
+              onPressed: () => _loadCars(),
+            )
+          ],
+        ),
+      );
+    }
+
+    if (_cars.isEmpty && !_isLoadingCars) {
+      return Container(
+        height: 56, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
+        child: Text('هیچ خودرویی یافت نشد.', style: TextStyle(color: theme.hintColor, fontSize: 12)),
+      );
+    }
+
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(border: Border.all(color: theme.dividerColor), borderRadius: BorderRadius.circular(16), color: theme.cardColor),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<Car>(
+          dropdownColor: theme.scaffoldBackgroundColor, value: _selectedCar, isExpanded: true,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.secondary),
+          hint: Text('خودرو را انتخاب کنید', style: TextStyle(fontSize: 13, color: theme.hintColor)),
+          items: _cars.map((car) {
+            return DropdownMenuItem<Car>(
+              value: car, child: Text(car.fullName, style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w600, fontSize: 14)),
+            );
+          }).toList(),
+          onChanged: (val) => setState(() => _selectedCar = val),
+        ),
+      ),
+    );
+  }
+
+  // 👈 متد نمایش دکمه‌های مشکلات رایج
+  Widget _buildCommonIssues(ThemeData theme) {
+    if (_isCustomCar || _selectedCar == null) {
+      return const SizedBox.shrink();
+    }
+
+    // فیلتر کردن متن‌های بی‌معنی دیتابیس
+    final issues = _selectedCar!.commonIssues.where((issue) => 
+      !issue.contains('اطلاعات دقیقی')).toList();
+
+    if (issues.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('مشکلات شایع این خودرو (برای انتخاب ضربه بزنید):',
+              style: TextStyle(
+                color: theme.colorScheme.secondary, 
+                fontWeight: FontWeight.bold, 
+                fontSize: 13
+              )),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: issues.map((issue) {
+              return ActionChip(
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+                labelStyle: TextStyle(color: theme.colorScheme.primary, fontSize: 13),
+                label: Text(issue),
+                onPressed: () {
+                  setState(() {
+                    _descController.text = issue;
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionField(ThemeData theme) {
+    return TextField(
+      controller: _descController, maxLines: 4, maxLength: 300,
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color, height: 1.5),
+      decoration: InputDecoration(
+        hintText: 'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ میزنه...',
+        hintStyle: TextStyle(color: theme.hintColor, fontSize: 14), filled: true, fillColor: theme.cardColor, contentPadding: const EdgeInsets.all(16),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
       ),
     );
   }
@@ -488,123 +699,6 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('شارژ حساب', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
         ],
-      ),
-    );
-  }
-
-  // 👈 بخش خودرو: هندل کردن لیست بازشو و فیلد تایپ دستی
-  Widget _buildCarSelector(ThemeData theme) {
-    if (_isCustomCar) {
-      // 👈 وقتی کاربر "ماشینم در لیست نیست" را زده است
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: _customCarController,
-            style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            decoration: InputDecoration(
-              hintText: 'مثال: تویوتا کمری 2007',
-              hintStyle: TextStyle(color: theme.hintColor, fontSize: 14),
-              filled: true, 
-              fillColor: theme.cardColor,
-              contentPadding: const EdgeInsets.all(16),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() {
-                _isCustomCar = false;
-                _customCarController.clear();
-              }),
-              icon: const Icon(Icons.arrow_back_rounded, size: 16),
-              label: const Text('بازگشت به لیست خودروها'),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_isLoadingCars && !_isRefreshing) {
-      return Container(
-        height: 60, decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_hasCarLoadError && _cars.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.5))),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Expanded(child: Text('خطا در بارگذاری خودروها', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
-            TextButton.icon(
-              icon: const Icon(Icons.refresh, size: 18), label: const Text('تلاش مجدد'),
-              onPressed: () => _loadCars(),
-            )
-          ],
-        ),
-      );
-    }
-
-    if (_cars.isEmpty && !_isLoadingCars) {
-      return Container(
-        padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
-        child: Text('هیچ خودرویی یافت نشد.\nبرای بارگذاری مجدد، صفحه را به پایین بکشید.',
-          textAlign: TextAlign.center, style: TextStyle(color: theme.hintColor),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(border: Border.all(color: theme.dividerColor), borderRadius: BorderRadius.circular(16), color: theme.cardColor),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<Car>(
-              dropdownColor: theme.scaffoldBackgroundColor, value: _selectedCar, isExpanded: true,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.secondary),
-              hint: const Text('خودرویی انتخاب نشده'),
-              items: _cars.map((car) {
-                return DropdownMenuItem<Car>(
-                  value: car, child: Text(car.fullName, style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w600, fontSize: 15)),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => _selectedCar = val),
-            ),
-          ),
-        ),
-        // 👈 دکمه طلایی برای وقتی که ماشین کاربر در لیست نیست
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => setState(() {
-              _isCustomCar = true;
-              _selectedCar = null;
-            }),
-            icon: const Icon(Icons.search_off_rounded, size: 16),
-            label: const Text('خودروی من در لیست نیست'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionField(ThemeData theme) {
-    return TextField(
-      controller: _descController, maxLines: 4, maxLength: 300,
-      style: TextStyle(color: theme.textTheme.bodyLarge?.color, height: 1.5),
-      decoration: InputDecoration(
-        hintText: 'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ میزنه...',
-        hintStyle: TextStyle(color: theme.hintColor, fontSize: 14), filled: true, fillColor: theme.cardColor, contentPadding: const EdgeInsets.all(16),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
       ),
     );
   }
