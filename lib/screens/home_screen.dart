@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // بهبود ۱ و ۲: اضافه شدن مدیریت خطای دقیق‌تر و امکان تلاش مجدد
+  // اضافه شدن مدیریت خطای دقیق‌تر و امکان تلاش مجدد
   Future<void> _loadCars() async {
     setState(() {
       _isLoadingCars = true;
@@ -68,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // بهبود ۳ و ۶: مدیریت صحیح Context بعد از Async و مدیریت خطای fetchProfile
+  // مدیریت صحیح Context بعد از Async و مدیریت خطای fetchProfile
   Future<void> _diagnose() async {
     FocusManager.instance.primaryFocus?.unfocus();
 
@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _descController.text.trim(),
       );
 
-      // بهبود ۶: مدیریت خطای آپدیت پروفایل در پس‌زمینه
+      // مدیریت خطای آپدیت پروفایل در پس‌زمینه
       try {
         await auth.fetchProfile();
       } catch (e) {
@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // بهبود ۷: بررسی‌های قبل از ورود به صفحه ضبط صدا
+  // بررسی‌های قبل از ورود به صفحه ضبط صدا
   void _onVoiceRecordTap() {
     FocusManager.instance.primaryFocus?.unfocus();
     final auth = context.read<AuthProvider>();
@@ -161,7 +161,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // هدایت به صفحه ضبط صدا (در صورت نیاز می‌توانید _selectedCar را هم به آن پاس دهید)
     Navigator.push(context, MaterialPageRoute(builder: (_) => const RecordScreen()));
   }
 
@@ -296,7 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 20),
 
-                // استفاده از اکشن جدید با بررسی‌های امنیتی
                 ElevatedButton.icon(
                   icon: const Icon(Icons.mic_none_rounded, size: 30),
                   label: const Text('شروع ضبط صدای موتور / خودرو'),
@@ -352,15 +350,30 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد.',
+            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد و خیالتان را راحت کند.',
             style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.9), fontSize: 14, height: 1.6),
           ),
           const SizedBox(height: 24),
-          _buildPromoItem(theme, icon: Icons.savings_rounded, title: 'جلوگیری از هزینه‌های میلیونی', desc: 'با تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب میلیونی وارد کند.'),
+          _buildPromoItem(
+            theme, 
+            icon: Icons.savings_rounded, 
+            title: 'پیشگیری بهتر از تعمیر', 
+            desc: 'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب جدی و هزینه‌های میلیونی وارد کند.'
+          ),
           const SizedBox(height: 16),
-          _buildPromoItem(theme, icon: Icons.shield_rounded, title: 'دست مکانیک‌های متقلب را بخوانید!', desc: 'قبل از مراجعه به تعمیرگاه، مشکل واقعی را بدانید تا قطعات سالم را تعویض نکنند.'),
+          _buildPromoItem(
+            theme, 
+            icon: Icons.handshake_rounded, 
+            title: 'دستیار هوشمند مکانیک شما', 
+            desc: 'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک خود در پیدا کردن سریع‌تر و اصولی‌تر مشکل کمک کنید.'
+          ),
           const SizedBox(height: 16),
-          _buildPromoItem(theme, icon: Icons.timer_rounded, title: 'صرفه‌جویی در وقت', desc: 'بدون نیاز به گشتن در تعمیرگاه‌ها، در کمتر از ۱۰ ثانیه مشکل را پیدا کنید.'),
+          _buildPromoItem(
+            theme, 
+            icon: Icons.timer_rounded, 
+            title: 'صرفه‌جویی در زمان', 
+            desc: 'بدون سردرگمی، در کمتر از ۱۰ ثانیه ریشه مشکل را بررسی کنید و با اطلاعات کافی اقدام به تعمیر کنید.'
+          ),
         ],
       ),
     );
