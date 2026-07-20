@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
@@ -12,69 +13,79 @@ class RecordScreen extends StatefulWidget {
   State<RecordScreen> createState() => _RecordScreenState();
 }
 
-class _RecordScreenState extends State<RecordScreen> {
+class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderStateMixin {
   bool _isRecording = false;
   bool _isProcessing = false;
-  String? _errorMessage;
+  int _secondsElapsed = 0;
+  Timer? _timer;
+  late AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
+    _timer?.cancel();
+    _animController.dispose();
     if (_isRecording) {
-      context.read<AudioService>().stopRecording(); // ignore: use_build_context_synchronously
+      context.read<AudioService>().stopRecording();
     }
     super.dispose();
+  }
+
+  void _startTimer() {
+    _secondsElapsed = 0;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() => _secondsElapsed++);
+    });
+  }
+
+  String get _formattedTime {
+    final minutes = (_secondsElapsed ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_secondsElapsed % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   Future<void> _toggleRecording() async {
     final audioService = context.read<AudioService>();
     final soundAnalyzer = context.read<SoundAnalyzer>();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (_isRecording) {
-      try {
-        setState(() {
-          _isRecording = false;
-          _isProcessing = true;
-        });
-        
-        // در کدهای جدید شما این متد یک File? برمی‌گرداند
-        final file = await audioService.stopRecording();
-        if (file == null) {
-          throw Exception('فایل صوتی ذخیره نشد.');
-        }
+      _timer?.cancel();
+      setState(() {
+        _isRecording = false;
+        _isProcessing = true;
+      });
 
-        // ارسال مسیر فایل به موتور تحلیل‌گر
+      try {
+        final file = await audioService.stopRecording();
+        if (file == null) throw Exception('فایل صوتی ذخیره نشد.');
+
         final AudioFeatures features = await soundAnalyzer.analyze(file.path);
 
         if (!mounted) return;
-        
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ResultScreen(
-              resultText: features.toJson().toString(), 
-              audioFeatures: features,
-            ),
+            builder: (_) => ResultScreen(resultText: 'تحلیل انجام شد.', audioFeatures: features),
           ),
         );
       } catch (e) {
-        if (mounted) {
-          setState(() {
-            _isProcessing = false;
-            _errorMessage = 'خطا در تحلیل صدا: $e';
-          });
-        }
+        if (!mounted) return;
+        setState(() => _isProcessing = false);
+        scaffoldMessenger.showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
       }
     } else {
       try {
         await audioService.startRecording();
-        setState(() {
-          _isRecording = true;
-          _errorMessage = null;
-        });
+        _startTimer();
+        setState(() => _isRecording = true);
       } catch (e) {
-        setState(() {
-          _errorMessage = 'خطا در شروع ضبط: $e';
-        });
+        scaffoldMessenger.showSnackBar(SnackBar(content: Text('خطا در شروع ضبط: $e')));
       }
     }
   }
@@ -84,53 +95,42 @@ class _RecordScreenState extends State<RecordScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ضبط صدای خودرو'),
-      ),
+      appBar: AppBar(title: const Text('آنالیز صوتی موتور')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: theme.colorScheme.error),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            GestureDetector(
-              onTap: _isProcessing ? null : _toggleRecording,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _isRecording ? Colors.red : theme.colorScheme.secondary,
-                  boxShadow: [
-                    BoxShadow(
-                      color: (_isRecording ? Colors.red : theme.colorScheme.secondary).withOpacity(0.5),
-                      blurRadius: 20,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: _isProcessing
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Icon(
-                          _isRecording ? Icons.stop : Icons.mic,
-                          color: Colors.white,
-                          size: 48,
-                        ),
+            if (_isRecording)
+              Text(_formattedTime, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+            
+            const SizedBox(height: 40),
+
+            ScaleTransition(
+              scale: _isRecording ? Tween(begin: 1.0, end: 1.15).animate(_animController) : const AlwaysStoppedAnimation(1.0),
+              child: GestureDetector(
+                onTap: _isProcessing ? null : _toggleRecording,
+                child: Container(
+                  width: 140, height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isRecording ? Colors.red.shade600 : theme.colorScheme.secondary,
+                    boxShadow: [BoxShadow(color: (_isRecording ? Colors.red : theme.colorScheme.secondary).withOpacity(0.3), blurRadius: 30, spreadRadius: 5)],
+                  ),
+                  child: Center(
+                    child: _isProcessing
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Icon(_isRecording ? Icons.stop_rounded : Icons.mic_rounded, color: Colors.white, size: 64),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            
+            const SizedBox(height: 30),
             Text(
-              _isRecording ? 'در حال ضبط... برای توقف ضربه بزنید' : 'برای شروع ضبط، ضربه بزنید',
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onBackground),
+              _isProcessing 
+                  ? 'در حال تحلیل هوشمند صدا...' 
+                  : (_isRecording ? 'در حال ضبط، گوشی را نزدیک موتور نگه دارید' : 'برای شروع تحلیل صوتی ضربه بزنید'),
+              style: TextStyle(color: theme.hintColor, fontSize: 16),
             ),
           ],
         ),
