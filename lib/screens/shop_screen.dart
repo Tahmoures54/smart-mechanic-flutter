@@ -33,7 +33,7 @@ class _ShopScreenState extends State<ShopScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e is ApiException ? e.message : 'خطا در ایجاد درگاه پرداخت.')),
+        const SnackBar(content: Text('خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.')),
       );
     } finally {
       if (mounted) setState(() => _loadingProductId = null);
@@ -131,10 +131,18 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
-            if (request.url.startsWith('smartmec://')) {
+            // 👈 تفکیک پرداخت موفق از ناموفق
+            if (request.url.startsWith('smartmec://success')) {
               if (!_isProcessed) {
                 _isProcessed = true;
-                _handlePaymentSuccess();
+                _handlePaymentResult(isSuccess: true);
+              }
+              return NavigationDecision.prevent; 
+            } 
+            else if (request.url.startsWith('smartmec://failed')) {
+              if (!_isProcessed) {
+                _isProcessed = true;
+                _handlePaymentResult(isSuccess: false);
               }
               return NavigationDecision.prevent; 
             }
@@ -145,9 +153,19 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       ..loadRequest(Uri.parse(widget.url));
   }
 
-  Future<void> _handlePaymentSuccess() async {
+  Future<void> _handlePaymentResult({required bool isSuccess}) async {
     if (!mounted) return;
     
+    // اگر کاربر انصراف داده بود یا پرداخت ناموفق بود
+    if (!isSuccess) {
+      Navigator.pop(context); // بستن وب‌ویو
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('پرداخت لغو شد یا ناموفق بود.', style: TextStyle(fontFamily: 'Vazirmatn')), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    // اگر پرداخت موفق بود
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -155,6 +173,7 @@ class _PaymentWebViewState extends State<PaymentWebView> {
     );
     
     try {
+      // دریافت اطلاعات جدید کاربر از سرور (تا تعداد اعتبار یا اشتراک آپدیت شود)
       await context.read<AuthProvider>().fetchProfile();
       if (!mounted) return;
       
@@ -162,31 +181,42 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       Navigator.pop(context); // بستن وب‌ویو
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('پرداخت با موفقیت تأیید شد و محصول به حساب شما اضافه گردید.'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('پرداخت با موفقیت انجام شد. موجودی شما بروزرسانی شد.', style: TextStyle(fontFamily: 'Vazirmatn')), backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); 
       Navigator.pop(context); 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('پرداخت موفق بود اما در بروزرسانی پروفایل خطایی رخ داد. یکبار برنامه را ببندید و باز کنید.')),
+        const SnackBar(content: Text('پرداخت انجام شد اما در بروزرسانی صفحه خطایی رخ داد. لطفاً صفحه را رفرش کنید.')),
       );
     }
   }
 
-  // 👇 ویجت PopScope را به روش امن و سازگار با ورژن ۳.۲۲ نوشتیم
+  // 👈 استفاده از PopScope به جای WillPopScope برای فلاتر 3.22 به بعد
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        
         if (await _controller.canGoBack()) {
           _controller.goBack();
-          return false;
+        } else {
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
         }
-        return true;
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('درگاه پرداخت امن')),
+        appBar: AppBar(
+          title: const Text('درگاه پرداخت امن'),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).pop(), // دکمه خروج دستی
+          ),
+        ),
         body: WebViewWidget(controller: _controller),
       ),
     );
