@@ -20,16 +20,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Car> _cars = [];
   Car? _selectedCar;
-  
-  // کنترلرها
+
   final _descController = TextEditingController();
-  final _customCarController = TextEditingController(); 
-  final _yearController = TextEditingController(); // 👈 کنترلر سال ساخت
-  
+  final _customCarController = TextEditingController();
+  final _yearController = TextEditingController();
+
   bool _isLoadingCars = true;
   bool _isRefreshing = false;
   bool _hasCarLoadError = false;
-  bool _isCustomCar = false; 
+  bool _isCustomCar = false;
 
   @override
   void initState() {
@@ -41,26 +40,29 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _descController.dispose();
     _customCarController.dispose();
-    _yearController.dispose(); // 👈 حتما dispose شود
+    _yearController.dispose();
     super.dispose();
   }
 
   Future<void> _loadCars({bool isRefresh = false}) async {
     setState(() {
-      if (isRefresh) _isRefreshing = true;
-      else _isLoadingCars = true;
+      if (isRefresh) {
+        _isRefreshing = true;
+      } else {
+        _isLoadingCars = true;
+      }
       _hasCarLoadError = false;
     });
-    
+
     try {
       final api = context.read<ApiService>();
       final cars = await api.getCars();
       if (!mounted) return;
-      
+
       setState(() {
         _cars = cars;
         if (cars.isNotEmpty && _selectedCar == null && !_isCustomCar) {
-          _selectedCar = cars.first; 
+          _selectedCar = cars.first;
         }
       });
     } catch (e) {
@@ -68,7 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() => _hasCarLoadError = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطا در دریافت لیست خودروها. اینترنت را بررسی کنید.')),
+          const SnackBar(
+            content: Text('خطا در دریافت لیست خودروها. اینترنت را بررسی کنید.'),
+          ),
         );
       }
     } finally {
@@ -79,6 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  bool _validateYear(String year) {
+    final n = int.tryParse(year);
+    if (n == null) return false;
+    final shamsi = n >= 1340 && n <= 1410;
+    final gregorian = n >= 1960 && n <= 2030;
+    return shamsi || gregorian;
   }
 
   void _diagnose() {
@@ -107,6 +119,18 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    final year = _yearController.text.trim();
+    if (year.isEmpty || !_validateYear(year)) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'سال ساخت را وارد کنید (مثلاً ۱۴۰۳ شمسی یا ۲۰۲۴ میلادی).',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (_descController.text.trim().length < 5) {
       scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('لطفاً مشکل را کمی واضح‌تر بنویسید.')),
@@ -119,39 +143,26 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // 👈 آماده‌سازی نام ماشین + سال ساخت برای هوش مصنوعی
-    String actualCarId = '';
-    String actualCarName = '';
-    String userMessage = _descController.text.trim();
-    String carYear = _yearController.text.trim();
-
-    if (_isCustomCar) {
-      actualCarName = _customCarController.text.trim();
-      actualCarId = _cars.isNotEmpty ? _cars.first.id : '1';
-      
-      if (carYear.isNotEmpty) {
-        actualCarName = '$actualCarName مدل $carYear';
-      }
-
-      userMessage = "⚠️ نکته: مدل ماشین من در سیستم نبود. ماشین واقعی من «$actualCarName» است. لطفاً عیب‌یابی را دقیقاً بر اساس همین ماشین انجام بده.\n\nشرح مشکل: $userMessage";
-    } else {
-      actualCarName = _selectedCar!.fullName;
-      actualCarId = _selectedCar!.id;
-      
-      if (carYear.isNotEmpty) {
-        actualCarName = '$actualCarName مدل $carYear';
-      }
-    }
+    final String actualCarId =
+        _isCustomCar ? 'custom' : _selectedCar!.id;
+    final String actualCarName = _isCustomCar
+        ? _customCarController.text.trim()
+        : _selectedCar!.fullName;
+    final String userMessage = _descController.text.trim();
 
     _descController.clear();
 
-    navigator.push(MaterialPageRoute(
-      builder: (_) => ChatScreen(
-        carName: actualCarName,
-        carId: actualCarId,
-        initialUserMessage: userMessage,
+    navigator.push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          carName: actualCarName,
+          carId: actualCarId,
+          year: year,
+          initialUserMessage: userMessage,
+          isCustomCar: _isCustomCar,
+        ),
       ),
-    ));
+    );
   }
 
   void _onVoiceRecordTap() {
@@ -159,20 +170,37 @@ class _HomeScreenState extends State<HomeScreen> {
     final auth = context.read<AuthProvider>();
 
     if (!auth.isAuthenticated) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
       return;
     }
 
     if (!_isCustomCar && _selectedCar == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً قبل از ضبط صدا، مدل خودرو را انتخاب کنید.')),
+        const SnackBar(
+          content: Text('لطفاً قبل از ضبط صدا، مدل خودرو را انتخاب کنید.'),
+        ),
       );
       return;
     }
 
     if (_isCustomCar && _customCarController.text.trim().length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً قبل از ضبط صدا، نام خودروی خود را بنویسید.')),
+        const SnackBar(
+          content: Text('لطفاً قبل از ضبط صدا، نام خودروی خود را بنویسید.'),
+        ),
+      );
+      return;
+    }
+
+    final year = _yearController.text.trim();
+    if (year.isEmpty || !_validateYear(year)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('قبل از ضبط صدا، سال ساخت خودرو را وارد کنید.'),
+        ),
       );
       return;
     }
@@ -182,20 +210,21 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    String carYear = _yearController.text.trim();
-    String actualCarId = _isCustomCar ? (_cars.isNotEmpty ? _cars.first.id : '1') : _selectedCar!.id;
-    String actualCarName = _isCustomCar ? _customCarController.text.trim() : _selectedCar!.fullName;
+    final String actualCarId =
+        _isCustomCar ? 'custom' : _selectedCar!.id;
+    final String actualCarName = _isCustomCar
+        ? _customCarController.text.trim()
+        : _selectedCar!.fullName;
 
-    if (carYear.isNotEmpty) {
-      actualCarName = '$actualCarName مدل $carYear';
-    }
-
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => RecordScreen(
-        carName: actualCarName,
-        carId: actualCarId,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecordScreen(
+          carName: actualCarName,
+          carId: actualCarId,
+        ),
       ),
-    ));
+    );
   }
 
   void _showNoCreditDialog() {
@@ -204,9 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.dialogBackgroundColor,
-        title: Text('اعتبار ناکافی', style: TextStyle(color: theme.textTheme.titleLarge?.color)),
-        content: Text('برای ادامه گفتگو و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
-            style: theme.textTheme.bodyMedium),
+        title: Text(
+          'اعتبار ناکافی',
+          style: TextStyle(color: theme.textTheme.titleLarge?.color),
+        ),
+        content: Text(
+          'برای ادامه گفتگو و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
+          style: theme.textTheme.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -224,7 +258,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ).then((goToShop) {
       if (goToShop == true && mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ShopScreen()),
+        );
       }
     });
   }
@@ -239,8 +276,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
-          title: const Text('مکانیک هوشمند', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+          title: const Text(
+            'مکانیک هوشمند',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor:
+              theme.appBarTheme.backgroundColor ?? theme.primaryColor,
           elevation: 0,
           actions: [
             if (auth.isAuthenticated)
@@ -248,16 +289,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.history),
                 tooltip: 'تاریخچه عیب‌یابی',
                 onPressed: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistoryScreen()),
                 ),
               )
             else
               TextButton(
                 onPressed: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
                 ),
-                child: Text('ورود',
-                    style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'ورود',
+                  style: TextStyle(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
           ],
         ),
@@ -270,112 +318,147 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (auth.isAuthenticated) 
+                if (auth.isAuthenticated)
                   _buildCreditCard(auth, theme)
                 else
                   _buildGuestBanner(theme),
-                  
                 const SizedBox(height: 20),
-
-                Text('۱. مشخصات خودروی خود را وارد کنید:',
-                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  '۱. مشخصات خودروی خود را وارد کنید:',
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                
-                // 👈 قرار دادن دراپ‌داون ماشین و فیلد سال ساخت در کنار هم
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 7,
-                      child: _buildCarSelector(theme),
-                    ),
+                    Expanded(flex: 7, child: _buildCarSelector(theme)),
                     const SizedBox(width: 8),
-                    Expanded(
-                      flex: 3,
-                      child: _buildYearField(theme),
-                    ),
+                    Expanded(flex: 3, child: _buildYearField(theme)),
                   ],
                 ),
-                
-                // دکمه تغییر حالت بین لیست و تایپ دستی
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: () {
                       setState(() {
                         _isCustomCar = !_isCustomCar;
-                        if (!_isCustomCar) _customCarController.clear();
-                        else _selectedCar = null;
+                        if (!_isCustomCar) {
+                          _customCarController.clear();
+                        } else {
+                          _selectedCar = null;
+                        }
                       });
                     },
-                    icon: Icon(_isCustomCar ? Icons.arrow_back_rounded : Icons.search_off_rounded, size: 16),
-                    label: Text(_isCustomCar ? 'بازگشت به لیست خودروها' : 'خودروی من در لیست نیست'),
+                    icon: Icon(
+                      _isCustomCar
+                          ? Icons.arrow_back_rounded
+                          : Icons.search_off_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      _isCustomCar
+                          ? 'بازگشت به لیست خودروها'
+                          : 'خودروی من در لیست نیست',
+                    ),
                   ),
                 ),
-
-                // 👈 فراخوانی مشکلات رایج خودرو در صورت وجود
                 _buildCommonIssues(theme),
-
                 const SizedBox(height: 24),
-
-                Text('۲. شرح خرابی را بنویسید:',
-                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  '۲. شرح خرابی را بنویسید:',
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildDescriptionField(theme),
-
                 const SizedBox(height: 24),
-
                 ElevatedButton.icon(
                   icon: const Icon(Icons.chat_bubble_outline_rounded, size: 28),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     elevation: 4,
                   ),
                   onPressed: _diagnose,
-                  label: Text('ارسال به مکانیک هوشمند',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSecondary)),
+                  label: Text(
+                    'ارسال به مکانیک هوشمند',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSecondary,
+                    ),
+                  ),
                 ),
-
                 const SizedBox(height: 20),
-                
                 Row(
                   children: [
-                    Expanded(child: Divider(color: theme.hintColor.withOpacity(0.2), thickness: 1.5)),
+                    Expanded(
+                      child: Divider(
+                        color: theme.hintColor.withOpacity(0.2),
+                        thickness: 1.5,
+                      ),
+                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.cardColor,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: theme.hintColor.withOpacity(0.2))
+                        border: Border.all(
+                          color: theme.hintColor.withOpacity(0.2),
+                        ),
                       ),
-                      child: Text('یا روش دقیق‌تر', style: TextStyle(color: theme.colorScheme.secondary, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'یا روش دقیق‌تر',
+                        style: TextStyle(
+                          color: theme.colorScheme.secondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    Expanded(child: Divider(color: theme.hintColor.withOpacity(0.2), thickness: 1.5)),
+                    Expanded(
+                      child: Divider(
+                        color: theme.hintColor.withOpacity(0.2),
+                        thickness: 1.5,
+                      ),
+                    ),
                   ],
                 ),
-                
                 const SizedBox(height: 20),
-
                 ElevatedButton.icon(
                   icon: const Icon(Icons.mic_none_rounded, size: 30),
                   label: const Text('شروع ضبط صدای موتور / خودرو'),
                   onPressed: _onVoiceRecordTap,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 65),
-                    textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                    backgroundColor: theme.scaffoldBackgroundColor, 
+                    textStyle: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    backgroundColor: theme.scaffoldBackgroundColor,
                     foregroundColor: theme.colorScheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    side: BorderSide(color: theme.colorScheme.primary, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    side: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 2,
+                    ),
                     elevation: 0,
                   ),
                 ),
-
                 const SizedBox(height: 36),
                 _buildPromoSection(theme),
                 const SizedBox(height: 30),
@@ -387,38 +470,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 👈 متد ساخت فیلد سال ساخت (کنار اسم ماشین)
   Widget _buildYearField(ThemeData theme) {
     return SizedBox(
-      height: 56, // هم‌اندازه با دراپ‌داون
+      height: 56,
       child: TextField(
         controller: _yearController,
         keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly], // فقط عدد مجاز است
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         maxLength: 4,
         textAlign: TextAlign.center,
-        style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: theme.textTheme.bodyLarge?.color,
+          fontWeight: FontWeight.bold,
+        ),
         decoration: InputDecoration(
-          counterText: "", // پنهان کردن عدد 4/4 زیر باکس
-          hintText: 'مثلاً: 1403',
-          labelText: 'مدل (سال)',
-          labelStyle: TextStyle(fontSize: 13, color: theme.colorScheme.secondary, fontWeight: FontWeight.bold),
+          counterText: '',
+          hintText: '1403',
+          labelText: 'سال *',
+          labelStyle: TextStyle(
+            fontSize: 13,
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.bold,
+          ),
           hintStyle: TextStyle(color: theme.hintColor, fontSize: 12),
           filled: true,
           fillColor: theme.cardColor,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: theme.dividerColor)),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(
+              color: theme.colorScheme.secondary,
+              width: 1.5,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // 👈 بخش خودرو: هندل کردن لیست بازشو یا فیلد تایپ دستی
   Widget _buildCarSelector(ThemeData theme) {
     if (_isCustomCar) {
       return SizedBox(
@@ -429,11 +523,23 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: InputDecoration(
             hintText: 'مثال: تویوتا کمری',
             hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
-            filled: true, 
+            filled: true,
             fillColor: theme.cardColor,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary.withOpacity(0.5))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.secondary.withOpacity(0.5),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.secondary,
+                width: 1.5,
+              ),
+            ),
           ),
         ),
       );
@@ -441,7 +547,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_isLoadingCars && !_isRefreshing) {
       return Container(
-        height: 56, decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
+        height: 56,
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -450,11 +560,20 @@ class _HomeScreenState extends State<HomeScreen> {
       return Container(
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.5))),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Expanded(child: Text('خطا در بارگذاری', style: TextStyle(color: Colors.redAccent, fontSize: 12))),
+            const Expanded(
+              child: Text(
+                'خطا در بارگذاری',
+                style: TextStyle(color: Colors.redAccent, fontSize: 12),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.refresh, size: 18),
               onPressed: () => _loadCars(),
@@ -466,23 +585,51 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_cars.isEmpty && !_isLoadingCars) {
       return Container(
-        height: 56, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
-        child: Text('هیچ خودرویی یافت نشد.', style: TextStyle(color: theme.hintColor, fontSize: 12)),
+        height: 56,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          'هیچ خودرویی یافت نشد.',
+          style: TextStyle(color: theme.hintColor, fontSize: 12),
+        ),
       );
     }
 
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(border: Border.all(color: theme.dividerColor), borderRadius: BorderRadius.circular(16), color: theme.cardColor),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(16),
+        color: theme.cardColor,
+      ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Car>(
-          dropdownColor: theme.scaffoldBackgroundColor, value: _selectedCar, isExpanded: true,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.secondary),
-          hint: Text('خودرو را انتخاب کنید', style: TextStyle(fontSize: 13, color: theme.hintColor)),
+          dropdownColor: theme.scaffoldBackgroundColor,
+          value: _selectedCar,
+          isExpanded: true,
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: theme.colorScheme.secondary,
+          ),
+          hint: Text(
+            'خودرو را انتخاب کنید',
+            style: TextStyle(fontSize: 13, color: theme.hintColor),
+          ),
           items: _cars.map((car) {
             return DropdownMenuItem<Car>(
-              value: car, child: Text(car.fullName, style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontWeight: FontWeight.w600, fontSize: 14)),
+              value: car,
+              child: Text(
+                car.fullName,
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             );
           }).toList(),
           onChanged: (val) => setState(() => _selectedCar = val),
@@ -491,31 +638,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 👈 متد نمایش دکمه‌های مشکلات رایج
   Widget _buildCommonIssues(ThemeData theme) {
     if (_isCustomCar || _selectedCar == null) {
       return const SizedBox.shrink();
     }
 
-    // فیلتر کردن متن‌های بی‌معنی دیتابیس
-    final issues = _selectedCar!.commonIssues.where((issue) => 
-      !issue.contains('اطلاعات دقیقی')).toList();
+    final issues = _selectedCar!.commonIssues
+        .where((issue) => !issue.contains('اطلاعات دقیقی'))
+        .toList();
 
-    if (issues.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (issues.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('مشکلات شایع این خودرو (برای انتخاب ضربه بزنید):',
-              style: TextStyle(
-                color: theme.colorScheme.secondary, 
-                fontWeight: FontWeight.bold, 
-                fontSize: 13
-              )),
+          Text(
+            'مشکلات شایع این خودرو (برای انتخاب ضربه بزنید):',
+            style: TextStyle(
+              color: theme.colorScheme.secondary,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -523,8 +669,13 @@ class _HomeScreenState extends State<HomeScreen> {
             children: issues.map((issue) {
               return ActionChip(
                 backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
-                labelStyle: TextStyle(color: theme.colorScheme.primary, fontSize: 13),
+                side: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                ),
+                labelStyle: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontSize: 13,
+                ),
                 label: Text(issue),
                 onPressed: () {
                   setState(() {
@@ -541,13 +692,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDescriptionField(ThemeData theme) {
     return TextField(
-      controller: _descController, maxLines: 4, maxLength: 300,
+      controller: _descController,
+      maxLines: 4,
+      maxLength: 300,
       style: TextStyle(color: theme.textTheme.bodyLarge?.color, height: 1.5),
       decoration: InputDecoration(
-        hintText: 'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ میزنه...',
-        hintStyle: TextStyle(color: theme.hintColor, fontSize: 14), filled: true, fillColor: theme.cardColor, contentPadding: const EdgeInsets.all(16),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5)),
+        hintText:
+            'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ میزنه...',
+        hintStyle: TextStyle(color: theme.hintColor, fontSize: 14),
+        filled: true,
+        fillColor: theme.cardColor,
+        contentPadding: const EdgeInsets.all(16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.dividerColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: theme.colorScheme.secondary,
+            width: 1.5,
+          ),
+        ),
       ),
     );
   }
@@ -572,7 +738,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 8),
           TextButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            ),
             style: TextButton.styleFrom(
               backgroundColor: theme.colorScheme.primary.withOpacity(0.15),
               foregroundColor: theme.colorScheme.primary,
@@ -589,51 +758,102 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [theme.colorScheme.primary.withOpacity(0.15), Colors.black87],
+          colors: [
+            theme.colorScheme.primary.withOpacity(0.15),
+            Colors.black87,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.3), width: 1.5),
-        boxShadow: [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.05), blurRadius: 20, spreadRadius: 5)],
+        border: Border.all(
+          color: theme.colorScheme.secondary.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.05),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.verified_user_rounded, color: theme.colorScheme.secondary, size: 32),
+              Icon(
+                Icons.verified_user_rounded,
+                color: theme.colorScheme.secondary,
+                size: 32,
+              ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text('چرا مکانیک هوشمند؟',
-                  style: TextStyle(color: theme.colorScheme.secondary, fontSize: 20, fontWeight: FontWeight.bold),
+                child: Text(
+                  'چرا مکانیک هوشمند؟',
+                  style: TextStyle(
+                    color: theme.colorScheme.secondary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد و خیالتان را راحت کند.',
-            style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.9), fontSize: 14, height: 1.6),
+            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد.',
+            style: TextStyle(
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.9),
+              fontSize: 14,
+              height: 1.6,
+            ),
           ),
           const SizedBox(height: 24),
-          _buildPromoItem(theme, icon: Icons.savings_rounded, title: 'پیشگیری بهتر از تعمیر', desc: 'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب جدی وارد کند.'),
+          _buildPromoItem(
+            theme,
+            icon: Icons.savings_rounded,
+            title: 'پیشگیری بهتر از تعمیر',
+            desc:
+                'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب جدی وارد کند.',
+          ),
           const SizedBox(height: 16),
-          _buildPromoItem(theme, icon: Icons.handshake_rounded, title: 'دستیار هوشمند مکانیک شما', desc: 'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک خود کمک کنید.'),
+          _buildPromoItem(
+            theme,
+            icon: Icons.handshake_rounded,
+            title: 'دستیار هوشمند مکانیک شما',
+            desc:
+                'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک خود کمک کنید.',
+          ),
           const SizedBox(height: 16),
-          _buildPromoItem(theme, icon: Icons.timer_rounded, title: 'صرفه‌جویی در زمان', desc: 'بدون سردرگمی، در کمتر از ۱۰ ثانیه ریشه مشکل را بررسی کنید.'),
+          _buildPromoItem(
+            theme,
+            icon: Icons.timer_rounded,
+            title: 'صرفه‌جویی در زمان',
+            desc:
+                'بدون سردرگمی، در کمتر از چند ثانیه ریشه مشکل را بررسی کنید.',
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPromoItem(ThemeData theme, {required IconData icon, required String title, required String desc}) {
+  Widget _buildPromoItem(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String desc,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: theme.cardColor.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+            color: theme.cardColor.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Icon(icon, color: Colors.white70, size: 24),
         ),
         const SizedBox(width: 16),
@@ -641,9 +861,23 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, height: 1.4)),
+              Text(
+                desc,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
             ],
           ),
         ),
@@ -656,11 +890,18 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: auth.isGolden ? [Colors.amber.shade700, Colors.orange.shade900] : [theme.cardColor, theme.cardColor.withOpacity(0.8)],
+          colors: auth.isGolden
+              ? [Colors.amber.shade700, Colors.orange.shade900]
+              : [theme.cardColor, theme.cardColor.withOpacity(0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: auth.isGolden ? Colors.amberAccent : theme.dividerColor, width: auth.isGolden ? 1.5 : 1),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+        border: Border.all(
+          color: auth.isGolden ? Colors.amberAccent : theme.dividerColor,
+          width: auth.isGolden ? 1.5 : 1,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -670,19 +911,45 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-                  child: Icon(auth.isGolden ? Icons.workspace_premium_rounded : Icons.account_balance_wallet_rounded, color: Colors.white, size: 28),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    auth.isGolden
+                        ? Icons.workspace_premium_rounded
+                        : Icons.account_balance_wallet_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(auth.isGolden ? 'اشتراک طلایی (نامحدود)' : 'موجودی اعتبار شما',
-                        style: TextStyle(color: auth.isGolden ? Colors.white : theme.textTheme.bodySmall?.color, fontSize: 12)),
+                      Text(
+                        auth.isGolden
+                            ? 'اشتراک طلایی'
+                            : 'موجودی اعتبار شما',
+                        style: TextStyle(
+                          color: auth.isGolden
+                              ? Colors.white
+                              : theme.textTheme.bodySmall?.color,
+                          fontSize: 12,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(auth.isGolden ? 'فعال می‌باشد' : '${auth.credits} بار عیب‌یابی',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        auth.isGolden
+                            ? 'فعال می‌باشد'
+                            : '${auth.credits} بار عیب‌یابی',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -692,11 +959,21 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!auth.isGolden)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.secondary, foregroundColor: theme.colorScheme.onSecondary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), elevation: 0,
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: theme.colorScheme.onSecondary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
               ),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopScreen())),
-              child: const Text('شارژ حساب', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ShopScreen()),
+              ),
+              child: const Text(
+                'شارژ حساب',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
         ],
       ),
