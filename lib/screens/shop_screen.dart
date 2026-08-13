@@ -15,6 +15,7 @@ class ShopScreen extends StatefulWidget {
 
 class _ShopScreenState extends State<ShopScreen> {
   String? _loadingProductId;
+  bool _withdrawLoading = false;
 
   @override
   void initState() {
@@ -77,6 +78,115 @@ class _ShopScreenState extends State<ShopScreen> {
     return '${buf.toString()} تومان';
   }
 
+  Future<void> _showWithdrawDialog(AuthProvider auth) async {
+    final amountCtrl = TextEditingController(
+      text: auth.earnings >= auth.minWithdrawal
+          ? auth.earnings.toString()
+          : '',
+    );
+    final cardCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          backgroundColor: theme.dialogBackgroundColor,
+          title: const Text('درخواست برداشت دستی'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'موجودی: ${_formatToman(auth.earnings)}\nحداقل: ${_formatToman(auth.minWithdrawal)}',
+                  style: TextStyle(color: theme.hintColor, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'مبلغ (تومان)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: cardCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'شماره کارت ۱۶ رقمی',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'نام صاحب حساب',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'پس از بررسی ادمین، مبلغ به‌صورت دستی واریز می‌شود.',
+                  style: TextStyle(color: theme.hintColor, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('ثبت درخواست'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (ok != true || !mounted) return;
+
+    final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
+    final card = cardCtrl.text.replaceAll(RegExp(r'\s|-'), '');
+    final name = nameCtrl.text.trim();
+
+    setState(() => _withdrawLoading = true);
+    try {
+      await context.read<ApiService>().requestWithdraw(
+            auth.token!,
+            amount: amount,
+            cardNumber: card,
+            fullName: name,
+          );
+      await auth.fetchProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('درخواست برداشت ثبت شد و در انتظار بررسی ادمین است.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('خطا در ثبت درخواست')),
+      );
+    } finally {
+      if (mounted) setState(() => _withdrawLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -122,6 +232,8 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Widget _buildReferralCard(AuthProvider auth, ThemeData theme) {
     final code = auth.referralCode!;
+    final canWithdraw = auth.earnings >= auth.minWithdrawal;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -212,13 +324,27 @@ class _ShopScreenState extends State<ShopScreen> {
               ),
             ],
           ),
-          if (auth.earnings > 0) ...[
-            const SizedBox(height: 8),
-            Text(
-              'حداقل برداشت: ${_formatToman(auth.minWithdrawal)} — برای تسویه با پشتیبانی در ارتباط باشید.',
-              style: TextStyle(color: theme.hintColor, fontSize: 11),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: (!canWithdraw || _withdrawLoading)
+                  ? null
+                  : () => _showWithdrawDialog(auth),
+              icon: _withdrawLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.account_balance_wallet_outlined),
+              label: Text(
+                canWithdraw
+                    ? 'درخواست برداشت دستی'
+                    : 'حداقل برداشت: ${_formatToman(auth.minWithdrawal)}',
+              ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -319,7 +445,8 @@ class _ShopScreenState extends State<ShopScreen> {
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                        color: isGold ? Colors.amber : theme.colorScheme.onPrimary,
+                        color:
+                            isGold ? Colors.amber : theme.colorScheme.onPrimary,
                         strokeWidth: 2,
                       ),
                     )
