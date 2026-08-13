@@ -1,24 +1,24 @@
 class Constants {
   // ==========================================
-  // Base URLs (آدرس‌های پایه)
+  // Base URLs
   // ==========================================
-  
-  // برای تست روی شبیه‌ساز اندروید (Emulator)
-  // static const String baseUrl = 'http://10.0.2.2:3000/api'; 
-  
-  // برای تست روی آیفون یا مرورگر وب
-  // static const String baseUrl = 'http://localhost:3000/api'; 
-  
-  // برای تست با گوشی واقعی متصل به یک وای‌فای (IP کامپیوتر خودتان را بگذارید)
+
+  // شبیه‌ساز اندروید:
+  // static const String baseUrl = 'http://10.0.2.2:3000/api';
+
+  // لوکال / وب:
+  // static const String baseUrl = 'http://localhost:3000/api';
+
+  // گوشی واقعی در همان شبکه:
   // static const String baseUrl = 'http://192.168.1.X:3000/api';
 
-  // آدرس اصلی سرور (Production)
-  static const String baseUrl = 'https://smart-mec.liara.run/api'; 
+  // Production — با دامنه نهایی هماهنگ کنید
+  static const String baseUrl = 'https://smart-mec.liara.run/api';
 
   // ==========================================
-  // Endpoints (مسیرهای اختصاصی بک‌اند)
+  // Endpoints
   // ==========================================
-  
+
   static const String account = '$baseUrl/account';
   static const String credits = '$baseUrl/account/credits';
   static const String diagnose = '$baseUrl/diagnose';

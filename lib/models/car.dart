@@ -2,19 +2,20 @@ class Car {
   final String id;
   final String brand;
   final String model;
+  /// سال نمونه در لیست (اختیاری) — سال واقعی را کاربر وارد می‌کند
   final String year;
   final String engine;
-  final String? region;        // ME, SA, ...
-  final String? fuelType;      // petrol, diesel, hybrid, electric
-  final String? transmission;  // manual, automatic
+  final String? region;
+  final String? fuelType;
+  final String? transmission;
   final List<String> commonIssues;
-  final List<dynamic> history; // می‌توانید به جای dynamic از نوع DiagnosticCode استفاده کنید
+  final List<dynamic> history;
 
   Car({
     required this.id,
     required this.brand,
     required this.model,
-    required this.year,
+    this.year = '',
     required this.engine,
     this.region,
     this.fuelType,
@@ -25,15 +26,20 @@ class Car {
 
   factory Car.fromJson(Map<String, dynamic> json) {
     return Car(
-      id: json['id'] ?? '',
+      id: (json['id'] ?? '').toString(),
       brand: json['brand'] ?? '',
       model: json['model'] ?? '',
       year: json['year']?.toString() ?? '',
       engine: json['engine'] ?? '',
       region: json['region'],
       fuelType: json['fuelType'],
-      transmission: json['transmission'],
-      commonIssues: List<String>.from(json['commonIssues'] ?? []),
+      transmission: json['transmission'] ?? json['gearbox'],
+      commonIssues: () {
+        final raw = json['commonIssues'];
+        if (raw is List) return List<String>.from(raw.map((e) => e.toString()));
+        if (raw is String && raw.isNotEmpty) return [raw];
+        return <String>[];
+      }(),
       history: List<dynamic>.from(json['history'] ?? []),
     );
   }
@@ -53,9 +59,9 @@ class Car {
     };
   }
 
-  String get fullName => '$brand $model ($year)';
+  /// فقط نام خودرو — بدون سال (سال را کاربر جدا وارد می‌کند)
+  String get fullName => '$brand $model'.trim();
 
-  /// توضیح کامل خودرو با جزئیات فنی
   String get description {
     final parts = <String>[];
     if (engine.isNotEmpty) parts.add(engine);
