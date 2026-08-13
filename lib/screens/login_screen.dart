@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -15,49 +14,70 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
+  final _referralController = TextEditingController();
   bool _codeSent = false;
   bool _isLoading = false;
+  bool _showReferral = false;
 
-  void _verifyOtp() async {
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _codeController.dispose();
+    _referralController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendOtp() async {
+    FocusScope.of(context).unfocus();
+    if (_phoneController.text.length != 11 ||
+        !_phoneController.text.startsWith('09')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('شماره موبایل نامعتبر است.')),
+      );
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      await context.read<ApiService>().sendOtp(_phoneController.text);
+      if (!mounted) return;
+      setState(() => _codeSent = true);
+    } catch (e) {
+      if (!mounted) return;
+      final errorMsg =
+          e is ApiException ? e.message : 'خطا در ارتباط با سرور';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(errorMsg)));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _verifyOtp() async {
     FocusScope.of(context).unfocus();
     if (_codeController.text.length < 4) return;
 
     setState(() => _isLoading = true);
     try {
-      await context.read<AuthProvider>().login(_phoneController.text, _codeController.text);
+      await context.read<AuthProvider>().login(
+            _phoneController.text,
+            _codeController.text,
+            referralCode: _referralController.text.trim().isEmpty
+                ? null
+                : _referralController.text.trim(),
+          );
       if (!mounted) return;
-      
-      // 👇 حل مشکل صفحه سیاه: بازگشت امن به صفحه اصلی
+
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // ... (بقیه کدهای _sendOtp و build دقیقاً مثل کدهای قبلی خودتان باشد)
-  // فقط دقت کنید در متد _sendOtp لاجیک تغییر نکرده است.
-  
-  Future<void> _sendOtp() async {
-    FocusScope.of(context).unfocus();
-    if (_phoneController.text.length != 11 || !_phoneController.text.startsWith('09')) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('شماره موبایل نامعتبر است.')));
-      return;
-    }
-    setState(() => _isLoading = true);
-    try {
-      await context.read<ApiService>().sendOtp(_phoneController.text);
-      if (!mounted) return; 
-      setState(() => _codeSent = true);
-    } catch (e) {
-      if (!mounted) return;
-      final errorMsg = e is ApiException ? e.message : 'خطا در ارتباط با سرور';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -66,24 +86,167 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    // UI همان UI قبلی شماست...
+
     return Scaffold(
       appBar: AppBar(title: const Text('ورود به حساب')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: 24),
+            Icon(
+              Icons.directions_car_filled_rounded,
+              size: 64,
+              color: theme.colorScheme.secondary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'مکانیک هوشمند',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.secondary,
+              ),
+            ),
+            const SizedBox(height: 32),
             if (!_codeSent) ...[
-              TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'شماره موبایل')),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                maxLength: 11,
+                decoration: InputDecoration(
+                  labelText: 'شماره موبایل',
+                  hintText: '09123456789',
+                  counterText: '',
+                  prefixIcon: const Icon(Icons.phone_android),
+                  filled: true,
+                  fillColor: theme.cardColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () =>
+                    setState(() => _showReferral = !_showReferral),
+                child: Text(
+                  _showReferral
+                      ? 'بستن کد معرف'
+                      : 'کد معرف دارید؟ (اختیاری)',
+                ),
+              ),
+              if (_showReferral) ...[
+                TextField(
+                  controller: _referralController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: 'کد معرف',
+                    hintText: 'مثلاً SM12AB3C',
+                    prefixIcon: const Icon(Icons.card_giftcard),
+                    filled: true,
+                    fillColor: theme.cardColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'با کد معرف، ۱ اعتبار اضافه هدیه می‌گیرید.',
+                  style: TextStyle(color: theme.hintColor, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 20),
-              ElevatedButton(onPressed: _isLoading ? null : _sendOtp, child: const Text('ارسال کد')),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _sendOtp,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: theme.colorScheme.secondary,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'ارسال کد تأیید',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+              ),
             ] else ...[
-              TextField(controller: _codeController, decoration: const InputDecoration(labelText: 'کد تایید')),
+              Text(
+                'کد ارسال‌شده به ${_phoneController.text} را وارد کنید',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.hintColor),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'کد تأیید',
+                  counterText: '',
+                  filled: true,
+                  fillColor: theme.cardColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
-              ElevatedButton(onPressed: _isLoading ? null : _verifyOtp, child: const Text('ورود')),
-            ]
+              ElevatedButton(
+                onPressed: _isLoading ? null : _verifyOtp,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: theme.colorScheme.secondary,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'ورود',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+              ),
+              TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => setState(() {
+                          _codeSent = false;
+                          _codeController.clear();
+                        }),
+                child: const Text('تغییر شماره موبایل'),
+              ),
+            ],
           ],
         ),
       ),

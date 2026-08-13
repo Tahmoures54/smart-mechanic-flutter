@@ -17,7 +17,6 @@ class ApiException implements Exception {
 
 class ApiService {
   final http.Client _httpClient;
-  /// عیب‌یابی AI ممکن است تا ۳۰+ ثانیه طول بکشد
   final Duration _timeout = const Duration(seconds: 20);
   final Duration _diagnoseTimeout = const Duration(seconds: 45);
 
@@ -118,12 +117,25 @@ class ApiService {
     _ensureSuccess(response, defaultError: 'خطا در ارسال پیامک');
   }
 
-  Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
+  Future<Map<String, dynamic>> verifyOtp(
+    String phone,
+    String code, {
+    String? referralCode,
+  }) async {
+    final body = <String, dynamic>{
+      'action': 'verify',
+      'phone': phone,
+      'code': code,
+    };
+    if (referralCode != null && referralCode.trim().isNotEmpty) {
+      body['referralCode'] = referralCode.trim();
+    }
+
     final response = await _safeApiCall(
       () => _httpClient.post(
         Uri.parse(Constants.account),
         headers: _getHeaders(),
-        body: jsonEncode({'action': 'verify', 'phone': phone, 'code': code}),
+        body: jsonEncode(body),
       ),
     );
 
@@ -143,7 +155,6 @@ class ApiService {
     return _parseResponseBody(response) as Map<String, dynamic>;
   }
 
-  /// عیب‌یابی — سال ساخت اجباری است؛ برای خودرو سفارشی carId=custom و carName بفرستید
   Future<String> diagnose(
     String token,
     String carId,
@@ -189,9 +200,8 @@ class ApiService {
     );
 
     _ensureSuccess(response, defaultError: 'خطا در دریافت تاریخچه');
-    final List<dynamic> data = _parseResponseBody(response) is List
-        ? _parseResponseBody(response)
-        : [];
+    final parsed = _parseResponseBody(response);
+    final List<dynamic> data = parsed is List ? parsed : [];
     return data
         .map((json) => Diagnostic.fromJson(json as Map<String, dynamic>))
         .toList();
