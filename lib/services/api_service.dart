@@ -155,6 +155,26 @@ class ApiService {
     return _parseResponseBody(response) as Map<String, dynamic>;
   }
 
+  Future<void> requestWithdraw(
+    String token, {
+    required int amount,
+    required String cardNumber,
+    required String fullName,
+  }) async {
+    final response = await _safeApiCall(
+      () => _httpClient.post(
+        Uri.parse(Constants.withdraw),
+        headers: _getHeaders(token),
+        body: jsonEncode({
+          'amount': amount,
+          'cardNumber': cardNumber,
+          'fullName': fullName,
+        }),
+      ),
+    );
+    _ensureSuccess(response, defaultError: 'خطا در ثبت درخواست برداشت');
+  }
+
   Future<String> diagnose(
     String token,
     String carId,
