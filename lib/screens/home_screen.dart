@@ -69,11 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('Error loading cars: $e');
       if (mounted) {
         setState(() => _hasCarLoadError = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('خطا در دریافت لیست خودروها. اینترنت را بررسی کنید.'),
-          ),
-        );
+        _showSnack('خطا در دریافت لیست خودروها. اینترنت را بررسی کنید.');
       }
     } finally {
       if (mounted) {
@@ -85,6 +81,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ✅ متد کمکی برای نمایش Snackbar (جلوگیری از تکرار و انباشت)
+  void _showSnack(String message, {Color? color}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
+    );
+  }
+
   bool _validateYear(String year) {
     final n = int.tryParse(year);
     if (n == null) return false;
@@ -93,71 +98,81 @@ class _HomeScreenState extends State<HomeScreen> {
     return shamsi || gregorian;
   }
 
+  // ✅ منطق مشترک اعتبارسنجی برای هر دو دکمه (متن و صدا)
+  // اگر همه چیز درست بود true برمی‌گرداند
+  bool _validateInputs({required bool requireDescription}) {
+    final auth = context.read<AuthProvider>();
+
+    // ۱. بررسی احراز هویت
+    if (!auth.isAuthenticated) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return false;
+    }
+
+    // ۲. بررسی انتخاب خودرو
+    if (!_isCustomCar && _selectedCar == null) {
+      _showSnack('لطفاً ابتدا خودروی خود را انتخاب کنید.');
+      return false;
+    }
+
+    // ۳. بررسی نام خودروی سفارشی
+    if (_isCustomCar && _customCarController.text.trim().length < 2) {
+      _showSnack('لطفاً نام و مدل خودروی خود را بنویسید.');
+      return false;
+    }
+
+    // ۴. بررسی سال ساخت
+    final year = _yearController.text.trim();
+    if (year.isEmpty || !_validateYear(year)) {
+      _showSnack('سال ساخت را وارد کنید (مثلاً ۱۴۰۳ شمسی یا ۲۰۲۴ میلادی).');
+      return false;
+    }
+
+    // ۵. بررسی توضیحات (فقط برای حالت متنی)
+    if (requireDescription && _descController.text.trim().length < 5) {
+      _showSnack('لطفاً مشکل را کمی واضح‌تر بنویسید.');
+      return false;
+    }
+
+    // ۶. بررسی اعتبار
+    if (!auth.isGolden && auth.credits <= 0) {
+      _showNoCreditDialog();
+      return false;
+    }
+
+    return true;
+  }
+
+  // ✅ گرفتن مشخصات خودرو به‌صورت متمرکز
+  ({String id, String name, String year}) _getCarInfo() {
+    return (
+      id: _isCustomCar ? 'custom' : _selectedCar!.id,
+      name: _isCustomCar
+          ? _customCarController.text.trim()
+          : _selectedCar!.fullName,
+      year: _yearController.text.trim(),
+    );
+  }
+
   void _diagnose() {
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final auth = context.read<AuthProvider>();
-    final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    if (!_validateInputs(requireDescription: true)) return;
 
-    if (!auth.isAuthenticated) {
-      navigator.push(MaterialPageRoute(builder: (_) => const LoginScreen()));
-      return;
-    }
-
-    if (!_isCustomCar && _selectedCar == null) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('لطفاً ابتدا خودروی خود را انتخاب کنید.')),
-      );
-      return;
-    }
-
-    if (_isCustomCar && _customCarController.text.trim().length < 2) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('لطفاً نام و مدل خودروی خود را بنویسید.')),
-      );
-      return;
-    }
-
-    final year = _yearController.text.trim();
-    if (year.isEmpty || !_validateYear(year)) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'سال ساخت را وارد کنید (مثلاً ۱۴۰۳ شمسی یا ۲۰۲۴ میلادی).',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (_descController.text.trim().length < 5) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('لطفاً مشکل را کمی واضح‌تر بنویسید.')),
-      );
-      return;
-    }
-
-    if (!auth.isGolden && auth.credits <= 0) {
-      _showNoCreditDialog();
-      return;
-    }
-
-    final String actualCarId =
-        _isCustomCar ? 'custom' : _selectedCar!.id;
-    final String actualCarName = _isCustomCar
-        ? _customCarController.text.trim()
-        : _selectedCar!.fullName;
-    final String userMessage = _descController.text.trim();
-
+    final car = _getCarInfo();
+    final userMessage = _descController.text.trim();
     _descController.clear();
 
-    navigator.push(
+    Navigator.push(
+      context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          carName: actualCarName,
-          carId: actualCarId,
-          year: year,
+          carName: car.name,
+          carId: car.id,
+          year: car.year,
           initialUserMessage: userMessage,
           isCustomCar: _isCustomCar,
         ),
@@ -167,61 +182,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onVoiceRecordTap() {
     FocusManager.instance.primaryFocus?.unfocus();
-    final auth = context.read<AuthProvider>();
 
-    if (!auth.isAuthenticated) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return;
-    }
+    if (!_validateInputs(requireDescription: false)) return;
 
-    if (!_isCustomCar && _selectedCar == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً قبل از ضبط صدا، مدل خودرو را انتخاب کنید.'),
-        ),
-      );
-      return;
-    }
-
-    if (_isCustomCar && _customCarController.text.trim().length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً قبل از ضبط صدا، نام خودروی خود را بنویسید.'),
-        ),
-      );
-      return;
-    }
-
-    final year = _yearController.text.trim();
-    if (year.isEmpty || !_validateYear(year)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('قبل از ضبط صدا، سال ساخت خودرو را وارد کنید.'),
-        ),
-      );
-      return;
-    }
-
-    if (!auth.isGolden && auth.credits <= 0) {
-      _showNoCreditDialog();
-      return;
-    }
-
-    final String actualCarId =
-        _isCustomCar ? 'custom' : _selectedCar!.id;
-    final String actualCarName = _isCustomCar
-        ? _customCarController.text.trim()
-        : _selectedCar!.fullName;
+    final car = _getCarInfo();
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => RecordScreen(
-          carName: actualCarName,
-          carId: actualCarId,
+          carName: car.name,
+          carId: car.id,
+          year: car.year, // ✅ اصلاح خطای اصلی
         ),
       ),
     );
@@ -746,7 +718,8 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: theme.colorScheme.primary.withOpacity(0.15),
               foregroundColor: theme.colorScheme.primary,
             ),
-            child: const Text('ورود', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('ورود',
+                style: TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -900,7 +873,8 @@ class _HomeScreenState extends State<HomeScreen> {
           width: auth.isGolden ? 1.5 : 1,
         ),
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+          BoxShadow(
+              color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
         ],
       ),
       child: Row(
