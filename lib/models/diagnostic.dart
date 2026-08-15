@@ -1,57 +1,361 @@
 import 'car.dart';
 import 'audio_features.dart';
 
+/// مدل کامل عیب‌یابی
 class Diagnostic {
+  // ── شناسه‌ها ──
   final String id;
   final String carId;
-  final Car? car;
-  final DateTime timestamp;
-  final String? description;
-  final String? result;
-  final AudioFeatures? audioFeatures;
-  final double? confidenceScore;
+  final String? carName;    // نام خودرو در زمان عیب‌یابی (برای نمایش بدون join)
+  final String? carYear;   // سال خودرو در زمان عیب‌یابی
+  final Car? car;           // آبجکت کامل خودرو (اگر سرور populate کرده باشد)
 
-  Diagnostic({
+  // ── زمان‌ها ──
+  final DateTime createdAt;   // زمان ایجاد (تغییر نمی‌کند)
+  final DateTime? updatedAt;  // آخرین آپدیت
+
+  // ── محتوا ──
+  final String? description;     // توضیح کاربر
+  final String? result;          // پاسخ AI
+  final AudioFeatures? audioFeatures; // ویژگی‌های صوتی (اگر از صدا استفاده شده)
+
+  // ── امتیازها ──
+  final double? confidenceScore; // اطمینان AI (0.0 - 1.0)
+  final int? userRating;         // امتیاز کاربر (1-5)
+
+  // ── وضعیت ──
+  final DiagnosticStatus status;
+  final DiagnosticType type;      // متنی یا صوتی
+  final bool isGolden;            // آیا با اشتراک طلایی انجام شده
+
+  // ── اطلاعات اضافی ──
+  final String? errorMessage;     // پیام خطا در صورت شکست
+  final Map<String, dynamic>? metadata; // داده‌های اضافی بدون ساختار ثابت
+
+  const Diagnostic({
     required this.id,
-    required this.timestamp,
-    this.carId = '',
+    required this.carId,
+    required this.createdAt,
+    this.carName,
+    this.carYear,
     this.car,
+    this.updatedAt,
     this.description,
     this.result,
     this.audioFeatures,
     this.confidenceScore,
+    this.userRating,
+    this.status = DiagnosticStatus.completed,
+    this.type = DiagnosticType.text,
+    this.isGolden = false,
+    this.errorMessage,
+    this.metadata,
   });
 
+  // ─────────────────────────────────────────
+  // ── سازنده از JSON ──
+  // ─────────────────────────────────────────
   factory Diagnostic.fromJson(Map<String, dynamic> json) {
-    // بک‌اند ممکن است تاریخ را با کلیدهای مختلفی بفرستد
-    final String? dateString = json['timestamp'] ?? json['createdAt'] ?? json['created_at'];
+    // ── پارس تاریخ‌ها ──
+    final createdAt = _parseDate(
+          json['createdAt'] ?? json['created_at'] ?? json['timestamp'],
+        ) ??
+        DateTime.now();
+
+    final updatedAt = _parseDate(
+      json['updatedAt'] ?? json['updated_at'],
+    );
+
+    // ── پارس Car ──
+    final Car? car = json['car'] is Map<String, dynamic>
+        ? Car.fromJson(json['car'] as Map<String, dynamic>)
+        : null;
+
+    // ── پارس AudioFeatures ──
+    final AudioFeatures? audioFeatures =
+        json['audioFeatures'] is Map<String, dynamic>
+            ? AudioFeatures.fromJson(
+                json['audioFeatures'] as Map<String, dynamic>,
+              )
+            : null;
+
+    // ── پارس metadata ──
+    final Map<String, dynamic>? metadata =
+        json['metadata'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(json['metadata'] as Map)
+            : null;
 
     return Diagnostic(
-      id: (json['id'] ?? '').toString(),
-      carId: json['carId'] ?? '',
-      car: json['car'] != null ? Car.fromJson(json['car']) : null,
-      timestamp: dateString != null 
-          ? DateTime.tryParse(dateString) ?? DateTime.now()
-          : DateTime.now(),
-      description: json['description'],
-      result: json['result'],
-      audioFeatures: json['audioFeatures'] != null
-          ? AudioFeatures.fromJson(json['audioFeatures'])
-          : null,
-      confidenceScore: (json['confidenceScore'] as num?)?.toDouble(),
+      id: _str(json['id']),
+      carId: _str(json['carId'] ?? json['car_id']),
+      carName: json['carName'] as String? ?? json['car_name'] as String?,
+      carYear: json['carYear']?.toString() ?? json['car_year']?.toString(),
+      car: car,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      description: json['description'] as String?,
+      result: json['result'] as String?,
+      audioFeatures: audioFeatures,
+      confidenceScore: _parseDouble(json['confidenceScore'] ?? json['confidence_score']),
+      userRating: _parseInt(json['userRating'] ?? json['user_rating']),
+      status: DiagnosticStatus.fromString(
+        json['status'] as String?,
+      ),
+      type: DiagnosticType.fromString(
+        json['type'] as String?,
+        hasAudio: audioFeatures != null,
+      ),
+      isGolden: _bool(json['isGolden'] ?? json['is_golden']),
+      errorMessage: json['errorMessage'] as String? ?? json['error_message'] as String?,
+      metadata: metadata,
     );
   }
 
+  // ─────────────────────────────────────────
+  // ── تبدیل به JSON ──
+  // ─────────────────────────────────────────
   Map<String, dynamic> toJson() => {
         'id': id,
         'carId': carId,
-        'car': car?.toJson(),
-        'timestamp': timestamp.toIso8601String(),
-        'description': description,
-        'result': result,
-        'audioFeatures': audioFeatures?.toJson(),
-        'confidenceScore': confidenceScore,
+        if (carName != null) 'carName': carName,
+        if (carYear != null) 'carYear': carYear,
+        if (car != null) 'car': car!.toJson(),
+        'createdAt': createdAt.toIso8601String(),
+        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+        if (description != null) 'description': description,
+        if (result != null) 'result': result,
+        if (audioFeatures != null) 'audioFeatures': audioFeatures!.toJson(),
+        if (confidenceScore != null) 'confidenceScore': confidenceScore,
+        if (userRating != null) 'userRating': userRating,
+        'status': status.name,
+        'type': type.name,
+        'isGolden': isGolden,
+        if (errorMessage != null) 'errorMessage': errorMessage,
+        if (metadata != null) 'metadata': metadata,
       };
 
-  String get summary => result ?? description ?? 'بدون خلاصه';
+  // ─────────────────────────────────────────
+  // ── copyWith ──
+  // ─────────────────────────────────────────
+  Diagnostic copyWith({
+    String? id,
+    String? carId,
+    String? carName,
+    String? carYear,
+    Car? car,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? description,
+    String? result,
+    AudioFeatures? audioFeatures,
+    double? confidenceScore,
+    int? userRating,
+    DiagnosticStatus? status,
+    DiagnosticType? type,
+    bool? isGolden,
+    String? errorMessage,
+    Map<String, dynamic>? metadata,
+  }) {
+    return Diagnostic(
+      id: id ?? this.id,
+      carId: carId ?? this.carId,
+      carName: carName ?? this.carName,
+      carYear: carYear ?? this.carYear,
+      car: car ?? this.car,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      description: description ?? this.description,
+      result: result ?? this.result,
+      audioFeatures: audioFeatures ?? this.audioFeatures,
+      confidenceScore: confidenceScore ?? this.confidenceScore,
+      userRating: userRating ?? this.userRating,
+      status: status ?? this.status,
+      type: type ?? this.type,
+      isGolden: isGolden ?? this.isGolden,
+      errorMessage: errorMessage ?? this.errorMessage,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ── Getters محاسباتی ──
+  // ─────────────────────────────────────────
+
+  /// نام خودرو — از carName یا car.fullName یا carId
+  String get displayCarName {
+    if (carName != null && carName!.isNotEmpty) return carName!;
+    if (car != null) return car!.fullName;
+    if (carId.isNotEmpty) return carId;
+    return 'خودروی ناشناس';
+  }
+
+  /// نام خودرو با سال
+  String get displayCarNameWithYear {
+    final name = displayCarName;
+    if (carYear != null && carYear!.isNotEmpty) return '$name ($carYear)';
+    return name;
+  }
+
+  /// خلاصه برای نمایش در تاریخچه
+  String get summary {
+    if (description != null && description!.isNotEmpty) {
+      return description!.length > 80
+          ? '${description!.substring(0, 80)}...'
+          : description!;
+    }
+    if (result != null && result!.isNotEmpty) {
+      return result!.length > 80
+          ? '${result!.substring(0, 80)}...'
+          : result!;
+    }
+    return 'بدون توضیحات';
+  }
+
+  /// نتیجه کامل یا توضیح
+  String get fullContent => result ?? description ?? 'بدون محتوا';
+
+  /// آیا نتیجه دارد
+  bool get hasResult => result != null && result!.isNotEmpty;
+
+  /// آیا داده صوتی دارد
+  bool get hasAudioFeatures => audioFeatures != null;
+
+  /// آیا امتیاز کاربر ثبت شده
+  bool get isRated => userRating != null;
+
+  /// آیا موفق بوده
+  bool get isSuccessful => status == DiagnosticStatus.completed && hasResult;
+
+  /// آیا در حال پردازش است
+  bool get isPending => status == DiagnosticStatus.pending;
+
+  /// آیا با خطا مواجه شده
+  bool get hasFailed => status == DiagnosticStatus.failed;
+
+  /// تاریخ فرمت‌شده برای نمایش
+  String get formattedDate {
+    final d = createdAt;
+    final date =
+        '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+    final time =
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    return '$date  $time';
+  }
+
+  /// سطح اطمینان به صورت درصد
+  String get confidencePercent {
+    if (confidenceScore == null) return '';
+    return '${(confidenceScore! * 100).toStringAsFixed(0)}٪';
+  }
+
+  // ─────────────────────────────────────────
+  // ── مقایسه ──
+  // ─────────────────────────────────────────
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Diagnostic && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => 'Diagnostic('
+      'id=$id, '
+      'car=$displayCarName, '
+      'status=${status.name}, '
+      'type=${type.name}, '
+      'isGolden=$isGolden)';
+
+  // ─────────────────────────────────────────
+  // ── توابع کمکی private ──
+  // ─────────────────────────────────────────
+  static String _str(dynamic value) =>
+      value == null ? '' : value.toString().trim();
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static bool _bool(dynamic value, {bool defaultValue = false}) {
+    if (value == null) return defaultValue;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) return value == 'true' || value == '1';
+    return defaultValue;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── وضعیت عیب‌یابی ──
+// ─────────────────────────────────────────────────────────────────────────────
+enum DiagnosticStatus {
+  pending,    // در انتظار پردازش
+  processing, // در حال پردازش
+  completed,  // انجام‌شده موفق
+  failed;     // شکست خورده
+
+  String get label => switch (this) {
+        DiagnosticStatus.pending => 'در انتظار',
+        DiagnosticStatus.processing => 'در حال پردازش',
+        DiagnosticStatus.completed => 'انجام‌شده',
+        DiagnosticStatus.failed => 'ناموفق',
+      };
+
+  static DiagnosticStatus fromString(String? value) {
+    if (value == null) return DiagnosticStatus.completed;
+    return DiagnosticStatus.values.firstWhere(
+      (e) => e.name == value.toLowerCase(),
+      orElse: () => DiagnosticStatus.completed,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── نوع عیب‌یابی ──
+// ─────────────────────────────────────────────────────────────────────────────
+enum DiagnosticType {
+  text,  // متنی
+  audio; // صوتی
+
+  String get label => switch (this) {
+        DiagnosticType.text => '💬 متنی',
+        DiagnosticType.audio => '🎙️ صوتی',
+      };
+
+  /// پارس از JSON با fallback بر اساس وجود audioFeatures
+  static DiagnosticType fromString(
+    String? value, {
+    bool hasAudio = false,
+  }) {
+    if (value != null) {
+      return DiagnosticType.values.firstWhere(
+        (e) => e.name == value.toLowerCase(),
+        orElse: () => hasAudio ? DiagnosticType.audio : DiagnosticType.text,
+      );
+    }
+    return hasAudio ? DiagnosticType.audio : DiagnosticType.text;
+  }
 }
