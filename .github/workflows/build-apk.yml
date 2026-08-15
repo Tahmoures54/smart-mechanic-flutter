@@ -36,12 +36,10 @@ jobs:
 
       - name: Force Fix Android Configurations
         run: |
-          # 1. آپدیت Kotlin و Gradle
           sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.1.0" apply false/' android/settings.gradle
           sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle
           sed -i -E 's/gradle-[0-9\.]+-all\.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
 
-          # 2. تنظیم SDK و NDK
           sed -i -E 's/^.*compileSdk.*$/    compileSdk = 36/g' android/app/build.gradle
           sed -i -E 's/^.*minSdk.*$/    minSdk = 24/g' android/app/build.gradle
           sed -i -E 's/^.*targetSdk.*$/    targetSdk = 36/g' android/app/build.gradle
@@ -51,17 +49,14 @@ jobs:
             sed -i '/compileSdk = 36/a \    ndkVersion = "26.1.10909125"' android/app/build.gradle
           fi
 
-          # 3. تنظیم نسخه JVM
           sed -i -E 's/VERSION_1_8/VERSION_17/g' android/app/build.gradle
           sed -i -E "s/jvmTarget = '1.8'/jvmTarget = '17'/g" android/app/build.gradle
           sed -i -E 's/jvmTarget = "1.8"/jvmTarget = "17"/g' android/app/build.gradle
 
-          # 4. دسترسی‌های AndroidManifest
           if ! grep -q "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml; then
             sed -i '/<manifest /a \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
           fi
 
-      # ----- مراحل جدید: تولید کلید و تنظیم امضا -----
       - name: Setup Java for keytool
         uses: actions/setup-java@v4
         with:
@@ -70,7 +65,7 @@ jobs:
 
       - name: Generate release keystore
         run: |
-          STORE_PASS="YourStrongPassword123"   # ⚠️ این رمز را می‌توانید تغییر دهید (بعداً یادداشت کنید)
+          STORE_PASS="YourStrongPassword123"
           KEY_ALIAS="release"
           keytool -genkey -v \
             -keystore android/app/release-keystore.jks \
@@ -80,7 +75,6 @@ jobs:
             -keypass "$STORE_PASS" \
             -dname "CN=Mechanic, OU=Dev, O=Smart, L=City, ST=State, C=IR"
 
-          # ذخیره اطلاعات در فایل key.properties
           cat > android/key.properties <<EOF
           storePassword=$STORE_PASS
           keyPassword=$STORE_PASS
@@ -90,7 +84,6 @@ jobs:
 
       - name: Inject signing configuration into build.gradle
         run: |
-          # اضافه کردن بخش signingConfigs قبل از buildTypes
           sed -i '/buildTypes {/i \
           def keystoreProperties = new Properties()\
           def keystorePropertiesFile = rootProject.file('\''key.properties'\'')\
@@ -107,9 +100,7 @@ jobs:
               }\
           }' android/app/build.gradle
 
-          # جایگزینی signingConfig در buildTypes.release
           sed -i '/buildTypes {/,/}/ s/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' android/app/build.gradle
-      # ------------------------------------------------
 
       - name: Install Flutter dependencies
         run: flutter pub get
@@ -120,14 +111,12 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
-      # آپلود APK
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      # آپلود فایل Keystore (برای دانلود و نگهداری)
       - name: Upload release keystore artifact
         uses: actions/upload-artifact@v4
         with:
