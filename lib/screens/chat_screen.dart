@@ -1,11 +1,46 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'shop_screen.dart';
 import 'login_screen.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ── مدل پیام ──
+// ─────────────────────────────────────────────────────────────────────────────
+enum MessageRole { user, assistant, error }
+
+class ChatMessage {
+  final String id;
+  final String text;
+  final MessageRole role;
+  final DateTime timestamp;
+
+  ChatMessage({
+    required this.text,
+    required this.role,
+    DateTime? timestamp,
+  })  : id = DateTime.now().microsecondsSinceEpoch.toString(),
+        timestamp = timestamp ?? DateTime.now();
+
+  bool get isUser => role == MessageRole.user;
+  bool get isAssistant => role == MessageRole.assistant;
+  bool get isError => role == MessageRole.error;
+
+  String get timeLabel {
+    final h = timestamp.hour.toString().padLeft(2, '0');
+    final m = timestamp.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── ChatScreen ──
+// ─────────────────────────────────────────────────────────────────────────────
 class ChatScreen extends StatefulWidget {
   final String carName;
   final String carId;
@@ -26,28 +61,55 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _chatController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+class _ChatScreenState extends State<ChatScreen>
+    with TickerProviderStateMixin {
+  final TextEditingController _inputCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
+  final FocusNode _focusNode = FocusNode();
 
-  final List<Map<String, dynamic>> _messages = [];
+  final List<ChatMessage> _messages = [];
   bool _isTyping = false;
+
+  // ── انیمیشن typing indicator ──
+  late final AnimationController _dotAnimCtrl;
 
   @override
   void initState() {
     super.initState();
-    _messages.add({
-      "isUser": true,
-      "text":
-          "ماشینم ${widget.carName} مدل ${widget.year} است.\nمشکل: ${widget.initialUserMessage}"
-    });
+
+    _dotAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+
+    // ── اضافه کردن پیام اول کاربر ──
+    _messages.add(
+      ChatMessage(
+        text: 'ماشینم ${widget.carName} مدل ${widget.year} است.\n'
+            'مشکل: ${widget.initialUserMessage}',
+        role: MessageRole.user,
+      ),
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchDiagnosis(widget.initialUserMessage);
     });
   }
 
+  @override
+  void dispose() {
+    _inputCtrl.dispose();
+    _scrollCtrl.dispose();
+    _focusNode.dispose();
+    _dotAnimCtrl.dispose();
+    super.dispose();
+  }
+
+  // ─────────────────────────────────────────
+  // ── ارسال به API ──
+  // ─────────────────────────────────────────
   Future<void> _fetchDiagnosis(String description) async {
+    if (!mounted) return;
     setState(() => _isTyping = true);
     _scrollToBottom();
 
@@ -63,31 +125,35 @@ class _ChatScreenState extends State<ChatScreen> {
         carName: widget.isCustomCar ? widget.carName : null,
       );
 
+      // آپدیت پروفایل بدون await
       auth.fetchProfile();
 
       if (!mounted) return;
-      setState(() {
-        _messages.add({"isUser": false, "text": result});
-      });
+      _addMessage(ChatMessage(text: result, role: MessageRole.assistant));
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.statusCode == 402) {
-        _showErrorSystemMessage(
-            'اعتبار شما کافی نیست. لطفاً حساب خود را شارژ کنید.');
+        _addMessage(ChatMessage(
+          text: 'اعتبار شما کافی نیست. لطفاً حساب خود را شارژ کنید.',
+          role: MessageRole.error,
+        ));
         _showNoCreditDialog();
       } else if (e.statusCode == 401) {
-        auth.logout();
+        await auth.logout();
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       } else {
-        _showErrorSystemMessage(e.message);
+        _addMessage(ChatMessage(text: e.message, role: MessageRole.error));
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showErrorSystemMessage(
-          'خطا در ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.');
+      _addMessage(ChatMessage(
+        text: 'خطا در ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.',
+        role: MessageRole.error,
+      ));
     } finally {
       if (mounted) {
         setState(() => _isTyping = false);
@@ -96,54 +162,60 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _showErrorSystemMessage(String error) {
-    setState(() {
-      _messages.add({"isUser": false, "isError": true, "text": "⚠️ خطا: $error"});
-    });
+  void _addMessage(ChatMessage msg) {
+    setState(() => _messages.add(msg));
   }
 
-  void _retryLastRequest() {
-    if (_messages.isEmpty) return;
-
-    setState(() {
-      _messages.removeLast();
-    });
-
-    String lastUserMsg = widget.initialUserMessage;
-    for (int i = _messages.length - 1; i >= 0; i--) {
-      if (_messages[i]['isUser'] == true) {
-        lastUserMsg = _messages[i]['text'];
-        break;
-      }
-    }
-
-    _fetchDiagnosis(lastUserMsg);
-  }
-
+  // ─────────────────────────────────────────
+  // ── ارسال پیام کاربر ──
+  // ─────────────────────────────────────────
   void _sendMessage() {
-    final text = _chatController.text.trim();
-    if (text.isEmpty) return;
+    final text = _inputCtrl.text.trim();
+    if (text.isEmpty || _isTyping) return;
 
     final auth = context.read<AuthProvider>();
-
-    if (!auth.isGolden && auth.credits <= 0) {
+    if (!auth.isGoldenActive && auth.credits <= 0) {
       _showNoCreditDialog();
       return;
     }
 
-    setState(() {
-      _messages.add({"isUser": true, "text": text});
-      _chatController.clear();
-    });
-
+    _addMessage(ChatMessage(text: text, role: MessageRole.user));
+    _inputCtrl.clear();
+    _focusNode.unfocus();
     _fetchDiagnosis(text);
   }
 
+  // ─────────────────────────────────────────
+  // ── تلاش مجدد ──
+  // ─────────────────────────────────────────
+  void _retryLast() {
+    if (_messages.isEmpty) return;
+
+    // حذف آخرین پیام خطا
+    if (_messages.last.isError) {
+      setState(() => _messages.removeLast());
+    }
+
+    // پیدا کردن آخرین پیام کاربر
+    final lastUser = _messages.lastWhere(
+      (m) => m.isUser,
+      orElse: () => ChatMessage(
+        text: widget.initialUserMessage,
+        role: MessageRole.user,
+      ),
+    );
+
+    _fetchDiagnosis(lastUser.text);
+  }
+
+  // ─────────────────────────────────────────
+  // ── scroll ──
+  // ─────────────────────────────────────────
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -151,28 +223,65 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  // ─────────────────────────────────────────
+  // ── کپی متن ──
+  // ─────────────────────────────────────────
+  void _copyMessage(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('متن کپی شد'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.green.shade700,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ── اشتراک‌گذاری ──
+  // ─────────────────────────────────────────
+  void _shareMessage(String text) {
+    Share.share(
+      '🔧 نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
+      subject: 'عیب‌یابی مکانیک هوشمند',
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ── دیالوگ اعتبار ناکافی ──
+  // ─────────────────────────────────────────
   void _showNoCreditDialog() {
     final theme = Theme.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: theme.dialogBackgroundColor,
-        title: Text('اعتبار ناکافی',
-            style: TextStyle(color: theme.textTheme.titleLarge?.color)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'اعتبار ناکافی',
+          style: TextStyle(color: theme.textTheme.titleLarge?.color),
+        ),
         content: Text(
-            'برای ادامه گفتگو و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
-            style: theme.textTheme.bodyMedium),
+          'برای ادامه گفتگو، نیاز به تهیه اعتبار دارید.',
+          style: theme.textTheme.bodyMedium,
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('انصراف')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('انصراف'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.colorScheme.secondary,
               foregroundColor: theme.colorScheme.onSecondary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ShopScreen()),
@@ -185,30 +294,46 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // ─────────────────────────────────────────
+  // ── build ──
+  // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: Row(
           children: [
             CircleAvatar(
               backgroundColor: theme.colorScheme.secondary,
-              child:
-                  const Icon(Icons.support_agent_rounded, color: Colors.black),
+              radius: 18,
+              child: const Icon(
+                Icons.support_agent_rounded,
+                color: Colors.black,
+                size: 20,
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('مکانیک هوشمند',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'مکانیک هوشمند',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   Text(
                     '${widget.carName} · ${widget.year}',
-                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.white70,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -216,190 +341,459 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          // ── نمایش اعتبار ──
+          if (!auth.isGoldenActive)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: auth.credits > 0
+                        ? Colors.green.withOpacity(0.2)
+                        : Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: auth.credits > 0 ? Colors.green : Colors.red,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '${auth.credits} اعتبار',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: auth.credits > 0 ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Center(
+                child: Text('⭐ طلایی',
+                    style: TextStyle(fontSize: 12, color: Colors.amber)),
+              ),
+            ),
+        ],
       ),
-      body: Column(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── نوار اطلاعات خودرو ──
+            _buildCarInfoBanner(theme),
+            // ── لیست پیام‌ها ──
+            Expanded(child: _buildMessageList(theme)),
+            // ── ورودی ──
+            _buildInputArea(theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ── نوار اطلاعات خودرو ──
+  // ─────────────────────────────────────────
+  Widget _buildCarInfoBanner(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.colorScheme.primary.withOpacity(0.07),
+      child: Row(
         children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length && _isTyping) {
-                  return _buildTypingIndicator(theme);
-                }
-
-                final msg = _messages[index];
-                final isLastMessage = index == _messages.length - 1;
-
-                return _buildChatBubble(
-                  msg['text'],
-                  msg['isUser'] == true,
-                  msg['isError'] == true,
-                  isLastMessage,
-                  theme,
-                );
-              },
+          Icon(
+            Icons.directions_car_rounded,
+            size: 16,
+            color: theme.colorScheme.secondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${widget.carName} · ${widget.year}',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.secondary,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          _buildChatInput(theme),
+          const Spacer(),
+          Text(
+            '${_messages.where((m) => m.isUser).length} پیام ارسالی',
+            style: TextStyle(fontSize: 11, color: theme.hintColor),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildChatBubble(
-    String text,
-    bool isUser,
-    bool isError,
-    bool isLastMessage,
-    ThemeData theme,
-  ) {
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
-        decoration: BoxDecoration(
-          color: isUser
-              ? theme.colorScheme.primary.withOpacity(0.2)
-              : (isError ? Colors.red.withOpacity(0.15) : theme.cardColor),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isUser ? 20 : 0),
-            bottomRight: Radius.circular(isUser ? 0 : 20),
-          ),
-          border: Border.all(
-            color: isUser
-                ? theme.colorScheme.primary.withOpacity(0.5)
-                : (isError
-                    ? Colors.redAccent.withOpacity(0.5)
-                    : theme.dividerColor),
+  // ─────────────────────────────────────────
+  // ── لیست پیام‌ها ──
+  // ─────────────────────────────────────────
+  Widget _buildMessageList(ThemeData theme) {
+    return ListView.builder(
+      controller: _scrollCtrl,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _messages.length && _isTyping) {
+          return _buildTypingIndicator(theme);
+        }
+        final msg = _messages[index];
+        final isLast = index == _messages.length - 1;
+        return _buildMessageItem(msg, isLast, theme);
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ── آیتم پیام با انیمیشن و long press ──
+  // ─────────────────────────────────────────
+  Widget _buildMessageItem(ChatMessage msg, bool isLast, ThemeData theme) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      builder: (_, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 16 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: GestureDetector(
+        onLongPress: () => _showMessageOptions(msg),
+        child: Align(
+          alignment:
+              msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.85,
+            ),
+            decoration: BoxDecoration(
+              color: _bubbleColor(msg, theme),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: Radius.circular(msg.isUser ? 18 : 2),
+                bottomRight: Radius.circular(msg.isUser ? 2 : 18),
+              ),
+              border: Border.all(color: _bubbleBorder(msg, theme)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── محتوا ──
+                _buildMessageContent(msg, theme),
+
+                // ── زمان ──
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const Spacer(),
+                    Text(
+                      msg.timeLabel,
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: theme.hintColor.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // ── دکمه retry ──
+                if (msg.isError && isLast) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _retryLast,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('تلاش مجدد'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: const BorderSide(color: Colors.redAccent),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(ChatMessage msg, ThemeData theme) {
+    if (msg.isUser) {
+      return SelectableText(
+        msg.text,
+        style: const TextStyle(
+          fontSize: 14,
+          height: 1.6,
+          color: Colors.white,
+        ),
+        textDirection: TextDirection.rtl,
+      );
+    }
+
+    if (msg.isError) {
+      return SelectableText(
+        '⚠️ ${msg.text}',
+        style: const TextStyle(
+          fontSize: 13,
+          height: 1.6,
+          color: Colors.redAccent,
+        ),
+        textDirection: TextDirection.rtl,
+      );
+    }
+
+    // پیام دستیار — markdown
+    return MarkdownBody(
+      data: msg.text,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        p: const TextStyle(fontSize: 14, height: 1.7, color: Colors.white),
+        h1: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.amber,
+        ),
+        h2: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.orange,
+        ),
+        h3: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: Colors.orangeAccent,
+        ),
+        listBullet: const TextStyle(color: Colors.orange),
+        code: TextStyle(
+          backgroundColor: Colors.black26,
+          color: Colors.greenAccent,
+          fontFamily: 'monospace',
+        ),
+        blockquote: const TextStyle(
+          color: Colors.white70,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ── منوی Long Press ──
+  // ─────────────────────────────────────────
+  void _showMessageOptions(ChatMessage msg) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: theme.cardColor,
+      builder: (ctx) => SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            isUser || isError
-                ? SelectableText(
-                    text,
-                    style: TextStyle(
-                      height: 1.6,
-                      fontSize: 14,
-                      color: isError
-                          ? Colors.redAccent
-                          : (isUser ? Colors.white : Colors.white70),
-                    ),
-                    textDirection: TextDirection.rtl,
-                  )
-                : MarkdownBody(
-                    data: text,
-                    selectable: true,
-                    styleSheet: MarkdownStyleSheet(
-                      p: const TextStyle(
-                          fontSize: 14, height: 1.6, color: Colors.white),
-                      h1: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber),
-                      h2: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange),
-                      listBullet: const TextStyle(color: Colors.orange),
-                    ),
-                  ),
-            if (isError && isLastMessage) ...[
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ElevatedButton.icon(
-                  onPressed: _retryLastRequest,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('تلاش مجدد'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent.withOpacity(0.2),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+            // ── دستگیره ──
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.dividerColor,
+                borderRadius: BorderRadius.circular(2),
               ),
-            ]
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_rounded),
+              title: const Text('کپی متن'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _copyMessage(msg.text);
+              },
+            ),
+            if (msg.isAssistant) ...[
+              ListTile(
+                leading: const Icon(Icons.share_rounded),
+                title: const Text('اشتراک‌گذاری'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _shareMessage(msg.text);
+                },
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  // ─────────────────────────────────────────
+  // ── رنگ‌های حباب ──
+  // ─────────────────────────────────────────
+  Color _bubbleColor(ChatMessage msg, ThemeData theme) {
+    if (msg.isUser) return theme.colorScheme.primary.withOpacity(0.2);
+    if (msg.isError) return Colors.red.withOpacity(0.12);
+    return theme.cardColor;
+  }
+
+  Color _bubbleBorder(ChatMessage msg, ThemeData theme) {
+    if (msg.isUser) return theme.colorScheme.primary.withOpacity(0.4);
+    if (msg.isError) return Colors.redAccent.withOpacity(0.4);
+    return theme.dividerColor;
+  }
+
+  // ─────────────────────────────────────────
+  // ── typing indicator با نقطه‌های متحرک ──
+  // ─────────────────────────────────────────
   Widget _buildTypingIndicator(ThemeData theme) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        margin: const EdgeInsets.only(bottom: 14),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomRight: Radius.circular(20),
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(18),
+            bottomRight: Radius.circular(18),
           ),
+          border: Border.all(color: theme.dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
-              width: 15,
-              height: 15,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.orange),
+            // ── سه نقطه متحرک ──
+            ...List.generate(3, (i) {
+              return AnimatedBuilder(
+                animation: _dotAnimCtrl,
+                builder: (_, __) {
+                  final delay = i * 0.33;
+                  final value = ((_dotAnimCtrl.value - delay) % 1.0)
+                      .clamp(0.0, 1.0);
+                  final scale = 0.6 + 0.4 * sin(value * pi);
+                  return Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.6 + 0.4 * scale),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  );
+                },
+              );
+            }),
+            const SizedBox(width: 10),
+            Text(
+              'در حال تحلیل...',
+              style: TextStyle(color: theme.hintColor, fontSize: 12),
             ),
-            const SizedBox(width: 12),
-            Text('مکانیک هوشمند در حال بررسی...',
-                style: TextStyle(color: theme.hintColor, fontSize: 12)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildChatInput(ThemeData theme) {
+  // ─────────────────────────────────────────
+  // ── ناحیه ورودی ──
+  // ─────────────────────────────────────────
+  Widget _buildInputArea(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         border: Border(top: BorderSide(color: theme.dividerColor)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: TextField(
-              controller: _chatController,
+              controller: _inputCtrl,
+              focusNode: _focusNode,
               enabled: !_isTyping,
+              maxLines: 4,
+              minLines: 1,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessage(),
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
-                hintText: _isTyping ? 'لطفاً صبر کنید...' : 'سوال دیگری دارید؟...',
+                hintText: _isTyping
+                    ? 'لطفاً صبر کنید...'
+                    : 'سوال دیگری دارید؟',
+                hintStyle:
+                    TextStyle(color: theme.hintColor, fontSize: 13),
                 filled: true,
                 fillColor: theme.cardColor,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide:
+                      BorderSide(color: theme.dividerColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.secondary,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor:
-                _isTyping ? theme.disabledColor : theme.colorScheme.primary,
+          // ── دکمه ارسال ──
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: _isTyping
+                  ? theme.disabledColor
+                  : theme.colorScheme.primary,
+              shape: BoxShape.circle,
+            ),
             child: IconButton(
               icon: const Icon(Icons.send_rounded, color: Colors.white),
               onPressed: _isTyping ? null : _sendMessage,
@@ -410,3 +804,15 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── import Math ──
+// ─────────────────────────────────────────────────────────────────────────────
+double sin(double x) => _sin(x);
+double _sin(double x) {
+  // استفاده از sin داخلی dart:math
+  // (این import باید در بالای فایل باشد: import 'dart:math' show sin, pi;)
+  return x - (x * x * x) / 6 + (x * x * x * x * x) / 120;
+}
+
+const double pi = 3.141592653589793;
