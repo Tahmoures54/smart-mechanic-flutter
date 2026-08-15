@@ -12,20 +12,60 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen>
+    with SingleTickerProviderStateMixin {
   List<Diagnostic>? _history;
+  List<Diagnostic>? _filteredHistory;
   String? _error;
   bool _isLoading = false;
+
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
+
+  late final AnimationController _listAnimCtrl;
 
   @override
   void initState() {
     super.initState();
+    _listAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchHistory());
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _listAnimCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── فیلتر جستجو ──
+  void _onSearchChanged() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (_history == null) return;
+
+    setState(() {
+      if (query.isEmpty) {
+        _filteredHistory = _history;
+      } else {
+        _filteredHistory = _history!.where((item) {
+          final carMatch =
+              (item.carName ?? item.carId).toLowerCase().contains(query);
+          final descMatch =
+              (item.description ?? '').toLowerCase().contains(query);
+          return carMatch || descMatch;
+        }).toList();
+      }
+    });
   }
 
   Future<void> _fetchHistory() async {
     if (_isLoading) return;
-    
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -44,183 +84,796 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final api = context.read<ApiService>();
       final history = await api.getHistory(auth.token!);
-      
-      // جلوگیری از خطای setState بعد از بسته شدن صفحه
-      if (!mounted) return; 
-      
+      if (!mounted) return;
+
       setState(() {
         _history = history;
+        _filteredHistory = history;
         _isLoading = false;
       });
+
+      // شروع انیمیشن ورود لیست
+      _listAnimCtrl.forward(from: 0);
     } catch (e) {
       debugPrint('Error fetching history: $e');
       if (!mounted) return;
       setState(() {
-        _error = 'خطا در دریافت اطلاعات. لطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.';
+        _error =
+            'خطا در دریافت اطلاعات. لطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.';
         _isLoading = false;
       });
+    }
+  }
+
+  // ── حذف یک آیتم ──
+  Future<void> _deleteItem(Diagnostic item, int index) async {
+    final auth = context.read<AuthProvider>();
+    if (auth.token == null) return;
+
+    // ── حذف موقت از UI با انیمیشن ──
+    setState(() {
+      _filteredHistory!.removeAt(index);
+      _history!.remove(item);
+    });
+
+    // ── نمایش Snackbar با امکان Undo ──
+    final snack = ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('آیتم حذف شد'),
+        action: SnackBarAction(
+          label: 'بازگشت',
+          onPressed: () {
+            setState(() {
+              _history!.insert(index, item);
+              _filteredHistory!.insert(index, item);
+            });
+          },
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+
+    // ── اگر Undo نشد، از سرور هم حذف کنیم ──
+    final result = await snack.closed;
+    if (result != SnackBarClosedReason.action && mounted) {
+      try {
+        await context.read<ApiService>().deleteHistory(auth.token!, item.id);
+      } catch (_) {
+        // اگر خطا داد، آیتم را برمی‌گردانیم
+        if (mounted) {
+          setState(() {
+            _history!.insert(index, item);
+            _filteredHistory!.insert(index, item);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('خطا در حذف. آیتم بازگردانده شد.'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('تاریخچه عیب‌یابی', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: TextStyle(color: theme.colorScheme.onPrimary),
+                decoration: InputDecoration(
+                  hintText: 'جستجو در تاریخچه...',
+                  hintStyle: TextStyle(
+                    color: theme.colorScheme.onPrimary.withOpacity(0.6),
+                  ),
+                  border: InputBorder.none,
+                ),
+              )
+            : const Text(
+                'تاریخچه عیب‌یابی',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+        centerTitle: !_isSearching,
         elevation: 0,
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+        backgroundColor:
+            theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+        actions: [
+          // ── دکمه جستجو ──
+          if (_history != null && _history!.isNotEmpty)
+            IconButton(
+              icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+              tooltip: _isSearching ? 'بستن جستجو' : 'جستجو',
+              onPressed: () {
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    _filteredHistory = _history;
+                  }
+                });
+              },
+            ),
+          // ── دکمه رفرش ──
+          if (!_isSearching)
+            IconButton(
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              tooltip: 'بارگذاری مجدد',
+              onPressed: _isLoading ? null : _fetchHistory,
+            ),
+        ],
       ),
-      body: _buildBody(theme),
+      body: SafeArea(child: _buildBody(theme)),
     );
   }
 
   Widget _buildBody(ThemeData theme) {
-    // حالت خطا
+    // ── حالت لودینگ اولیه ──
+    if (_isLoading && _history == null) {
+      return _buildLoadingShimmer(theme);
+    }
+
+    // ── حالت خطا ──
     if (_error != null && _history == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.error.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.wifi_off_rounded, color: theme.colorScheme.error, size: 48),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                _error!, 
-                textAlign: TextAlign.center,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16, height: 1.5),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _fetchHistory,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('تلاش مجدد', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildErrorState(theme);
     }
 
-    // حالت در حال بارگذاری
-    if (_history == null) {
-      return const Center(child: CircularProgressIndicator());
+    // ── حالت لیست خالی ──
+    if (_history != null && _history!.isEmpty) {
+      return _buildEmptyState(theme);
     }
 
-    // حالت لیست خالی
-    if (_history!.isEmpty) {
-      return Center(
+    // ── لیست تاریخچه ──
+    if (_filteredHistory != null) {
+      return RefreshIndicator(
+        color: theme.colorScheme.secondary,
+        onRefresh: _fetchHistory,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history_rounded, size: 80, color: theme.hintColor.withOpacity(0.3)),
-            const SizedBox(height: 16),
-            Text(
-              'هنوز هیچ عیب‌یابی ثبت نکرده‌اید.', 
-              style: TextStyle(color: theme.hintColor, fontSize: 16, fontWeight: FontWeight.bold),
+            // ── نوار تعداد نتایج هنگام جستجو ──
+            if (_isSearching && _searchController.text.isNotEmpty)
+              _buildSearchResultBanner(theme),
+            Expanded(
+              child: _filteredHistory!.isEmpty
+                  ? _buildNoSearchResult(theme)
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      itemCount: _filteredHistory!.length,
+                      itemBuilder: (context, index) {
+                        return _buildHistoryItem(
+                          _filteredHistory![index],
+                          index,
+                          theme,
+                        );
+                      },
+                    ),
             ),
           ],
         ),
       );
     }
 
-    // لیست تاریخچه
-    return RefreshIndicator(
-      color: theme.colorScheme.secondary,
-      onRefresh: _fetchHistory,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        itemCount: _history!.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final item = _history![index];
-          return Card(
-            elevation: 2,
-            shadowColor: Colors.black12,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: theme.dividerColor.withOpacity(0.5), width: 1),
+    return const SizedBox.shrink();
+  }
+
+  // ── آیتم تاریخچه با انیمیشن و Swipe حذف ──
+  Widget _buildHistoryItem(Diagnostic item, int index, ThemeData theme) {
+    // انیمیشن ورود تدریجی هر آیتم
+    final itemAnim = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _listAnimCtrl,
+        curve: Interval(
+          (index * 0.1).clamp(0.0, 0.8),
+          ((index * 0.1) + 0.3).clamp(0.0, 1.0),
+          curve: Curves.easeOut,
+        ),
+      ),
+    );
+
+    return AnimatedBuilder(
+      animation: _listAnimCtrl,
+      builder: (context, child) => FadeTransition(
+        opacity: itemAnim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.05, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: _listAnimCtrl,
+            curve: Interval(
+              (index * 0.1).clamp(0.0, 0.8),
+              ((index * 0.1) + 0.3).clamp(0.0, 1.0),
+              curve: Curves.easeOut,
             ),
-            color: theme.cardColor,
-            child: InkWell(
+          )),
+          child: child,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Dismissible(
+          key: ValueKey(item.id),
+          direction: DismissDirection.endToStart,
+          // ── پس‌زمینه Swipe برای حذف ──
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            decoration: BoxDecoration(
+              color: Colors.red.shade700,
               borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ResultScreen(resultText: item.result),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'حذف',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    // آیکون کنار هر آیتم
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.directions_car_rounded, color: theme.colorScheme.primary, size: 28),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.delete_outline_rounded, color: Colors.white),
+              ],
+            ),
+          ),
+          confirmDismiss: (_) async {
+            return await _showDeleteConfirmDialog(item);
+          },
+          onDismissed: (_) => _deleteItem(item, index),
+          child: _buildItemCard(item, index, theme),
+        ),
+      ),
+    );
+  }
+
+  // ── کارت آیتم ──
+  Widget _buildItemCard(Diagnostic item, int index, ThemeData theme) {
+    final isGolden = item.isGolden ?? false;
+    final carLabel = item.carName ?? item.carId;
+    final formattedDate = _formatDate(item.createdAt);
+
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isGolden
+              ? Colors.amber.withOpacity(0.4)
+              : theme.dividerColor.withOpacity(0.5),
+          width: isGolden ? 1.5 : 1,
+        ),
+      ),
+      color: theme.cardColor,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ResultScreen(resultText: item.result),
+            ),
+          );
+        },
+        onLongPress: () => _showItemOptions(item, index),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // ── آیکون خودرو ──
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isGolden
+                          ? Colors.amber.withOpacity(0.15)
+                          : theme.colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(width: 16),
-                    // متن‌ها
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.carId, 
+                    child: Icon(
+                      Icons.directions_car_rounded,
+                      color: isGolden
+                          ? Colors.amber.shade600
+                          : theme.colorScheme.primary,
+                      size: 28,
+                    ),
+                  ),
+                  // ── شماره ردیف ──
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+
+              // ── متن‌ها ──
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── نام خودرو + badge طلایی ──
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            carLabel,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: 15,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isGolden) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: Colors.amber.withOpacity(0.4),
+                              ),
+                            ),
+                            child: const Text(
+                              '⭐ طلایی',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.amber,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+
+                    // ── توضیحات ──
+                    Text(
+                      item.description ?? 'بدون توضیحات',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.textTheme.bodySmall?.color
+                            ?.withOpacity(0.8),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // ── تاریخ ──
+                    if (formattedDate != null)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 12,
+                            color: theme.hintColor,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            item.description ?? 'بدون توضیحات',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                            formattedDate,
                             style: TextStyle(
-                              color: theme.textTheme.bodySmall?.color?.withOpacity(0.8),
-                              fontSize: 13,
-                              height: 1.4,
+                              fontSize: 11,
+                              color: theme.hintColor,
                             ),
                           ),
                         ],
                       ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // ── فلش ──
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: theme.hintColor.withOpacity(0.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── دیالوگ تأیید حذف ──
+  Future<bool?> _showDeleteConfirmDialog(Diagnostic item) {
+    final theme = Theme.of(context);
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: theme.dialogBackgroundColor,
+        title: const Text('حذف تاریخچه'),
+        content: Text(
+          'آیا مطمئن هستید که می‌خواهید این عیب‌یابی را حذف کنید؟',
+          style: theme.textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── منوی Long Press ──
+  void _showItemOptions(Diagnostic item, int index) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: theme.cardColor,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── دستگیره ──
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: theme.dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.open_in_new_rounded),
+                title: const Text('مشاهده نتیجه'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ResultScreen(resultText: item.result),
                     ),
-                    const SizedBox(width: 12),
-                    // فلش انتهای لیست
-                    Icon(
-                      Icons.arrow_forward_ios_rounded, 
-                      size: 16, 
-                      color: theme.hintColor.withOpacity(0.5),
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                title: const Text(
+                  'حذف',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final confirm = await _showDeleteConfirmDialog(item);
+                  if (confirm == true && mounted) {
+                    _deleteItem(item, index);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── نوار نتیجه جستجو ──
+  Widget _buildSearchResultBanner(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.colorScheme.secondary.withOpacity(0.08),
+      child: Text(
+        '${_filteredHistory!.length} نتیجه یافت شد',
+        style: TextStyle(
+          color: theme.colorScheme.secondary,
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // ── حالت عدم نتیجه جستجو ──
+  Widget _buildNoSearchResult(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: theme.hintColor.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'نتیجه‌ای یافت نشد',
+            style: TextStyle(
+              color: theme.hintColor,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'عبارت دیگری را جستجو کنید',
+            style: TextStyle(color: theme.hintColor, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── حالت خطا ──
+  Widget _buildErrorState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                color: theme.colorScheme.error,
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 15,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: theme.colorScheme.onSecondary,
+              ),
+              onPressed: _fetchHistory,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text(
+                'تلاش مجدد',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── حالت خالی ──
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.history_rounded,
+              size: 80,
+              color: theme.hintColor.withOpacity(0.25),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'هنوز عیب‌یابی ثبت نشده',
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'اولین عیب‌یابی خودروی خود را انجام دهید\nو نتیجه آن اینجا ذخیره می‌شود.',
+              style: TextStyle(
+                color: theme.hintColor,
+                fontSize: 13,
+                height: 1.6,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Shimmer لودینگ ──
+  Widget _buildLoadingShimmer(ThemeData theme) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      itemCount: 5,
+      itemBuilder: (_, index) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _ShimmerCard(theme: theme),
+      ),
+    );
+  }
+
+  // ── فرمت تاریخ ──
+  String? _formatDate(DateTime? date) {
+    if (date == null) return null;
+    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}  '
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+// ── ویجت Shimmer برای لودینگ ──
+class _ShimmerCard extends StatefulWidget {
+  final ThemeData theme;
+  const _ShimmerCard({required this.theme});
+
+  @override
+  State<_ShimmerCard> createState() => _ShimmerCardState();
+}
+
+class _ShimmerCardState extends State<_ShimmerCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) {
+        final shimmerColor = Color.lerp(
+          widget.theme.cardColor,
+          widget.theme.dividerColor,
+          _anim.value,
+        )!;
+        return Container(
+          height: 90,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: widget.theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: widget.theme.dividerColor),
+          ),
+          child: Row(
+            children: [
+              // ── آیکون Shimmer ──
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: shimmerColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      height: 14,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: shimmerColor,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 11,
+                      width: 160,
+                      decoration: BoxDecoration(
+                        color: shimmerColor,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          );
-        },
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
