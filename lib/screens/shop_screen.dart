@@ -559,7 +559,9 @@ class _PaymentWebViewState extends State<PaymentWebView> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
+      // ✅ اصلاح شد: onPopInvoked به جای onPopInvokedWithResult
+      // (سازگار با Flutter 3.22.0)
+      onPopInvoked: (didPop) async {
         if (didPop) return;
         if (await _controller.canGoBack()) {
           _controller.goBack();
