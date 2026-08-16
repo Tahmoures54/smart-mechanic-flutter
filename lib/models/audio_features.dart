@@ -1,30 +1,19 @@
-import 'dart:math';
+import 'package:flutter/material.dart'; // ✅ اضافه شد
 
 /// ویژگی‌های استخراج‌شده از صدای موتور خودرو
 class AudioFeatures {
-  /// قدرت سیگنال (Root Mean Square)
-  /// مقادیر معمول: 0.01 (خیلی آرام) تا 0.5+ (بسیار بلند/ناقوبی)
   final double rms;
-  
-  /// فرکانس غالب (دور موتور)
-  /// واحد: هرتز (Hz)
   final double dominantFrequency;
-  
-  /// مرکز طیف (میانگین وزنی فرکانس‌ها)
-  /// نشان‌دهنده «روشنایی» یا «تاریکی» صدا است
   final double spectralCentroid;
-  
-  /// نرخ فرکانس طیفی (Spectral Rolloff)
-  /// فرکانسی که 85% یا 95% انرژی سیگنال زیر آن است
   final double spectralRolloff;
-  
-  /// نرخ عبور از صفر (Zero Crossing Rate)
-  /// نشان‌دهنده میزان نویز یا ریزش صدا است
   final double zeroCrossingRate;
-  
-  /// طیف فرکانسی (برای رسم نمودار)
-  /// ⚠️ هشدار: این لیست ممکن است بسیار بزرگ باشد (مثلاً 2048 نقطه)
   final List<double> frequencySpectrum;
+
+  // ✅ فیلدهای جدید (که sound_analyzer.dart استفاده می‌کند)
+  final double spectralFlux;
+  final double snr;
+  final int sampleRate;
+  final int durationMs;
 
   AudioFeatures({
     required this.rms,
@@ -33,13 +22,16 @@ class AudioFeatures {
     required this.spectralRolloff,
     required this.zeroCrossingRate,
     required this.frequencySpectrum,
+    this.spectralFlux = 0.0,  // ✅ optional با مقدار پیش‌فرض
+    this.snr = 0.0,           // ✅ optional با مقدار پیش‌فرض
+    this.sampleRate = 44100,  // ✅ optional با مقدار پیش‌فرض
+    this.durationMs = 0,      // ✅ optional با مقدار پیش‌فرض
   });
 
-  // ─────────────────────────────────────────────
-  // متدهای کمکی و تفسیر داده
-  // ─────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // متدهای کمکی
+  // ─────────────────────────────────────────
 
-  /// سطح صدای موتور بر اساس RMS
   EngineNoiseLevel get noiseLevel {
     if (rms < 0.05) return EngineNoiseLevel.quiet;
     if (rms < 0.15) return EngineNoiseLevel.normal;
@@ -47,7 +39,6 @@ class AudioFeatures {
     return EngineNoiseLevel.critical;
   }
 
-  /// تفسیر فرکانس غالب (دور موتور)
   String get frequencyInterpretation {
     if (dominantFrequency < 100) return 'بسیار پایین (ارتعاش)';
     if (dominantFrequency < 500) return 'پایین (دور آرام)';
@@ -56,26 +47,21 @@ class AudioFeatures {
     return 'بسیار بالا (ناکوبی احتمالی)';
   }
 
-  /// کاهش حجم نقاط نمودار برای جلوگیری از Lag در UI
-  /// [maxPoints] حداکثر نقاطی که برمی‌گرداند (پیش‌فرض 200)
   List<double> downsampleSpectrum({int maxPoints = 200}) {
     if (frequencySpectrum.length <= maxPoints) {
       return frequencySpectrum;
     }
-
     final step = frequencySpectrum.length / maxPoints;
     final downsampled = <double>[];
-    
     for (var i = 0.0; i < frequencySpectrum.length; i += step) {
       downsampled.add(frequencySpectrum[i.round()]);
     }
-    
     return downsampled;
   }
 
-  // ─────────────────────────────────────────────
+  // ─────────────────────────────────────────
   // Serialization
-  // ─────────────────────────────────────────────
+  // ─────────────────────────────────────────
 
   Map<String, dynamic> toJson() => {
         'rms': rms,
@@ -84,9 +70,12 @@ class AudioFeatures {
         'spectral_rolloff': spectralRolloff,
         'zero_crossing_rate': zeroCrossingRate,
         'frequency_spectrum': frequencySpectrum,
+        'spectral_flux': spectralFlux,
+        'snr': snr,
+        'sample_rate': sampleRate,
+        'duration_ms': durationMs,
       };
 
-  /// ✅ اصلاح شده: جلوگیری از TypeError اگر API عدد صحیح بفرستد
   factory AudioFeatures.fromJson(Map<String, dynamic> json) {
     return AudioFeatures(
       rms: _toDouble(json['rms']),
@@ -95,18 +84,19 @@ class AudioFeatures {
       spectralRolloff: _toDouble(json['spectral_rolloff']),
       zeroCrossingRate: _toDouble(json['zero_crossing_rate']),
       frequencySpectrum: _toDoubleList(json['frequency_spectrum']),
+      spectralFlux: _toDouble(json['spectral_flux']),
+      snr: _toDouble(json['snr']),
+      sampleRate: (json['sample_rate'] as num?)?.toInt() ?? 44100,
+      durationMs: (json['duration_ms'] as num?)?.toInt() ?? 0,
     );
   }
 
-  /// تبدیل ایمن num به double
   static double _toDouble(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();
     return 0.0;
   }
 
-  /// تبدیل ایمن List<dynamic> به List<double>
-  /// (جلوگیری از خطای cast<double>() اگر لیست حاوی int باشد)
   static List<double> _toDoubleList(dynamic value) {
     if (value is List) {
       return value.map((e) => _toDouble(e)).toList();
@@ -114,11 +104,10 @@ class AudioFeatures {
     return [];
   }
 
-  // ─────────────────────────────────────────────
-  // ابزارهای Dart
-  // ─────────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // copyWith / equals / toString
+  // ─────────────────────────────────────────
 
-  /// کپی آبجکت با امکان تغییر فیلدهای خاص
   AudioFeatures copyWith({
     double? rms,
     double? dominantFrequency,
@@ -126,6 +115,10 @@ class AudioFeatures {
     double? spectralRolloff,
     double? zeroCrossingRate,
     List<double>? frequencySpectrum,
+    double? spectralFlux,
+    double? snr,
+    int? sampleRate,
+    int? durationMs,
   }) {
     return AudioFeatures(
       rms: rms ?? this.rms,
@@ -134,6 +127,10 @@ class AudioFeatures {
       spectralRolloff: spectralRolloff ?? this.spectralRolloff,
       zeroCrossingRate: zeroCrossingRate ?? this.zeroCrossingRate,
       frequencySpectrum: frequencySpectrum ?? this.frequencySpectrum,
+      spectralFlux: spectralFlux ?? this.spectralFlux,
+      snr: snr ?? this.snr,
+      sampleRate: sampleRate ?? this.sampleRate,
+      durationMs: durationMs ?? this.durationMs,
     );
   }
 
@@ -141,7 +138,6 @@ class AudioFeatures {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! AudioFeatures) return false;
-    // برای مقایسه لیست، از listEquals استفاده می‌کنیم
     return other.rms == rms &&
         other.dominantFrequency == dominantFrequency &&
         other.spectralCentroid == spectralCentroid &&
@@ -160,7 +156,6 @@ class AudioFeatures {
         Object.hashAll(frequencySpectrum),
       );
 
-  /// مقایسه دو لیست
   static bool _listEquals(List<double> a, List<double> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
@@ -173,16 +168,14 @@ class AudioFeatures {
   String toString() {
     return 'AudioFeatures(rms: ${rms.toStringAsFixed(3)}, '
         'dominantFreq: ${dominantFrequency.toStringAsFixed(1)}Hz, '
-        'centroid: ${spectralCentroid.toStringAsFixed(1)}, '
-        'rolloff: ${spectralRolloff.toStringAsFixed(1)}, '
-        'zcr: ${zeroCrossingRate.toStringAsFixed(3)}, '
+        'snr: ${snr.toStringAsFixed(1)}dB, '
         'spectrumPoints: ${frequencySpectrum.length})';
   }
 }
 
-// ─────────────────────────────────────────────
-// Enum برای سطح صدا
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Enum سطح صدا
+// ─────────────────────────────────────────────────────────────────────────────
 
 enum EngineNoiseLevel {
   quiet,
@@ -197,6 +190,7 @@ enum EngineNoiseLevel {
         EngineNoiseLevel.critical => 'بحرانی',
       };
 
+  // ✅ حالا با import material.dart کار می‌کند
   Color get color => switch (this) {
         EngineNoiseLevel.quiet => Colors.blueAccent,
         EngineNoiseLevel.normal => Colors.green,
