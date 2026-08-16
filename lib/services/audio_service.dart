@@ -233,7 +233,7 @@ class AudioService implements IAudioService {
   // ─────────────────────────────────────────
   @override
   Future<void> startRecording({RecordingConfig? config}) async {
-    _config = config ?? const RecordingConfig.engineAnalysis();
+   _config = config ?? RecordingConfig.engineAnalysis;
 
     if (!_isInitialized) {
       throw AudioServiceException(
