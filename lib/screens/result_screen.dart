@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../models/audio_features.dart'; // ✅ این import اضافه شد
 import '../services/ai_diagnostic_service.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -23,8 +24,6 @@ class _ResultScreenState extends State<ResultScreen>
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
-
-  // برای نمایش gauge انیمیشن‌دار
   late final Animation<double> _gaugeAnim;
 
   @override
@@ -123,13 +122,11 @@ class _ResultScreenState extends State<ResultScreen>
         elevation: 0,
         actions: [
           if (hasResult) ...[
-            // ── دکمه کپی ──
             IconButton(
               tooltip: 'کپی نتیجه',
               icon: const Icon(Icons.copy_rounded),
               onPressed: () => _copyResult(context),
             ),
-            // ── دکمه اشتراک‌گذاری ──
             IconButton(
               tooltip: 'اشتراک‌گذاری',
               icon: const Icon(Icons.share_rounded),
@@ -148,7 +145,6 @@ class _ResultScreenState extends State<ResultScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── بنر موفقیت ──
                   if (hasResult || hasAudio)
                     _buildSuccessBanner(theme),
 
@@ -172,7 +168,6 @@ class _ResultScreenState extends State<ResultScreen>
                     _buildAudioCard(theme),
                   ],
 
-                  // ── حالت خالی ──
                   if (!hasResult && !hasAudio)
                     _buildEmptyState(theme),
 
@@ -276,7 +271,6 @@ class _ResultScreenState extends State<ResultScreen>
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
-            // ── دکمه‌های copy/share داخل کارت ──
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -351,12 +345,10 @@ class _ResultScreenState extends State<ResultScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Gauge بصری RMS ──
             _buildRmsGauge(f.rms, rmsLevel, theme),
             const SizedBox(height: 16),
             const Divider(),
 
-            // ── ردیف‌های داده ──
             _buildAudioFeatureRow(
               icon: Icons.graphic_eq_rounded,
               label: 'قدرت سیگنال (RMS)',
@@ -389,7 +381,6 @@ class _ResultScreenState extends State<ResultScreen>
               theme: theme,
             ),
 
-            // ── راهنمای رنگ‌ها ──
             const SizedBox(height: 16),
             _buildLegend(theme),
           ],
@@ -404,7 +395,6 @@ class _ResultScreenState extends State<ResultScreen>
     _AudioLevel level,
     ThemeData theme,
   ) {
-    // نرمال‌سازی RMS بین 0 تا 1 (حداکثر فرضی 0.5)
     final normalizedRms = (rms / 0.5).clamp(0.0, 1.0);
 
     return Column(
@@ -441,13 +431,11 @@ class _ResultScreenState extends State<ResultScreen>
           ],
         ),
         const SizedBox(height: 10),
-        // ── نوار پیشرفت انیمیشن‌دار ──
         AnimatedBuilder(
           animation: _gaugeAnim,
           builder: (context, _) {
             return Stack(
               children: [
-                // پس‌زمینه
                 Container(
                   height: 14,
                   decoration: BoxDecoration(
@@ -455,20 +443,19 @@ class _ResultScreenState extends State<ResultScreen>
                     borderRadius: BorderRadius.circular(7),
                   ),
                 ),
-                // پر شدن انیمیشن‌دار
                 FractionallySizedBox(
                   widthFactor: normalizedRms * _gaugeAnim.value,
                   child: Container(
                     height: 14,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
                           Colors.green,
                           Colors.yellow,
                           Colors.orange,
                           Colors.red,
                         ],
-                        stops: const [0.0, 0.4, 0.7, 1.0],
+                        stops: [0.0, 0.4, 0.7, 1.0],
                       ),
                       borderRadius: BorderRadius.circular(7),
                       boxShadow: [
@@ -488,15 +475,17 @@ class _ResultScreenState extends State<ResultScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('آرام', style: TextStyle(color: theme.hintColor, fontSize: 10)),
-            Text('بلند', style: TextStyle(color: theme.hintColor, fontSize: 10)),
+            Text('آرام',
+                style: TextStyle(color: theme.hintColor, fontSize: 10)),
+            Text('بلند',
+                style: TextStyle(color: theme.hintColor, fontSize: 10)),
           ],
         ),
       ],
     );
   }
 
-  // ── ردیف داده صوتی با تفسیر ──
+  // ── ردیف داده صوتی ──
   Widget _buildAudioFeatureRow({
     required IconData icon,
     required String label,
@@ -585,7 +574,8 @@ class _ResultScreenState extends State<ResultScreen>
                   const SizedBox(width: 4),
                   Text(
                     level.label,
-                    style: TextStyle(fontSize: 11, color: theme.hintColor),
+                    style:
+                        TextStyle(fontSize: 11, color: theme.hintColor),
                   ),
                 ],
               );
@@ -618,8 +608,13 @@ class _ResultScreenState extends State<ResultScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'متأسفانه پاسخی از سرور دریافت نشد.\nلطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.',
-            style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.6),
+            'متأسفانه پاسخی از سرور دریافت نشد.\n'
+            'لطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.',
+            style: TextStyle(
+              color: theme.hintColor,
+              fontSize: 13,
+              height: 1.6,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -632,7 +627,6 @@ class _ResultScreenState extends State<ResultScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── دکمه بازگشت ──
         ElevatedButton.icon(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.home_rounded),
@@ -651,7 +645,6 @@ class _ResultScreenState extends State<ResultScreen>
           ),
         ),
         const SizedBox(height: 10),
-        // ── دکمه اشتراک‌گذاری ──
         if (widget.resultText != null)
           OutlinedButton.icon(
             onPressed: _shareResult,
@@ -662,7 +655,10 @@ class _ResultScreenState extends State<ResultScreen>
             ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              side: BorderSide(color: theme.colorScheme.secondary, width: 1.5),
+              side: BorderSide(
+                color: theme.colorScheme.secondary,
+                width: 1.5,
+              ),
               foregroundColor: theme.colorScheme.secondary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -674,7 +670,11 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   // ── عنوان بخش ──
-  Widget _buildSectionTitle(IconData icon, String title, ThemeData theme) {
+  Widget _buildSectionTitle(
+    IconData icon,
+    String title,
+    ThemeData theme,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
       child: Row(
@@ -694,7 +694,9 @@ class _ResultScreenState extends State<ResultScreen>
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ── سطح صدا ──
+// ─────────────────────────────────────────────────────────────────────────────
 enum _AudioLevel {
   low,
   normal,
