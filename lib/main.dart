@@ -16,7 +16,6 @@ import 'services/map_service.dart';
 import 'services/api_service.dart';
 import 'services/sound_analyzer.dart';
 import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Entry Point ──
@@ -81,12 +80,12 @@ void main() async {
         ),
 
         // ── Theme ──
-        ChangeNotifierProvider(
+        ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider(),
         ),
 
         // ── Locale ──
-        ChangeNotifierProvider.value(value: localeProvider),
+        ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
       ],
       child: const SmartMechanicApp(),
     ),
@@ -136,7 +135,6 @@ Future<_AppServices> _initServices() async {
     await audio.init();
   } catch (e) {
     debugPrint('[AudioService] خطا در مقداردهی (ادامه بدون صدا): $e');
-    // اپ بدون AudioService هم کار می‌کند
   }
 
   return _AppServices(api: api, audio: audio);
@@ -186,7 +184,7 @@ class SmartMechanicApp extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── نقطه ورود (Splash + Auth Check) ──
+// ── نقطه ورود (Auth Check) ──
 // ─────────────────────────────────────────────────────────────────────────────
 class _AppEntryPoint extends StatelessWidget {
   const _AppEntryPoint();
@@ -200,7 +198,7 @@ class _AppEntryPoint extends StatelessWidget {
       return const _SplashScreen();
     }
 
-    // ── رفتن به خانه (لاگین یا نه) ──
+    // ── رفتن به خانه ──
     return const HomeScreen();
   }
 }
@@ -454,27 +452,4 @@ class AppTheme {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── ThemeProvider ──
-// ─────────────────────────────────────────────────────────────────────────────
-class ThemeProvider with ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.dark;
-
-  ThemeMode get themeMode => _themeMode;
-  bool get isDark => _themeMode == ThemeMode.dark;
-
-  Future<void> setTheme(ThemeMode mode) async {
-    if (_themeMode == mode) return;
-    _themeMode = mode;
-    notifyListeners();
-    // ذخیره در SharedPreferences
-    // final prefs = await SharedPreferences.getInstance();
-    // await prefs.setString(Constants.keyThemeMode, mode.name);
-  }
-
-  void toggleTheme() {
-    setTheme(isDark ? ThemeMode.light : ThemeMode.dark);
-  }
 }
