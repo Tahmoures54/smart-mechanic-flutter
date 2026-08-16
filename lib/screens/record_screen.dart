@@ -77,7 +77,7 @@ class _RecordScreenState extends State<RecordScreen>
         final file = await audioService.stopRecording();
         if (file == null) throw Exception('فایل صوتی ذخیره نشد.');
 
-        final features = await soundAnalyzer.analyze(file.path);
+        final features = await soundAnalyzer.analyze(file.filePath);
 
         if (!mounted) return;
 
