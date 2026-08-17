@@ -35,24 +35,25 @@ class EnvironmentConfig {
     this.enableCrashReporting = true,
   });
 
-  // ── تعریف هر محیط ──
+  // ── تعریف هر محیط (اصلاح شده با آدرس Vercel) ──
+  // نکته: اگر بک‌اند شما مسیر /api را ندارد، آن را از انتهای آدرس‌ها حذف کنید
   static const development = EnvironmentConfig(
     environment: AppEnvironment.development,
-    baseUrl: 'http://localhost:3000/api',
+    baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
     enableLogging: true,
     enableCrashReporting: false,
   );
 
   static const staging = EnvironmentConfig(
     environment: AppEnvironment.staging,
-    baseUrl: 'https://staging.smart-mec.liara.run/api',
+    baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
     enableLogging: true,
     enableCrashReporting: true,
   );
 
   static const production = EnvironmentConfig(
     environment: AppEnvironment.production,
-    baseUrl: 'https://smart-mec.liara.run/api',
+    baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
     enableLogging: false,
     enableCrashReporting: true,
   );
@@ -84,6 +85,8 @@ class Constants {
   // ─────────────────────────────────────────
   // ── Endpoints: Account ──
   // ─────────────────────────────────────────
+  // نکته: در کد قبلی endpoints از baseUrl استفاده میکردند. اگر بک‌اند شما v1 را نیاز دارد،
+  // بهتر است از apiUrl استفاده کنند. فعلا برای جلوگیری از تغییر ناگهانی، روی baseUrl نگه داشته‌ام.
   static String get account => '$baseUrl/account';
   static String get sendOtp => '$baseUrl/account';          // POST {action: send}
   static String get verifyOtp => '$baseUrl/account';        // POST {action: verify}
@@ -109,6 +112,7 @@ class Constants {
   // ── Endpoints: Static ──
   // ─────────────────────────────────────────
   static String get carsJson {
+    // حذف /api از انتهای آدرس برای دسترسی به فایل‌های استاتیک در ریشه دامنه
     final publicBase = baseUrl.replaceAll('/api', '');
     return '$publicBase/cars.json';
   }
