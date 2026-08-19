@@ -1,8 +1,8 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart'; // ✅ اضافه شد
 import 'package:share_plus/share_plus.dart';
-import '../models/audio_features.dart'; // ✅ این import اضافه شد
+import '../models/audio_features.dart';
 import '../services/ai_diagnostic_service.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -61,7 +61,27 @@ class _ResultScreenState extends State<ResultScreen>
     super.dispose();
   }
 
-  // ── اشتراک‌گذاری نتیجه ──
+  // ✅ متد کمکی برای مدیریت Snackbar
+  void _showSnack(String msg, Color color) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(msg),
+          ],
+        ),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _shareResult() {
     if (widget.resultText == null) return;
     Share.share(
@@ -70,28 +90,12 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── کپی متن ──
   void _copyResult(BuildContext context) {
     if (widget.resultText == null) return;
     Clipboard.setData(ClipboardData(text: widget.resultText!));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text('متن نتیجه کپی شد'),
-          ],
-        ),
-        backgroundColor: Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    _showSnack('متن نتیجه کپی شد', Colors.green.shade700);
   }
 
-  // ── تفسیر RMS ──
   _AudioLevel _interpretRms(double rms) {
     if (rms < 0.05) return _AudioLevel.low;
     if (rms < 0.15) return _AudioLevel.normal;
@@ -99,7 +103,6 @@ class _ResultScreenState extends State<ResultScreen>
     return _AudioLevel.critical;
   }
 
-  // ── تفسیر فرکانس ──
   String _interpretFrequency(double freq) {
     if (freq < 100) return 'بسیار پایین (ارتعاش)';
     if (freq < 500) return 'پایین (موتور در دور آرام)';
@@ -145,8 +148,7 @@ class _ResultScreenState extends State<ResultScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (hasResult || hasAudio)
-                    _buildSuccessBanner(theme),
+                  if (hasResult || hasAudio) _buildSuccessBanner(theme),
 
                   if (hasResult) ...[
                     const SizedBox(height: 20),
@@ -157,7 +159,6 @@ class _ResultScreenState extends State<ResultScreen>
                     ),
                     _buildResultCard(theme),
                   ],
-
                   if (hasAudio) ...[
                     const SizedBox(height: 24),
                     _buildSectionTitle(
@@ -167,9 +168,7 @@ class _ResultScreenState extends State<ResultScreen>
                     ),
                     _buildAudioCard(theme),
                   ],
-
-                  if (!hasResult && !hasAudio)
-                    _buildEmptyState(theme),
+                  if (!hasResult && !hasAudio) _buildEmptyState(theme),
 
                   const SizedBox(height: 32),
                   _buildActionButtons(theme),
@@ -183,7 +182,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── بنر موفقیت ──
   Widget _buildSuccessBanner(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -195,9 +193,7 @@ class _ResultScreenState extends State<ResultScreen>
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.3),
-        ),
+        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -229,10 +225,7 @@ class _ResultScreenState extends State<ResultScreen>
                 const SizedBox(height: 2),
                 Text(
                   'نتیجه زیر توسط هوش مصنوعی تولید شده است.',
-                  style: TextStyle(
-                    color: theme.hintColor,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: theme.hintColor, fontSize: 12),
                 ),
               ],
             ),
@@ -242,30 +235,41 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── کارت نتیجه متنی ──
   Widget _buildResultCard(ThemeData theme) {
     return Card(
       elevation: 4,
       shadowColor: theme.colorScheme.primary.withOpacity(0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.primary.withOpacity(0.3),
-        ),
+        side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SelectableText(
-              widget.resultText!,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontSize: 15,
-                height: 1.9,
-                color: Colors.white.withOpacity(0.9),
+            // ✅ استفاده از MarkdownBody برای نمایش درست فرمت‌های هوش مصنوعی
+            MarkdownBody(
+              data: widget.resultText!,
+              selectable: true,
+              styleSheet: MarkdownStyleSheet(
+                p: TextStyle(
+                  fontSize: 15,
+                  height: 1.9,
+                  // ✅ رنگ داینامیک برای سازگاری با تم تاریک و روشن
+                  color: theme.textTheme.bodyLarge?.color ?? Colors.black87,
+                ),
+                h1: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.secondary,
+                ),
+                h2: TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.secondary,
+                ),
+                listBullet: TextStyle(
+                  color: theme.colorScheme.secondary,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -309,9 +313,7 @@ class _ResultScreenState extends State<ResultScreen>
         decoration: BoxDecoration(
           color: theme.colorScheme.secondary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: theme.colorScheme.secondary.withOpacity(0.3),
-          ),
+          border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -332,7 +334,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── کارت داده‌های صوتی ──
   Widget _buildAudioCard(ThemeData theme) {
     final f = widget.audioFeatures!;
     final rmsLevel = _interpretRms(f.rms);
@@ -348,7 +349,6 @@ class _ResultScreenState extends State<ResultScreen>
             _buildRmsGauge(f.rms, rmsLevel, theme),
             const SizedBox(height: 16),
             const Divider(),
-
             _buildAudioFeatureRow(
               icon: Icons.graphic_eq_rounded,
               label: 'قدرت سیگنال (RMS)',
@@ -380,7 +380,6 @@ class _ResultScreenState extends State<ResultScreen>
               value: f.zeroCrossingRate.toStringAsFixed(3),
               theme: theme,
             ),
-
             const SizedBox(height: 16),
             _buildLegend(theme),
           ],
@@ -389,12 +388,7 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── Gauge بصری برای RMS ──
-  Widget _buildRmsGauge(
-    double rms,
-    _AudioLevel level,
-    ThemeData theme,
-  ) {
+  Widget _buildRmsGauge(double rms, _AudioLevel level, ThemeData theme) {
     final normalizedRms = (rms / 0.5).clamp(0.0, 1.0);
 
     return Column(
@@ -412,8 +406,7 @@ class _ResultScreenState extends State<ResultScreen>
               ),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: level.color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
@@ -449,20 +442,12 @@ class _ResultScreenState extends State<ResultScreen>
                     height: 14,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [
-                          Colors.green,
-                          Colors.yellow,
-                          Colors.orange,
-                          Colors.red,
-                        ],
+                        colors: [Colors.green, Colors.yellow, Colors.orange, Colors.red],
                         stops: [0.0, 0.4, 0.7, 1.0],
                       ),
                       borderRadius: BorderRadius.circular(7),
                       boxShadow: [
-                        BoxShadow(
-                          color: level.color.withOpacity(0.4),
-                          blurRadius: 6,
-                        ),
+                        BoxShadow(color: level.color.withOpacity(0.4), blurRadius: 6),
                       ],
                     ),
                   ),
@@ -475,17 +460,14 @@ class _ResultScreenState extends State<ResultScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('آرام',
-                style: TextStyle(color: theme.hintColor, fontSize: 10)),
-            Text('بلند',
-                style: TextStyle(color: theme.hintColor, fontSize: 10)),
+            Text('آرام', style: TextStyle(color: theme.hintColor, fontSize: 10)),
+            Text('بلند', style: TextStyle(color: theme.hintColor, fontSize: 10)),
           ],
         ),
       ],
     );
   }
 
-  // ── ردیف داده صوتی ──
   Widget _buildAudioFeatureRow({
     required IconData icon,
     required String label,
@@ -504,10 +486,7 @@ class _ResultScreenState extends State<ResultScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
-                ),
+                Text(label, style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13)),
                 if (interpretation != null) ...[
                   const SizedBox(height: 2),
                   Text(
@@ -536,7 +515,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── راهنمای رنگ‌ها ──
   Widget _buildLegend(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -549,11 +527,7 @@ class _ResultScreenState extends State<ResultScreen>
         children: [
           Text(
             'راهنمای سطح صدا:',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              color: theme.hintColor,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: theme.hintColor),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -566,17 +540,10 @@ class _ResultScreenState extends State<ResultScreen>
                   Container(
                     width: 10,
                     height: 10,
-                    decoration: BoxDecoration(
-                      color: level.color,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: level.color, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    level.label,
-                    style:
-                        TextStyle(fontSize: 11, color: theme.hintColor),
-                  ),
+                  Text(level.label, style: TextStyle(fontSize: 11, color: theme.hintColor)),
                 ],
               );
             }).toList(),
@@ -586,35 +553,21 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── حالت خالی ──
   Widget _buildEmptyState(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60),
       child: Column(
         children: [
-          Icon(
-            Icons.search_off_rounded,
-            size: 64,
-            color: theme.hintColor.withOpacity(0.4),
-          ),
+          Icon(Icons.search_off_rounded, size: 64, color: theme.hintColor.withOpacity(0.4)),
           const SizedBox(height: 16),
           Text(
             'نتیجه‌ای دریافت نشد',
-            style: TextStyle(
-              color: theme.hintColor,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: theme.hintColor, fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'متأسفانه پاسخی از سرور دریافت نشد.\n'
-            'لطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.',
-            style: TextStyle(
-              color: theme.hintColor,
-              fontSize: 13,
-              height: 1.6,
-            ),
+            'متأسفانه پاسخی از سرور دریافت نشد.\nلطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.',
+            style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.6),
             textAlign: TextAlign.center,
           ),
         ],
@@ -622,7 +575,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ── دکمه‌های اکشن ──
   Widget _buildActionButtons(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -630,17 +582,12 @@ class _ResultScreenState extends State<ResultScreen>
         ElevatedButton.icon(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.home_rounded),
-          label: const Text(
-            'بازگشت به صفحه اصلی',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          label: const Text('بازگشت به صفحه اصلی', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
             backgroundColor: theme.colorScheme.secondary,
             foregroundColor: theme.colorScheme.onSecondary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             elevation: 2,
           ),
         ),
@@ -649,32 +596,19 @@ class _ResultScreenState extends State<ResultScreen>
           OutlinedButton.icon(
             onPressed: _shareResult,
             icon: const Icon(Icons.share_rounded),
-            label: const Text(
-              'اشتراک‌گذاری نتیجه',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
+            label: const Text('اشتراک‌گذاری نتیجه', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              side: BorderSide(
-                color: theme.colorScheme.secondary,
-                width: 1.5,
-              ),
+              side: BorderSide(color: theme.colorScheme.secondary, width: 1.5),
               foregroundColor: theme.colorScheme.secondary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
       ],
     );
   }
 
-  // ── عنوان بخش ──
-  Widget _buildSectionTitle(
-    IconData icon,
-    String title,
-    ThemeData theme,
-  ) {
+  Widget _buildSectionTitle(IconData icon, String title, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
       child: Row(
@@ -694,9 +628,6 @@ class _ResultScreenState extends State<ResultScreen>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── سطح صدا ──
-// ─────────────────────────────────────────────────────────────────────────────
 enum _AudioLevel {
   low,
   normal,
