@@ -59,6 +59,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final cars = await api.getCars();
       if (!mounted) return;
 
+      // ✅ مرتب‌سازی لیست خودروها بر اساس نام (حروف الفبا)
+      cars.sort((a, b) => a.fullName.compareTo(b.fullName));
+
       setState(() {
         _cars = cars;
         if (cars.isNotEmpty && _selectedCar == null && !_isCustomCar) {
@@ -475,6 +478,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─────────────────────────────────────────
+  // ✅ بخش انتخاب خودرو (دکمه باز کردن مودال جستجو)
+  // ─────────────────────────────────────────
   Widget _buildCarSelector(ThemeData theme) {
     if (_isCustomCar) {
       return SizedBox(
@@ -560,43 +566,73 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor),
-        borderRadius: BorderRadius.circular(16),
-        color: theme.cardColor,
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<Car>(
-          dropdownColor: theme.scaffoldBackgroundColor,
-          value: _selectedCar,
-          isExpanded: true,
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: theme.colorScheme.secondary,
-          ),
-          hint: Text(
-            'خودرو را انتخاب کنید',
-            style: TextStyle(fontSize: 13, color: theme.hintColor),
-          ),
-          items: _cars.map((car) {
-            return DropdownMenuItem<Car>(
-              value: car,
+    // ✅ تبدیل به دکمه برای باز کردن Bottom Sheet جستجو
+    return InkWell(
+      onTap: () => _showCarSearchModal(theme),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.dividerColor),
+          borderRadius: BorderRadius.circular(16),
+          color: theme.cardColor,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
               child: Text(
-                car.fullName,
+                _selectedCar?.fullName ?? 'خودرو را انتخاب کنید',
                 style: TextStyle(
-                  color: theme.textTheme.bodyLarge?.color,
-                  fontWeight: FontWeight.w600,
                   fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _selectedCar != null
+                      ? theme.textTheme.bodyLarge?.color
+                      : theme.hintColor,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-            );
-          }).toList(),
-          onChanged: (val) => setState(() => _selectedCar = val),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: theme.colorScheme.secondary,
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // ✅ مودال جستجو و فیلتر خودروها
+  // ─────────────────────────────────────────
+  void _showCarSearchModal(ThemeData theme) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: _CarSearchSheet(
+            cars: _cars,
+            selectedCar: _selectedCar,
+            theme: theme,
+            onCarSelected: (car) {
+              setState(() => _selectedCar = car);
+              Navigator.pop(context);
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -939,6 +975,155 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ ویجت مجزا برای شیت پایین صفحه (جستجوی خودرو)
+// ─────────────────────────────────────────────────────────────────────────────
+class _CarSearchSheet extends StatefulWidget {
+  final List<Car> cars;
+  final Car? selectedCar;
+  final ThemeData theme;
+  final Function(Car) onCarSelected;
+
+  const _CarSearchSheet({
+    required this.cars,
+    required this.selectedCar,
+    required this.theme,
+    required this.onCarSelected,
+  });
+
+  @override
+  State<_CarSearchSheet> createState() => _CarSearchSheetState();
+}
+
+class _CarSearchSheetState extends State<_CarSearchSheet> {
+  final _searchController = TextEditingController();
+  List<Car> _filteredCars = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredCars = widget.cars;
+    _searchController.addListener(_filterCars);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterCars);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterCars() {
+    final query = _searchController.text.toLowerCase().trim();
+    setState(() {
+      _filteredCars = widget.cars.where((car) {
+        return car.fullName.toLowerCase().contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.75,
+      child: Column(
+        children: [
+          // ── هدر شیت ──
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            decoration: BoxDecoration(
+              color: widget.theme.cardColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: widget.theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'انتخاب خودرو',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: widget.theme.textTheme.titleLarge?.color,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'نام خودرو را جستجو کنید... (مثلاً پژو ۲۰۶)',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () {
+                              _searchController.clear();
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: widget.theme.scaffoldBackgroundColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // ── لیست خودروها ──
+          Expanded(
+            child: _filteredCars.isEmpty
+                ? Center(
+                    child: Text(
+                      'خودرویی با این نام یافت نشد',
+                      style: TextStyle(color: widget.theme.hintColor),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _filteredCars.length,
+                    itemBuilder: (context, index) {
+                      final car = _filteredCars[index];
+                      final isSelected = car.id == widget.selectedCar?.id;
+                      return Container(
+                        color: isSelected
+                            ? widget.theme.colorScheme.primary.withOpacity(0.1)
+                            : Colors.transparent,
+                        child: ListTile(
+                          title: Text(
+                            car.fullName,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected
+                                  ? widget.theme.colorScheme.primary
+                                  : widget.theme.textTheme.bodyLarge?.color,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? Icon(Icons.check_circle_rounded,
+                                  color: widget.theme.colorScheme.primary)
+                              : null,
+                          onTap: () => widget.onCarSelected(car),
+                        ),
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );
