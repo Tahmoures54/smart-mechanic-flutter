@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'; // ✅ اضافه شد
+import 'package:flutter/material.dart';
 
 /// ویژگی‌های استخراج‌شده از صدای موتور خودرو
 class AudioFeatures {
@@ -9,7 +9,6 @@ class AudioFeatures {
   final double zeroCrossingRate;
   final List<double> frequencySpectrum;
 
-  // ✅ فیلدهای جدید (که sound_analyzer.dart استفاده می‌کند)
   final double spectralFlux;
   final double snr;
   final int sampleRate;
@@ -22,10 +21,10 @@ class AudioFeatures {
     required this.spectralRolloff,
     required this.zeroCrossingRate,
     required this.frequencySpectrum,
-    this.spectralFlux = 0.0,  // ✅ optional با مقدار پیش‌فرض
-    this.snr = 0.0,           // ✅ optional با مقدار پیش‌فرض
-    this.sampleRate = 44100,  // ✅ optional با مقدار پیش‌فرض
-    this.durationMs = 0,      // ✅ optional با مقدار پیش‌فرض
+    this.spectralFlux = 0.0,
+    this.snr = 0.0,
+    this.sampleRate = 44100,
+    this.durationMs = 0,
   });
 
   // ─────────────────────────────────────────
@@ -51,10 +50,15 @@ class AudioFeatures {
     if (frequencySpectrum.length <= maxPoints) {
       return frequencySpectrum;
     }
-    final step = frequencySpectrum.length / maxPoints;
+    
+    // ✅ الگوریتم بهتر برای Downsample (جلوگیری از تکرار اندیس‌ها)
     final downsampled = <double>[];
-    for (var i = 0.0; i < frequencySpectrum.length; i += step) {
-      downsampled.add(frequencySpectrum[i.round()]);
+    final step = frequencySpectrum.length / maxPoints;
+    double currentIndex = 0.0;
+    
+    while (currentIndex < frequencySpectrum.length) {
+      downsampled.add(frequencySpectrum[currentIndex.round()]);
+      currentIndex += step;
     }
     return downsampled;
   }
@@ -138,11 +142,20 @@ class AudioFeatures {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! AudioFeatures) return false;
-    return other.rms == rms &&
-        other.dominantFrequency == dominantFrequency &&
-        other.spectralCentroid == spectralCentroid &&
-        other.spectralRolloff == spectralRolloff &&
-        other.zeroCrossingRate == zeroCrossingRate &&
+    
+    // ✅ استفاده از حد آستانه برای مقایسه اعداد اعشاری (جلوگیری از باگ‌های دقیق)
+    const epsilon = 1e-10;
+    bool doubleEq(double a, double b) => (a - b).abs() < epsilon;
+
+    return doubleEq(other.rms, rms) &&
+        doubleEq(other.dominantFrequency, dominantFrequency) &&
+        doubleEq(other.spectralCentroid, spectralCentroid) &&
+        doubleEq(other.spectralRolloff, spectralRolloff) &&
+        doubleEq(other.zeroCrossingRate, zeroCrossingRate) &&
+        doubleEq(other.spectralFlux, spectralFlux) && // ✅ اضافه شد
+        doubleEq(other.snr, snr) &&                   // ✅ اضافه شد
+        other.sampleRate == sampleRate &&             // ✅ اضافه شد
+        other.durationMs == durationMs &&             // ✅ اضافه شد
         _listEquals(other.frequencySpectrum, frequencySpectrum);
   }
 
@@ -153,13 +166,19 @@ class AudioFeatures {
         spectralCentroid,
         spectralRolloff,
         zeroCrossingRate,
+        spectralFlux, // ✅ اضافه شد
+        snr,          // ✅ اضافه شد
+        sampleRate,   // ✅ اضافه شد
+        durationMs,   // ✅ اضافه شد
         Object.hashAll(frequencySpectrum),
       );
 
   static bool _listEquals(List<double> a, List<double> b) {
     if (a.length != b.length) return false;
+    // ✅ مقایسه لیست‌های اعشاری نیز با حد آستانه
+    const epsilon = 1e-10;
     for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
+      if ((a[i] - b[i]).abs() > epsilon) return false;
     }
     return true;
   }
@@ -190,7 +209,6 @@ enum EngineNoiseLevel {
         EngineNoiseLevel.critical => 'بحرانی',
       };
 
-  // ✅ حالا با import material.dart کار می‌کند
   Color get color => switch (this) {
         EngineNoiseLevel.quiet => Colors.blueAccent,
         EngineNoiseLevel.normal => Colors.green,
