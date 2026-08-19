@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math'; // ✅ ایمپورت استاندارد کتابخانه ریاضی دارت
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -70,7 +71,6 @@ class _ChatScreenState extends State<ChatScreen>
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
 
-  // ── انیمیشن typing indicator ──
   late final AnimationController _dotAnimCtrl;
 
   @override
@@ -82,7 +82,6 @@ class _ChatScreenState extends State<ChatScreen>
       duration: const Duration(milliseconds: 1200),
     )..repeat();
 
-    // ── اضافه کردن پیام اول کاربر ──
     _messages.add(
       ChatMessage(
         text: 'ماشینم ${widget.carName} مدل ${widget.year} است.\n'
@@ -125,15 +124,15 @@ class _ChatScreenState extends State<ChatScreen>
         carName: widget.isCustomCar ? widget.carName : null,
       );
 
-      // آپدیت پروفایل بدون await
-      auth.fetchProfile();
+      // آپدیت پروفایل بدون مسدود کردن صفحه
+      unawaited(auth.fetchProfile());
 
       if (!mounted) return;
       _addMessage(ChatMessage(text: result, role: MessageRole.assistant));
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.statusCode == 402) {
-        _addMessage(ChatMessage(
+        _addMessage(const ChatMessage(
           text: 'اعتبار شما کافی نیست. لطفاً حساب خود را شارژ کنید.',
           role: MessageRole.error,
         ));
@@ -150,7 +149,7 @@ class _ChatScreenState extends State<ChatScreen>
       }
     } catch (_) {
       if (!mounted) return;
-      _addMessage(ChatMessage(
+      _addMessage(const ChatMessage(
         text: 'خطا در ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.',
         role: MessageRole.error,
       ));
@@ -191,12 +190,10 @@ class _ChatScreenState extends State<ChatScreen>
   void _retryLast() {
     if (_messages.isEmpty) return;
 
-    // حذف آخرین پیام خطا
     if (_messages.last.isError) {
       setState(() => _messages.removeLast());
     }
 
-    // پیدا کردن آخرین پیام کاربر
     final lastUser = _messages.lastWhere(
       (m) => m.isUser,
       orElse: () => ChatMessage(
@@ -212,7 +209,8 @@ class _ChatScreenState extends State<ChatScreen>
   // ── scroll ──
   // ─────────────────────────────────────────
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 120), () {
+    // ✅ استفاده از PostFrameCallback به جای Delay برای دقت بالاتر
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
@@ -342,7 +340,6 @@ class _ChatScreenState extends State<ChatScreen>
           ],
         ),
         actions: [
-          // ── نمایش اعتبار ──
           if (!auth.isGoldenActive)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -384,11 +381,8 @@ class _ChatScreenState extends State<ChatScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // ── نوار اطلاعات خودرو ──
             _buildCarInfoBanner(theme),
-            // ── لیست پیام‌ها ──
             Expanded(child: _buildMessageList(theme)),
-            // ── ورودی ──
             _buildInputArea(theme),
           ],
         ),
@@ -488,10 +482,7 @@ class _ChatScreenState extends State<ChatScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── محتوا ──
                 _buildMessageContent(msg, theme),
-
-                // ── زمان ──
                 const SizedBox(height: 4),
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -507,8 +498,6 @@ class _ChatScreenState extends State<ChatScreen>
                     ),
                   ],
                 ),
-
-                // ── دکمه retry ──
                 if (msg.isError && isLast) ...[
                   const SizedBox(height: 8),
                   Align(
@@ -539,6 +528,9 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  // ─────────────────────────────────────────
+  // ── محتوای پیام (Markdown) ──
+  // ─────────────────────────────────────────
   Widget _buildMessageContent(ChatMessage msg, ThemeData theme) {
     if (msg.isUser) {
       return SelectableText(
@@ -564,35 +556,39 @@ class _ChatScreenState extends State<ChatScreen>
       );
     }
 
-    // پیام دستیار — markdown
+    // ✅ استفاده از رنگ‌های داینامیک تم برای جلوگیری از نامرئی شدن متن در تم روشن
     return MarkdownBody(
       data: msg.text,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
-        p: const TextStyle(fontSize: 14, height: 1.7, color: Colors.white),
-        h1: const TextStyle(
+        p: TextStyle(
+          fontSize: 14, 
+          height: 1.7, 
+          color: theme.textTheme.bodyLarge?.color ?? Colors.black87
+        ),
+        h1: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.amber,
+          color: theme.colorScheme.secondary,
         ),
-        h2: const TextStyle(
+        h2: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.orange,
+          color: theme.colorScheme.secondary,
         ),
-        h3: const TextStyle(
+        h3: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
-          color: Colors.orangeAccent,
+          color: theme.colorScheme.secondary,
         ),
-        listBullet: const TextStyle(color: Colors.orange),
+        listBullet: TextStyle(color: theme.colorScheme.secondary),
         code: TextStyle(
-          backgroundColor: Colors.black26,
-          color: Colors.greenAccent,
+          backgroundColor: theme.dividerColor.withOpacity(0.3),
+          color: theme.colorScheme.error,
           fontFamily: 'monospace',
         ),
-        blockquote: const TextStyle(
-          color: Colors.white70,
+        blockquote: TextStyle(
+          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
           fontSize: 13,
         ),
       ),
@@ -614,7 +610,6 @@ class _ChatScreenState extends State<ChatScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── دستگیره ──
             Container(
               width: 40,
               height: 4,
@@ -671,8 +666,7 @@ class _ChatScreenState extends State<ChatScreen>
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: const BorderRadius.only(
@@ -685,15 +679,17 @@ class _ChatScreenState extends State<ChatScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── سه نقطه متحرک ──
+            // ✅ استفاده از توابع استاندارد دارت (dart:math)
             ...List.generate(3, (i) {
               return AnimatedBuilder(
                 animation: _dotAnimCtrl,
                 builder: (_, __) {
-                  final delay = i * 0.33;
-                  final value = ((_dotAnimCtrl.value - delay) % 1.0)
-                      .clamp(0.0, 1.0);
-                  final scale = 0.6 + 0.4 * sin(value * pi);
+                  // محاسبه تاخیر برای هر نقطه
+                  final delay = i * 0.2;
+                  final t = (_dotAnimCtrl.value - delay) % 1.0;
+                  // استفاده از sin و pi استاندارد و سریع
+                  final scale = 0.5 + 0.5 * sin(t * pi);
+                  
                   return Transform.scale(
                     scale: scale,
                     child: Container(
@@ -701,7 +697,7 @@ class _ChatScreenState extends State<ChatScreen>
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.6 + 0.4 * scale),
+                        color: theme.colorScheme.secondary.withOpacity(0.4 + 0.6 * scale),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -754,11 +750,8 @@ class _ChatScreenState extends State<ChatScreen>
                 fontSize: 14,
               ),
               decoration: InputDecoration(
-                hintText: _isTyping
-                    ? 'لطفاً صبر کنید...'
-                    : 'سوال دیگری دارید؟',
-                hintStyle:
-                    TextStyle(color: theme.hintColor, fontSize: 13),
+                hintText: _isTyping ? 'لطفاً صبر کنید...' : 'سوال دیگری دارید؟',
+                hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
                 filled: true,
                 fillColor: theme.cardColor,
                 contentPadding: const EdgeInsets.symmetric(
@@ -771,8 +764,7 @@ class _ChatScreenState extends State<ChatScreen>
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide:
-                      BorderSide(color: theme.dividerColor),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -785,7 +777,6 @@ class _ChatScreenState extends State<ChatScreen>
             ),
           ),
           const SizedBox(width: 8),
-          // ── دکمه ارسال ──
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
@@ -804,15 +795,3 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── import Math ──
-// ─────────────────────────────────────────────────────────────────────────────
-double sin(double x) => _sin(x);
-double _sin(double x) {
-  // استفاده از sin داخلی dart:math
-  // (این import باید در بالای فایل باشد: import 'dart:math' show sin, pi;)
-  return x - (x * x * x) / 6 + (x * x * x * x * x) / 120;
-}
-
-const double pi = 3.141592653589793;
