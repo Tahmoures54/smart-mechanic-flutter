@@ -13,24 +13,24 @@ class Car {
 
   // ── مشخصات اضافه ──
   final String? region;
-  final String? fuelType;
-  final String? transmission;
-  final String? category;       // سدان، شاسی‌بلند، هاچ‌بک، وانت، ...
-  final String? imageUrl;       // آدرس تصویر خودرو
-  final String? countryOfOrigin; // کشور سازنده: ایران، ژاپن، کره، ...
+  final FuelType? fuelType;               // ✅ تغییر به Enum
+  final TransmissionType? transmission;  // ✅ تغییر به Enum
+  final CarCategory? category;            // ✅ تغییر به Enum
+  final String? imageUrl;       
+  final String? countryOfOrigin; 
 
   // ── ویژگی‌های بولی ──
-  final bool isPopular;         // خودروهای محبوب (برای نمایش اول لیست)
-  final bool isElectric;        // خودروی برقی یا هیبرید
-  final bool isActive;          // آیا در حال تولید است
+  final bool isPopular;         
+  final bool isElectric;        
+  final bool isActive;          
 
   // ── مشکلات و تاریخچه ──
   final List<String> commonIssues;
   final List<CarHistoryEntry> history;
 
   // ── اطلاعات تکمیلی ──
-  final int? productionStartYear;  // سال شروع تولید
-  final int? productionEndYear;    // سال پایان تولید (null یعنی در حال تولید)
+  final int? productionStartYear;  
+  final int? productionEndYear;    
 
   const Car({
     required this.id,
@@ -63,13 +63,13 @@ class Car {
       model: _str(json['model']),
       year: json['year']?.toString() ?? '',
       engine: _str(json['engine']),
-      region: json['region'] as String?,
-      fuelType: json['fuelType'] as String?,
-      transmission: (json['transmission'] ?? json['gearbox']) as String?,
-      category: json['category'] as String?,
-      imageUrl: json['imageUrl'] ?? json['image_url'] as String?,
-      countryOfOrigin:
-          json['countryOfOrigin'] ?? json['country_of_origin'] as String?,
+      region: json['region']?.toString(),
+      // ✅ استفاده از متدهای ایمن تبدیل استرینگ به Enum
+      fuelType: FuelType.fromString(json['fuelType']?.toString()),
+      transmission: TransmissionType.fromString((json['transmission'] ?? json['gearbox'])?.toString()),
+      category: CarCategory.fromString(json['category']?.toString()),
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
+      countryOfOrigin: (json['countryOfOrigin'] ?? json['country_of_origin'])?.toString(),
       isPopular: _bool(json['isPopular'] ?? json['is_popular']),
       isElectric: _bool(json['isElectric'] ?? json['is_electric']),
       isActive: _bool(json['isActive'] ?? json['is_active'], defaultValue: true),
@@ -90,9 +90,10 @@ class Car {
         'year': year,
         'engine': engine,
         if (region != null) 'region': region,
-        if (fuelType != null) 'fuelType': fuelType,
-        if (transmission != null) 'transmission': transmission,
-        if (category != null) 'category': category,
+        // ✅ سریالایز کردن نام Enum به جای استرینگ خام
+        if (fuelType != null) 'fuelType': fuelType!.name,
+        if (transmission != null) 'transmission': transmission!.name,
+        if (category != null) 'category': category!.name,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (countryOfOrigin != null) 'countryOfOrigin': countryOfOrigin,
         'isPopular': isPopular,
@@ -115,9 +116,9 @@ class Car {
     String? year,
     String? engine,
     String? region,
-    String? fuelType,
-    String? transmission,
-    String? category,
+    FuelType? fuelType,
+    TransmissionType? transmission,
+    CarCategory? category,
     String? imageUrl,
     String? countryOfOrigin,
     bool? isPopular,
@@ -174,10 +175,9 @@ class Car {
   String get description {
     final parts = <String>[];
     if (engine.isNotEmpty) parts.add(engine);
-    if (fuelType != null && fuelType!.isNotEmpty) parts.add(fuelType!);
-    if (transmission != null && transmission!.isNotEmpty) {
-      parts.add(transmission!);
-    }
+    // ✅ استفاده از لیبل فارسی Enum
+    if (fuelType != null) parts.add(fuelType!.label);
+    if (transmission != null) parts.add(transmission!.label);
     if (isElectric) parts.add('⚡ برقی');
     return parts.join(' · ');
   }
@@ -199,7 +199,6 @@ class Car {
   // ── مقایسه ──
   // ─────────────────────────────────────────
 
-  /// مقایسه بر اساس id
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -239,8 +238,7 @@ class Car {
   static List<String> _parseStringList(dynamic raw) {
     if (raw is List) {
       return raw
-          .where((e) => e != null)
-          .map((e) => e.toString().trim())
+          .map((e) => e?.toString().trim() ?? '')
           .where((e) => e.isNotEmpty)
           .toList();
     }
@@ -276,20 +274,16 @@ class CarHistoryEntry {
   });
 
   factory CarHistoryEntry.fromJson(Map<String, dynamic> json) {
-    DateTime? date;
-    final dateStr = json['date'] as String?;
-    if (dateStr != null) {
-      try {
-        date = DateTime.parse(dateStr);
-      } catch (_) {}
-    }
+    // ✅ استفاده از tryParse به جای try-catch
+    final dateStr = json['date']?.toString();
+    final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
 
     return CarHistoryEntry(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
-      description: json['description'] as String?,
+      description: json['description']?.toString(),
       date: date,
-      type: json['type'] as String?,
+      type: json['type']?.toString(),
     );
   }
 
@@ -331,13 +325,14 @@ enum CarCategory {
         CarCategory.other => 'سایر',
       };
 
-  /// پارس از رشته JSON
-  static CarCategory fromString(String? value) {
-    if (value == null) return CarCategory.other;
-    return CarCategory.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
-      orElse: () => CarCategory.other,
-    );
+  /// پارس از رشته JSON (ایمن و بدون Exception)
+  static CarCategory? fromString(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    for (final cat in CarCategory.values) {
+      if (cat.name == lower) return cat;
+    }
+    return CarCategory.other;
   }
 }
 
@@ -361,12 +356,13 @@ enum FuelType {
         FuelType.lpg => 'گاز مایع',
       };
 
-  static FuelType fromString(String? value) {
-    if (value == null) return FuelType.gasoline;
-    return FuelType.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
-      orElse: () => FuelType.gasoline,
-    );
+  static FuelType? fromString(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    for (final type in FuelType.values) {
+      if (type.name == lower) return type;
+    }
+    return null; // اگر نوع سوخت نامشخص بود، null برمی‌گردد
   }
 }
 
@@ -386,11 +382,12 @@ enum TransmissionType {
         TransmissionType.dct => 'دوکلاچه',
       };
 
-  static TransmissionType fromString(String? value) {
-    if (value == null) return TransmissionType.manual;
-    return TransmissionType.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
-      orElse: () => TransmissionType.manual,
-    );
+  static TransmissionType? fromString(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    for (final type in TransmissionType.values) {
+      if (type.name == lower) return type;
+    }
+    return null;
   }
 }
