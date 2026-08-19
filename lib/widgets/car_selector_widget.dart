@@ -42,22 +42,10 @@ class CarSelectorWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // ── لودینگ ──
-    if (isLoading) {
-      return _ShimmerBox(theme: theme);
-    }
+    if (isLoading) return _ShimmerBox(theme: theme);
+    if (hasError && cars.isEmpty) return _ErrorBox(onRetry: onRetry, theme: theme);
+    if (cars.isEmpty) return _EmptyBox(theme: theme);
 
-    // ── خطا ──
-    if (hasError && cars.isEmpty) {
-      return _ErrorBox(onRetry: onRetry, theme: theme);
-    }
-
-    // ── خالی ──
-    if (cars.isEmpty) {
-      return _EmptyBox(theme: theme);
-    }
-
-    // ── دکمه انتخاب ──
     final bool isSelected = selectedCar != null;
 
     return Material(
@@ -71,81 +59,54 @@ class CarSelectorWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: theme.cardColor,
             border: Border.all(
-              color: isSelected
-                  ? theme.colorScheme.secondary.withOpacity(0.6)
-                  : theme.dividerColor,
+              color: isSelected ? theme.colorScheme.secondary.withOpacity(0.6) : theme.dividerColor,
               width: isSelected ? 1.5 : 1.0,
             ),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              // ── آیکون ──
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? theme.colorScheme.secondary.withOpacity(0.12)
-                      : theme.dividerColor.withOpacity(0.3),
+                  color: isSelected ? theme.colorScheme.secondary.withOpacity(0.12) : theme.dividerColor.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.directions_car_rounded,
-                  color: isSelected
-                      ? theme.colorScheme.secondary
-                      : theme.hintColor,
+                  color: isSelected ? theme.colorScheme.secondary : theme.hintColor,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-
-              // ── متن ──
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      selectedCar?.fullName ??
-                          'انتخاب یا جستجوی خودرو...',
+                      selectedCar?.fullName ?? 'انتخاب یا جستجوی خودرو...',
                       style: TextStyle(
-                        color: isSelected
-                            ? theme.textTheme.bodyLarge?.color
-                            : theme.hintColor,
+                        color: isSelected ? theme.textTheme.bodyLarge?.color : theme.hintColor,
                         fontSize: 14,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
-                    if (isSelected &&
-                        selectedCar!.description.isNotEmpty) ...[
+                    if (isSelected && selectedCar!.description.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         selectedCar!.description,
-                        style: TextStyle(
-                          color: theme.hintColor,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: theme.hintColor, fontSize: 11),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
                 ),
               ),
-
-              // ── آیکون سمت راست ──
               if (isSelected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: theme.colorScheme.secondary,
-                  size: 18,
-                )
+                Icon(Icons.check_circle_rounded, color: theme.colorScheme.secondary, size: 18)
               else
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: theme.hintColor,
-                ),
+                Icon(Icons.keyboard_arrow_down_rounded, color: theme.hintColor),
             ],
           ),
         ),
@@ -161,10 +122,7 @@ class _CarSearchSheet extends StatefulWidget {
   final List<Car> cars;
   final Car? selectedCar;
 
-  const _CarSearchSheet({
-    required this.cars,
-    required this.selectedCar,
-  });
+  const _CarSearchSheet({required this.cars, required this.selectedCar});
 
   @override
   State<_CarSearchSheet> createState() => _CarSearchSheetState();
@@ -192,14 +150,15 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     super.dispose();
   }
 
-  // ── debounce 250ms ──
   void _onSearchChanged() {
+    // ✅ آپدیت فوری برای نمایش/مخفی دکمه X و شمارش نتایج بدون دابل setState
+    final newQuery = _searchCtrl.text;
+    if (_query == newQuery) return;
+
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 250), () {
-      _applyFilter(_searchCtrl.text);
+      _applyFilter(newQuery);
     });
-    // آپدیت فوری برای نمایش/مخفی دکمه X
-    setState(() => _query = _searchCtrl.text);
   }
 
   void _applyFilter(String query) {
@@ -214,7 +173,9 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
               car.brand.toLowerCase().contains(q) ||
               car.model.toLowerCase().contains(q) ||
               car.engine.toLowerCase().contains(q) ||
-              (car.fuelType?.toLowerCase().contains(q) ?? false);
+              // ✅ اصلاح باگ کرش: استفاده از label برای Enum
+              (car.fuelType?.label.toLowerCase().contains(q) ?? false) ||
+              (car.transmission?.label.toLowerCase().contains(q) ?? false);
         }).toList();
       }
     });
@@ -225,16 +186,10 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     _applyFilter('');
   }
 
-  void _selectCar(Car car) {
-    Navigator.pop(context, car);
-  }
+  void _selectCar(Car car) => Navigator.pop(context, car);
 
-  // ── جداسازی خودروهای محبوب ──
-  List<Car> get _popularCars =>
-      _filtered.where((c) => c.isPopular).toList();
-
-  List<Car> get _regularCars =>
-      _filtered.where((c) => !c.isPopular).toList();
+  List<Car> get _popularCars => _filtered.where((c) => c.isPopular).toList();
+  List<Car> get _regularCars => _filtered.where((c) => !c.isPopular).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -247,82 +202,49 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
-          // ── دستگیره ──
           _buildHandle(theme),
-
-          // ── هدر ──
           _buildHeader(theme),
-
-          // ── فیلد جستجو ──
           _buildSearchField(theme),
-
           const Divider(height: 1),
-
-          // ── لیست ──
           Expanded(child: _buildList(theme)),
         ],
       ),
     );
   }
 
-  Widget _buildHandle(ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.only(top: 10, bottom: 4),
-      height: 4,
-      width: 40,
-      decoration: BoxDecoration(
-        color: theme.dividerColor,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
+  Widget _buildHandle(ThemeData theme) => Container(
+        margin: const EdgeInsets.only(top: 10, bottom: 4),
+        height: 4,
+        width: 40,
+        decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
+      );
 
   Widget _buildHeader(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
       child: Row(
         children: [
-          Icon(
-            Icons.directions_car_rounded,
-            color: theme.colorScheme.secondary,
-            size: 22,
-          ),
+          Icon(Icons.directions_car_rounded, color: theme.colorScheme.secondary, size: 22),
           const SizedBox(width: 8),
-          Text(
-            'انتخاب خودرو',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('انتخاب خودرو', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           const Spacer(),
-          // ── تعداد نتایج ──
           if (_query.isNotEmpty)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color:
-                    theme.colorScheme.secondary.withOpacity(0.12),
+                color: theme.colorScheme.secondary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '${_filtered.length} نتیجه',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.secondary,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary, fontWeight: FontWeight.bold),
               ),
             ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded),
-            onPressed: () => Navigator.pop(context),
-          ),
+          IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
         ],
       ),
     );
@@ -338,75 +260,63 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         decoration: InputDecoration(
           hintText: 'جستجو (پراید، دنا، پژو ۲۰۶، ...)',
           hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
-          prefixIcon:
-              Icon(Icons.search_rounded, color: theme.hintColor),
+          prefixIcon: Icon(Icons.search_rounded, color: theme.hintColor),
           suffixIcon: _query.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  onPressed: _clearSearch,
-                )
+              ? IconButton(icon: const Icon(Icons.close_rounded, size: 20), onPressed: _clearSearch)
               : null,
           filled: true,
           fillColor: theme.cardColor,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: theme.dividerColor),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: theme.colorScheme.secondary,
-              width: 1.5,
-            ),
+            borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5),
           ),
         ),
       ),
     );
   }
 
+  // ✅ استفاده از ListView.builder برای پرفورمنس بهتر
   Widget _buildList(ThemeData theme) {
-    // ── هیچ نتیجه‌ای نیست ──
-    if (_filtered.isEmpty) {
-      return _buildNoResult(theme);
-    }
+    if (_filtered.isEmpty) return _buildNoResult(theme);
 
     final popular = _popularCars;
     final regular = _regularCars;
 
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 16),
-      children: [
-        // ── بخش محبوب‌ها ──
-        if (popular.isNotEmpty && _query.isEmpty) ...[
-          _buildSectionHeader('⭐ محبوب‌ترین‌ها', theme),
-          ...popular.map((car) => _buildCarTile(car, theme)),
-          const Divider(height: 8),
-          _buildSectionHeader('همه خودروها', theme),
-        ],
+    // ساخت یک لیست ترکیبی از هدرها و آیتم‌ها برای builder
+    final items = <dynamic>[];
+    if (popular.isNotEmpty && _query.isEmpty) {
+      items.add('⭐ محبوب‌ترین‌ها');
+      items.addAll(popular);
+      items.add('divider');
+      items.add('همه خودروها');
+      items.addAll(regular);
+    } else {
+      items.addAll(_filtered);
+    }
 
-        // ── بقیه ──
-        ...(_query.isEmpty ? regular : _filtered)
-            .map((car) => _buildCarTile(car, theme)),
-      ],
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 16),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        if (item is String) {
+          if (item == 'divider') return const Divider(height: 8);
+          return _buildSectionHeader(item, theme);
+        } else if (item is Car) {
+          return _buildCarTile(item, theme);
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 
   Widget _buildSectionHeader(String title, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: theme.hintColor,
-        ),
-      ),
+      child: Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.hintColor)),
     );
   }
 
@@ -420,103 +330,58 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         onTap: () => _selectCar(car),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          margin:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected
-                ? theme.colorScheme.secondary.withOpacity(0.1)
-                : Colors.transparent,
+            color: isSelected ? theme.colorScheme.secondary.withOpacity(0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            border: isSelected
-                ? Border.all(
-                    color:
-                        theme.colorScheme.secondary.withOpacity(0.3),
-                  )
-                : null,
+            border: isSelected ? Border.all(color: theme.colorScheme.secondary.withOpacity(0.3)) : null,
           ),
           child: Row(
             children: [
-              // ── آیکون ──
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? theme.colorScheme.secondary.withOpacity(0.15)
-                      : theme.cardColor,
+                  color: isSelected ? theme.colorScheme.secondary.withOpacity(0.15) : theme.cardColor,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.directions_car_rounded,
-                  color: isSelected
-                      ? theme.colorScheme.secondary
-                      : theme.hintColor,
+                  color: isSelected ? theme.colorScheme.secondary : theme.hintColor,
                   size: 18,
                 ),
               ),
               const SizedBox(width: 12),
-
-              // ── متن + توضیح ──
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── نام با highlight ──
-                    _buildHighlightedText(
-                      car.fullName,
-                      query,
-                      theme,
-                      isSelected: isSelected,
-                    ),
+                    _buildHighlightedText(car.fullName, query, theme, isSelected: isSelected),
                     if (car.description.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         car.description,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.hintColor,
-                        ),
+                        style: TextStyle(fontSize: 11, color: theme.hintColor),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
                 ),
               ),
-
-              // ── badge محبوب ──
               if (car.isPopular && _query.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(left: 4),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.amber.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text(
-                    '⭐',
-                    style: TextStyle(fontSize: 10),
-                  ),
+                  child: const Text('⭐', style: TextStyle(fontSize: 10)),
                 ),
-
-              // ── تیک انتخاب ──
               if (isSelected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: theme.colorScheme.secondary,
-                  size: 20,
-                )
+                Icon(Icons.check_circle_rounded, color: theme.colorScheme.secondary, size: 20)
               else
-                Icon(
-                  Icons.chevron_left_rounded,
-                  color: theme.hintColor.withOpacity(0.4),
-                  size: 20,
-                ),
+                Icon(Icons.chevron_left_rounded, color: theme.hintColor.withOpacity(0.4), size: 20),
             ],
           ),
         ),
@@ -524,22 +389,14 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     );
   }
 
-  // ── هایلایت متن جستجوشده ──
-  Widget _buildHighlightedText(
-    String text,
-    String query,
-    ThemeData theme, {
-    bool isSelected = false,
-  }) {
+  Widget _buildHighlightedText(String text, String query, ThemeData theme, {bool isSelected = false}) {
     if (query.isEmpty) {
       return Text(
         text,
         style: TextStyle(
           fontSize: 14,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected
-              ? theme.colorScheme.secondary
-              : theme.textTheme.bodyLarge?.color,
+          color: isSelected ? theme.colorScheme.secondary : theme.textTheme.bodyLarge?.color,
         ),
       );
     }
@@ -547,28 +404,18 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     final lower = text.toLowerCase();
     final idx = lower.indexOf(query);
     if (idx < 0) {
-      return Text(
-        text,
-        style: TextStyle(
-          fontSize: 14,
-          color: theme.textTheme.bodyLarge?.color,
-        ),
-      );
+      return Text(text, style: TextStyle(fontSize: 14, color: theme.textTheme.bodyLarge?.color));
     }
 
     return RichText(
       text: TextSpan(
-        style: TextStyle(
-          fontSize: 14,
-          color: theme.textTheme.bodyLarge?.color,
-        ),
+        style: TextStyle(fontSize: 14, color: theme.textTheme.bodyLarge?.color),
         children: [
           TextSpan(text: text.substring(0, idx)),
           TextSpan(
             text: text.substring(idx, idx + query.length),
             style: TextStyle(
-              backgroundColor:
-                  theme.colorScheme.secondary.withOpacity(0.25),
+              backgroundColor: theme.colorScheme.secondary.withOpacity(0.25),
               color: theme.colorScheme.secondary,
               fontWeight: FontWeight.bold,
             ),
@@ -586,28 +433,18 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 56,
-              color: theme.hintColor.withOpacity(0.3),
-            ),
+            Icon(Icons.search_off_rounded, size: 56, color: theme.hintColor.withOpacity(0.3)),
             const SizedBox(height: 12),
             Text(
               'خودرویی با نام "$_query" یافت نشد.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: theme.hintColor,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: theme.hintColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
             Text(
               'نام برند یا مدل را به شکل دیگری امتحان کنید.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: theme.hintColor.withOpacity(0.6),
-                fontSize: 12,
-              ),
+              style: TextStyle(color: theme.hintColor.withOpacity(0.6), fontSize: 12),
             ),
           ],
         ),
@@ -617,9 +454,8 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── ویجت‌های کمکی ──
+// ─ـ ویجت‌های کمکی ──
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _ShimmerBox extends StatefulWidget {
   final ThemeData theme;
   const _ShimmerBox({required this.theme});
@@ -628,18 +464,14 @@ class _ShimmerBox extends StatefulWidget {
   State<_ShimmerBox> createState() => _ShimmerBoxState();
 }
 
-class _ShimmerBoxState extends State<_ShimmerBox>
-    with SingleTickerProviderStateMixin {
+class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
@@ -654,17 +486,10 @@ class _ShimmerBoxState extends State<_ShimmerBox>
     return AnimatedBuilder(
       animation: _anim,
       builder: (_, __) {
-        final color = Color.lerp(
-          widget.theme.cardColor,
-          widget.theme.dividerColor,
-          _anim.value,
-        )!;
+        final color = Color.lerp(widget.theme.cardColor, widget.theme.dividerColor, _anim.value)!;
         return Container(
           height: 56,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(16),
-          ),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
         );
       },
     );
@@ -674,7 +499,6 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 class _ErrorBox extends StatelessWidget {
   final VoidCallback onRetry;
   final ThemeData theme;
-
   const _ErrorBox({required this.onRetry, required this.theme});
 
   @override
@@ -684,28 +508,20 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: Colors.redAccent.withOpacity(0.4)),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off_rounded,
-              color: Colors.redAccent, size: 20),
+          const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 20),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'خطا در بارگذاری خودروها',
-              style: TextStyle(color: Colors.redAccent, fontSize: 13),
-            ),
-          ),
+          const Expanded(child: Text('خطا در بارگذاری خودروها', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
           TextButton.icon(
             icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('تلاش مجدد'),
             onPressed: onRetry,
             style: TextButton.styleFrom(
               foregroundColor: Colors.redAccent,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             ),
           ),
         ],
@@ -722,14 +538,10 @@ class _EmptyBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded,
-              color: theme.hintColor, size: 18),
+          Icon(Icons.info_outline_rounded, color: theme.hintColor, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
