@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart'; // ✅ افزودن پکیج دسترسی‌ها
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
@@ -8,13 +9,13 @@ import 'chat_screen.dart';
 class RecordScreen extends StatefulWidget {
   final String carName;
   final String carId;
-  final String year; // ✅ اضافه شد
+  final String year;
 
   const RecordScreen({
     super.key,
     required this.carName,
     required this.carId,
-    required this.year, // ✅ اضافه شد
+    required this.year,
   });
 
   @override
@@ -28,6 +29,9 @@ class _RecordScreenState extends State<RecordScreen>
   int _secondsElapsed = 0;
   Timer? _timer;
   late AnimationController _animController;
+
+  // ✅ حداکثر زمان مجاز برای ضبط (15 ثانیه برای آنالیز موتور کافی است)
+  static const int _maxRecordingDuration = 15;
 
   @override
   void initState() {
@@ -51,7 +55,14 @@ class _RecordScreenState extends State<RecordScreen>
   void _startTimer() {
     _secondsElapsed = 0;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() => _secondsElapsed++);
+      setState(() {
+        _secondsElapsed++;
+        // ✅ توقف خودکار هنگام رسیدن به زمان maximal
+        if (_secondsElapsed >= _maxRecordingDuration) {
+          timer.cancel();
+          _toggleRecording(); // توقف خودکار ضبط
+        }
+      });
     });
   }
 
@@ -61,10 +72,43 @@ class _RecordScreenState extends State<RecordScreen>
     return '$minutes:$seconds';
   }
 
+  // ✅ متد کمکی برای نمایش Snackbar
+  void _showSnack(String msg, {Color color = Colors.redAccent}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // ✅ بررسی و درخواست دسترسی میکروفون
+  Future<bool> _requestMicPermission() async {
+    var status = await Permission.microphone.status;
+    if (status.isGranted) return true;
+
+    if (status.isDenied || status.isPermanentlyDenied) {
+      status = await Permission.microphone.request();
+    }
+
+    if (status.isGranted) {
+      return true;
+    } else {
+      _showSnack('دسترسی به میکروفون داده نشد. لطفاً از تنظیمات فعال کنید.');
+      return false;
+    }
+  }
+
   Future<void> _toggleRecording() async {
+    // جلوگیری از اجرای همزمان
+    if (_isProcessing) return;
+
     final audioService = context.read<AudioService>();
     final soundAnalyzer = context.read<SoundAnalyzer>();
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (_isRecording) {
       _timer?.cancel();
@@ -77,16 +121,17 @@ class _RecordScreenState extends State<RecordScreen>
         final file = await audioService.stopRecording();
         if (file == null) throw Exception('فایل صوتی ذخیره نشد.');
 
+        // آنالیز فایل صوتی
         final features = await soundAnalyzer.analyze(file.filePath);
 
         if (!mounted) return;
 
-        final voiceMessage =
-            "من صدای موتور ماشین رو با گوشی ضبط کردم.\n"
+        // ساخت پیام مبتنی بر داده‌های استخراج شده
+        final voiceMessage = "من صدای موتور ماشین رو با گوشی ضبط کردم.\n"
             "نتایج آنالیز صوتی نرم‌افزار اینه:\n"
             "- قدرت صدا (RMS): ${features.rms.toStringAsFixed(3)}\n"
             "- فرکانس غالب: ${features.dominantFrequency.toStringAsFixed(1)} هرتز\n"
-            "لطفاً بر اساس این اطلاعات بگو مشکل چیه؟";
+            "لطفاً بر اساس این اطلاعات بگو مشکل چیا ممکنه باشه؟";
 
         Navigator.pushReplacement(
           context,
@@ -94,32 +139,27 @@ class _RecordScreenState extends State<RecordScreen>
             builder: (_) => ChatScreen(
               carName: widget.carName,
               carId: widget.carId,
-              year: widget.year, // ✅ اضافه شد
+              year: widget.year,
               initialUserMessage: voiceMessage,
             ),
           ),
         );
       } catch (e) {
         if (!mounted) return;
+        _showSnack('خطا در پردازش صدا. لطفاً دوباره تلاش کنید.');
         setState(() => _isProcessing = false);
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'خطا: ${e.toString().replaceAll('Exception: ', '')}',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     } else {
+      // ✅ بررسی دسترسی قبل از شروع ضبط
+      final hasPermission = await _requestMicPermission();
+      if (!hasPermission) return;
+
       try {
         await audioService.startRecording();
         _startTimer();
         setState(() => _isRecording = true);
       } catch (e) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('خطا در شروع ضبط: $e')),
-        );
+        _showSnack('خطا در شروع ضبط صدا.');
       }
     }
   }
@@ -129,23 +169,29 @@ class _RecordScreenState extends State<RecordScreen>
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('آنالیز صوتی موتور')),
+      appBar: AppBar(
+        title: const Text('آنالیز صوتی موتور'),
+        centerTitle: true,
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_isRecording)
+            // ── نمایش تایمر ──
+            if (_isRecording || _isProcessing)
               Text(
                 _formattedTime,
                 style: const TextStyle(
                   fontSize: 48,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
+                  letterSpacing: 2,
                 ),
               ),
 
             const SizedBox(height: 40),
 
+            // ── دکمه ضبط ──
             ScaleTransition(
               scale: _isRecording
                   ? Tween(begin: 1.0, end: 1.15).animate(_animController)
@@ -187,11 +233,13 @@ class _RecordScreenState extends State<RecordScreen>
             ),
 
             const SizedBox(height: 30),
+            
+            // ── متن وضعیت ──
             Text(
               _isProcessing
-                  ? 'در حال پردازش صدا...'
+                  ? 'در حال پردازش صدا... لطفاً شکیبا باشید.'
                   : (_isRecording
-                      ? 'در حال ضبط، گوشی را نزدیک موتور نگه دارید'
+                      ? 'در حال ضبط (حداکثر $_maxRecordingDuration ثانیه)'
                       : 'برای شروع تحلیل صوتی ضربه بزنید'),
               style: TextStyle(color: theme.hintColor, fontSize: 16),
               textAlign: TextAlign.center,
