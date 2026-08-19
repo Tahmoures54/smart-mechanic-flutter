@@ -25,6 +25,20 @@ class _ShopScreenState extends State<ShopScreen> {
     });
   }
 
+  // ✅ متد کمکی برای مدیریت Snackbar
+  void _showSnack(String msg, {Color color = Colors.green}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Future<void> _buyProduct(String productId) async {
     final auth = context.read<AuthProvider>();
     if (!auth.isAuthenticated || auth.token == null) return;
@@ -43,11 +57,7 @@ class _ShopScreenState extends State<ShopScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.'),
-        ),
-      );
+      _showSnack('خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.', color: Colors.redAccent);
     } finally {
       if (mounted) setState(() => _loadingProductId = null);
     }
@@ -55,9 +65,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
   void _copyReferralCode(String code) {
     Clipboard.setData(ClipboardData(text: code));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('کد معرف کپی شد')),
-    );
+    _showSnack('کد معرف کپی شد');
   }
 
   void _shareReferral(String code, int percent) {
@@ -80,12 +88,11 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Future<void> _showWithdrawDialog(AuthProvider auth) async {
     final amountCtrl = TextEditingController(
-      text: auth.earnings >= auth.minWithdrawal
-          ? auth.earnings.toString()
-          : '',
+      text: auth.earnings >= auth.minWithdrawal ? auth.earnings.toString() : '',
     );
     final cardCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     final ok = await showDialog<bool>(
       context: context,
@@ -94,46 +101,58 @@ class _ShopScreenState extends State<ShopScreen> {
         return AlertDialog(
           backgroundColor: theme.dialogBackgroundColor,
           title: const Text('درخواست برداشت دستی'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'موجودی: ${_formatToman(auth.earnings)}\nحداقل: ${_formatToman(auth.minWithdrawal)}',
-                  style: TextStyle(color: theme.hintColor, fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'مبلغ (تومان)',
-                    border: OutlineInputBorder(),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'موجودی: ${_formatToman(auth.earnings)}\nحداقل: ${_formatToman(auth.minWithdrawal)}',
+                    style: TextStyle(color: theme.hintColor, fontSize: 13),
                   ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: cardCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'شماره کارت ۱۶ رقمی',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'مبلغ (تومان)', border: OutlineInputBorder()),
+                    validator: (v) {
+                      final val = int.tryParse(v ?? '');
+                      if (val == null || val < auth.minWithdrawal) {
+                        return 'حداقل مبلغ: ${auth.minWithdrawal}';
+                      }
+                      if (val > auth.earnings) {
+                        return 'موجودی شما کافی نیست';
+                      }
+                      return null;
+                    },
                   ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'نام صاحب حساب',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: cardCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 16,
+                    decoration: const InputDecoration(labelText: 'شماره کارت ۱۶ رقمی', border: OutlineInputBorder(), counterText: ''),
+                    validator: (v) {
+                      if (v == null || v.replaceAll(RegExp(r'\s|-'), '').length != 16) {
+                        return 'شماره کارت باید ۱۶ رقم باشد';
+                      }
+                      return null;
+                    },
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'پس از بررسی ادمین، مبلغ به‌صورت دستی واریز می‌شود.',
-                  style: TextStyle(color: theme.hintColor, fontSize: 11),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'نام صاحب حساب', border: OutlineInputBorder()),
+                    validator: (v) => (v == null || v.trim().length < 3) ? 'نام را درست وارد کنید' : null,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'پس از بررسی ادمین، مبلغ به‌صورت دستی واریز می‌شود.',
+                    style: TextStyle(color: theme.hintColor, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -142,13 +161,22 @@ class _ShopScreenState extends State<ShopScreen> {
               child: const Text('انصراف'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(ctx, true);
+                }
+              },
               child: const Text('ثبت درخواست'),
             ),
           ],
         );
       },
     );
+
+    // ✅ پاکسازی حافظه کنترلرها
+    amountCtrl.dispose();
+    cardCtrl.dispose();
+    nameCtrl.dispose();
 
     if (ok != true || !mounted) return;
 
@@ -166,22 +194,13 @@ class _ShopScreenState extends State<ShopScreen> {
           );
       await auth.fetchProfile();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('درخواست برداشت ثبت شد و در انتظار بررسی ادمین است.'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSnack('درخواست برداشت ثبت شد و در انتظار بررسی ادمین است.');
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      _showSnack(e.message, color: Colors.redAccent);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('خطا در ثبت درخواست')),
-      );
+      _showSnack('خطا در ثبت درخواست', color: Colors.redAccent);
     } finally {
       if (mounted) setState(() => _withdrawLoading = false);
     }
@@ -196,8 +215,7 @@ class _ShopScreenState extends State<ShopScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('فروشگاه اعتبار و اشتراک'),
-        backgroundColor:
-            theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -205,26 +223,9 @@ class _ShopScreenState extends State<ShopScreen> {
           if (auth.referralCode != null && auth.referralCode!.isNotEmpty)
             _buildReferralCard(auth, theme),
           _buildPackage(context, 'بسته ۵ عیب‌یابی', '۶۵,۰۰۰ تومان', 'credit_5'),
-          _buildPackage(
-            context,
-            'بسته ۱۰ عیب‌یابی (محبوب)',
-            '۱۲۰,۰۰۰ تومان',
-            'credit_10',
-          ),
-          _buildPackage(
-            context,
-            'اشتراک طلایی (۳۰ روزه)',
-            '۱۹۹,۰۰۰ تومان',
-            'golden_30',
-            isGold: true,
-          ),
-          _buildPackage(
-            context,
-            'اشتراک طلایی (۹۰ روزه)',
-            '۴۹۹,۰۰۰ تومان',
-            'golden_90',
-            isGold: true,
-          ),
+          _buildPackage(context, 'بسته ۱۰ عیب‌یابی (محبوب)', '۱۲۰,۰۰۰ تومان', 'credit_10'),
+          _buildPackage(context, 'اشتراک طلایی (۳۰ روزه)', '۱۹۹,۰۰۰ تومان', 'golden_30', isGold: true),
+          _buildPackage(context, 'اشتراک طلایی (۹۰ روزه)', '۴۹۹,۰۰۰ تومان', 'golden_90', isGold: true),
         ],
       ),
     );
@@ -239,15 +240,10 @@ class _ShopScreenState extends State<ShopScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary.withOpacity(0.25),
-            theme.cardColor,
-          ],
+          colors: [theme.colorScheme.primary.withOpacity(0.25), theme.cardColor],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.4),
-        ),
+        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,11 +279,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 Expanded(
                   child: Text(
                     code,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      letterSpacing: 1.5,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.5),
                   ),
                 ),
                 IconButton(
@@ -297,8 +289,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 ),
                 IconButton(
                   tooltip: 'اشتراک‌گذاری',
-                  onPressed: () =>
-                      _shareReferral(code, auth.referralPercentage),
+                  onPressed: () => _shareReferral(code, auth.referralPercentage),
                   icon: const Icon(Icons.share, size: 20),
                 ),
               ],
@@ -307,21 +298,9 @@ class _ShopScreenState extends State<ShopScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: _statChip(
-                  theme,
-                  'دعوت‌شده‌ها',
-                  '${auth.referredCount} نفر',
-                ),
-              ),
+              Expanded(child: _statChip(theme, 'دعوت‌شده‌ها', '${auth.referredCount} نفر')),
               const SizedBox(width: 8),
-              Expanded(
-                child: _statChip(
-                  theme,
-                  'درآمد شما',
-                  _formatToman(auth.earnings),
-                ),
-              ),
+              Expanded(child: _statChip(theme, 'درآمد شما', _formatToman(auth.earnings))),
             ],
           ),
           const SizedBox(height: 12),
@@ -332,16 +311,10 @@ class _ShopScreenState extends State<ShopScreen> {
                   ? null
                   : () => _showWithdrawDialog(auth),
               icon: _withdrawLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.account_balance_wallet_outlined),
               label: Text(
-                canWithdraw
-                    ? 'درخواست برداشت دستی'
-                    : 'حداقل برداشت: ${_formatToman(auth.minWithdrawal)}',
+                canWithdraw ? 'درخواست برداشت دستی' : 'حداقل برداشت: ${_formatToman(auth.minWithdrawal)}',
               ),
             ),
           ),
@@ -363,10 +336,7 @@ class _ShopScreenState extends State<ShopScreen> {
         children: [
           Text(label, style: TextStyle(color: theme.hintColor, fontSize: 11)),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ],
       ),
     );
@@ -380,7 +350,9 @@ class _ShopScreenState extends State<ShopScreen> {
     bool isGold = false,
   }) {
     final theme = Theme.of(context);
+    // ✅ اگر هر محصولی در حال لودینگ باشد، دکمه‌های دیگر غیرفعال شوند
     final bool isLoadingThis = _loadingProductId == id;
+    final bool isAnyLoading = _loadingProductId != null;
 
     return Card(
       color: isGold ? Colors.amber[800] : theme.cardColor,
@@ -393,9 +365,7 @@ class _ShopScreenState extends State<ShopScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isGold
-                    ? Colors.black26
-                    : theme.colorScheme.primary.withOpacity(0.1),
+                color: isGold ? Colors.black26 : theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -411,9 +381,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   Text(
                     title,
                     style: TextStyle(
-                      color: isGold
-                          ? Colors.black
-                          : theme.textTheme.titleMedium?.color,
+                      color: isGold ? Colors.black : theme.textTheme.titleMedium?.color,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -422,9 +390,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   Text(
                     price,
                     style: TextStyle(
-                      color: isGold
-                          ? Colors.black87
-                          : theme.colorScheme.secondary,
+                      color: isGold ? Colors.black87 : theme.colorScheme.secondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -433,29 +399,24 @@ class _ShopScreenState extends State<ShopScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isGold ? Colors.black : theme.colorScheme.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                backgroundColor: isGold ? Colors.black : theme.colorScheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: isLoadingThis ? null : () => _buyProduct(id),
+              // ✅ جلوگیری از خرید همزمان
+              onPressed: (isLoadingThis || isAnyLoading) ? null : () => _buyProduct(id),
               child: isLoadingThis
                   ? SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                        color:
-                            isGold ? Colors.amber : theme.colorScheme.onPrimary,
+                        color: isGold ? Colors.amber : theme.colorScheme.onPrimary,
                         strokeWidth: 2,
                       ),
                     )
                   : Text(
                       'خرید',
                       style: TextStyle(
-                        color: isGold
-                            ? Colors.amber
-                            : theme.colorScheme.onPrimary,
+                        color: isGold ? Colors.amber : theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -467,6 +428,9 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ── WebView برای پرداخت ──
+// ─────────────────────────────────────────────────────────────────────────────
 class PaymentWebView extends StatefulWidget {
   final String url;
   const PaymentWebView({super.key, required this.url});
@@ -524,16 +488,15 @@ class _PaymentWebViewState extends State<PaymentWebView> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) =>
-          const Center(child: CircularProgressIndicator(color: Colors.orange)),
+      builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.orange)),
     );
 
     try {
       await context.read<AuthProvider>().fetchProfile();
       if (!mounted) return;
 
-      Navigator.pop(context);
-      Navigator.pop(context);
+      Navigator.pop(context); // بستن دیالوگ لودینگ
+      Navigator.pop(context); // خروج از وب‌ویو
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -547,9 +510,7 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'پرداخت انجام شد اما در بروزرسانی صفحه خطایی رخ داد. لطفاً صفحه را رفرش کنید.',
-          ),
+          content: Text('پرداخت انجام شد اما در بروزرسانی صفحه خطایی رخ داد. لطفاً صفحه را رفرش کنید.'),
         ),
       );
     }
@@ -559,8 +520,6 @@ class _PaymentWebViewState extends State<PaymentWebView> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      // ✅ اصلاح شد: onPopInvoked به جای onPopInvokedWithResult
-      // (سازگار با Flutter 3.22.0)
       onPopInvoked: (didPop) async {
         if (didPop) return;
         if (await _controller.canGoBack()) {
