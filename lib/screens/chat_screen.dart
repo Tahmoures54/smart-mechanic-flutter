@@ -132,7 +132,8 @@ class _ChatScreenState extends State<ChatScreen>
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.statusCode == 402) {
-        _addMessage(const ChatMessage(
+        // ✅ اصلاح شد: حذف کلمه const
+        _addMessage(ChatMessage(
           text: 'اعتبار شما کافی نیست. لطفاً حساب خود را شارژ کنید.',
           role: MessageRole.error,
         ));
@@ -149,7 +150,8 @@ class _ChatScreenState extends State<ChatScreen>
       }
     } catch (_) {
       if (!mounted) return;
-      _addMessage(const ChatMessage(
+      // ✅ اصلاح شد: حذف کلمه const
+      _addMessage(ChatMessage(
         text: 'خطا در ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.',
         role: MessageRole.error,
       ));
@@ -166,7 +168,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── ارسال پیام کاربر ──
+  // ─ـ ارسال پیام کاربر ──
   // ─────────────────────────────────────────
   void _sendMessage() {
     final text = _inputCtrl.text.trim();
@@ -185,7 +187,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── تلاش مجدد ──
+  // ─ـ تلاش مجدد ──
   // ─────────────────────────────────────────
   void _retryLast() {
     if (_messages.isEmpty) return;
@@ -206,7 +208,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── scroll ──
+  // ─ـ scroll ──
   // ─────────────────────────────────────────
   void _scrollToBottom() {
     // ✅ استفاده از PostFrameCallback به جای Delay برای دقت بالاتر
@@ -222,7 +224,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── کپی متن ──
+  // ─ـ کپی متن ──
   // ─────────────────────────────────────────
   void _copyMessage(String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -238,7 +240,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── اشتراک‌گذاری ──
+  // ─ـ اشتراک‌گذاری ──
   // ─────────────────────────────────────────
   void _shareMessage(String text) {
     Share.share(
@@ -248,7 +250,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── دیالوگ اعتبار ناکافی ──
+  // ─ـ دیالوگ اعتبار ناکافی ──
   // ─────────────────────────────────────────
   void _showNoCreditDialog() {
     final theme = Theme.of(context);
@@ -293,7 +295,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── build ──
+  // ─ـ build ──
   // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -391,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── نوار اطلاعات خودرو ──
+  // ─ـ نوار اطلاعات خودرو ──
   // ─────────────────────────────────────────
   Widget _buildCarInfoBanner(ThemeData theme) {
     return Container(
@@ -424,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── لیست پیام‌ها ──
+  // ─ـ لیست پیام‌ها ──
   // ─────────────────────────────────────────
   Widget _buildMessageList(ThemeData theme) {
     return ListView.builder(
@@ -443,7 +445,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── آیتم پیام با انیمیشن و long press ──
+  // ─ـ آیتم پیام با انیمیشن و long press ──
   // ─────────────────────────────────────────
   Widget _buildMessageItem(ChatMessage msg, bool isLast, ThemeData theme) {
     return TweenAnimationBuilder<double>(
@@ -529,7 +531,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── محتوای پیام (Markdown) ──
+  // ─ـ محتوای پیام (Markdown) ──
   // ─────────────────────────────────────────
   Widget _buildMessageContent(ChatMessage msg, ThemeData theme) {
     if (msg.isUser) {
@@ -596,7 +598,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── منوی Long Press ──
+  // ─ـ منوی Long Press ──
   // ─────────────────────────────────────────
   void _showMessageOptions(ChatMessage msg) {
     final theme = Theme.of(context);
@@ -644,7 +646,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── رنگ‌های حباب ──
+  // ─ـ رنگ‌های حباب ──
   // ─────────────────────────────────────────
   Color _bubbleColor(ChatMessage msg, ThemeData theme) {
     if (msg.isUser) return theme.colorScheme.primary.withOpacity(0.2);
@@ -659,7 +661,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── typing indicator با نقطه‌های متحرک ──
+  // ─ـ typing indicator با نقطه‌های متحرک ──
   // ─────────────────────────────────────────
   Widget _buildTypingIndicator(ThemeData theme) {
     return Align(
@@ -717,7 +719,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   // ─────────────────────────────────────────
-  // ── ناحیه ورودی ──
+  // ─ـ ناحیه ورودی ──
   // ─────────────────────────────────────────
   Widget _buildInputArea(ThemeData theme) {
     return Container(
