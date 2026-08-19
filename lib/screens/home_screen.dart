@@ -81,7 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ✅ متد کمکی برای نمایش Snackbar (جلوگیری از تکرار و انباشت)
   void _showSnack(String message, {Color? color}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -98,12 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return shamsi || gregorian;
   }
 
-  // ✅ منطق مشترک اعتبارسنجی برای هر دو دکمه (متن و صدا)
-  // اگر همه چیز درست بود true برمی‌گرداند
   bool _validateInputs({required bool requireDescription}) {
     final auth = context.read<AuthProvider>();
 
-    // ۱. بررسی احراز هویت
     if (!auth.isAuthenticated) {
       Navigator.push(
         context,
@@ -112,32 +108,27 @@ class _HomeScreenState extends State<HomeScreen> {
       return false;
     }
 
-    // ۲. بررسی انتخاب خودرو
     if (!_isCustomCar && _selectedCar == null) {
       _showSnack('لطفاً ابتدا خودروی خود را انتخاب کنید.');
       return false;
     }
 
-    // ۳. بررسی نام خودروی سفارشی
     if (_isCustomCar && _customCarController.text.trim().length < 2) {
       _showSnack('لطفاً نام و مدل خودروی خود را بنویسید.');
       return false;
     }
 
-    // ۴. بررسی سال ساخت
     final year = _yearController.text.trim();
     if (year.isEmpty || !_validateYear(year)) {
       _showSnack('سال ساخت را وارد کنید (مثلاً ۱۴۰۳ شمسی یا ۲۰۲۴ میلادی).');
       return false;
     }
 
-    // ۵. بررسی توضیحات (فقط برای حالت متنی)
     if (requireDescription && _descController.text.trim().length < 5) {
       _showSnack('لطفاً مشکل را کمی واضح‌تر بنویسید.');
       return false;
     }
 
-    // ۶. بررسی اعتبار
     if (!auth.isGolden && auth.credits <= 0) {
       _showNoCreditDialog();
       return false;
@@ -146,7 +137,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return true;
   }
 
-  // ✅ گرفتن مشخصات خودرو به‌صورت متمرکز
   ({String id, String name, String year}) _getCarInfo() {
     return (
       id: _isCustomCar ? 'custom' : _selectedCar!.id,
@@ -193,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => RecordScreen(
           carName: car.name,
           carId: car.id,
-          year: car.year, // ✅ اصلاح خطای اصلی
+          year: car.year,
         ),
       ),
     );
@@ -732,8 +722,8 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.primary.withOpacity(0.15),
-            Colors.black87,
+            theme.colorScheme.primary.withOpacity(0.9),
+            theme.colorScheme.primary.withOpacity(0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -745,7 +735,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.05),
+            color: theme.colorScheme.primary.withOpacity(0.1),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -778,7 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد.',
             style: TextStyle(
-              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.9),
+              color: Colors.white.withOpacity(0.9),
               fontSize: 14,
               height: 1.6,
             ),
@@ -824,10 +814,10 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: theme.cardColor.withOpacity(0.5),
+            color: Colors.white.withOpacity(0.15),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.white70, size: 24),
+          child: Icon(icon, color: Colors.white, size: 24),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -846,7 +836,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 desc,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withOpacity(0.8),
                   fontSize: 13,
                   height: 1.4,
                 ),
