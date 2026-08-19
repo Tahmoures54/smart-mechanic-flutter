@@ -23,6 +23,9 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── تنظیم ErrorWidget در ابتدای برنامه (جلوگیری از Side-Effect در Build) ──
+  _setupErrorWidget();
+
   // ── نمایش اطلاعات محیط در debug ──
   Constants.printInfo();
 
@@ -46,8 +49,10 @@ void main() async {
   // ── سرویس‌ها ──
   final services = await _initServices();
 
-  // ── LocaleProvider ──
+  // ── Providers Async ──
   final localeProvider = await LocaleProvider.create();
+  // ✅ اصلاح باگ بحرتی: خواندن تم ذخیره شده کاربر
+  final themeProvider = await ThemeProvider.create();
 
   runApp(
     MultiProvider(
@@ -79,10 +84,8 @@ void main() async {
           create: (_) => SoundAnalyzer(),
         ),
 
-        // ── Theme ──
-        ChangeNotifierProvider<ThemeProvider>(
-          create: (_) => ThemeProvider(),
-        ),
+        // ── Theme (تزریق نمونه ساخته شده) ──
+        ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
 
         // ── Locale ──
         ChangeNotifierProvider<LocaleProvider>.value(value: localeProvider),
@@ -93,7 +96,38 @@ void main() async {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── مقداردهی Hive ──
+// ── تنظیم ErrorWidget ──
+// ─────────────────────────────────────────────────────────────────────────────
+void _setupErrorWidget() {
+  ErrorWidget.builder = (details) {
+    debugPrint('[ErrorBoundary] ${details.exception}');
+    return Material(
+      color: const Color(0xFF0D0D12), // رنگ پس‌زمینه دارک
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 64, color: Colors.orange.shade400),
+              const SizedBox(height: 16),
+              const Text('مشکلی پیش آمد', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 8),
+              const Text(
+                'لطفاً اپلیکیشن را مجدداً باز کنید.',
+                style: TextStyle(color: Colors.white54),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ─ـ مقداردهی Hive ──
 // ─────────────────────────────────────────────────────────────────────────────
 Future<void> _initHive() async {
   await Hive.initFlutter();
@@ -116,7 +150,7 @@ Future<void> _initHive() async {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── نتیجه مقداردهی سرویس‌ها ──
+// ─ـ نتیجه مقداردهی سرویس‌ها ──
 // ─────────────────────────────────────────────────────────────────────────────
 class _AppServices {
   final ApiService api;
@@ -129,7 +163,6 @@ Future<_AppServices> _initServices() async {
   final httpClient = http.Client();
   final api = ApiService(httpClient: httpClient);
 
-  // ── AudioService با مدیریت خطا ──
   final audio = AudioService();
   try {
     await audio.init();
@@ -141,7 +174,7 @@ Future<_AppServices> _initServices() async {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── App اصلی ──
+// ─ـ App اصلی ──
 // ─────────────────────────────────────────────────────────────────────────────
 class SmartMechanicApp extends StatelessWidget {
   const SmartMechanicApp({super.key});
@@ -173,7 +206,7 @@ class SmartMechanicApp extends StatelessWidget {
       builder: (context, child) {
         return Directionality(
           textDirection: localeProvider.textDirection,
-          child: _ErrorBoundary(child: child ?? const SizedBox.shrink()),
+          child: child ?? const SizedBox.shrink(),
         );
       },
 
@@ -193,18 +226,13 @@ class _AppEntryPoint extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    // ── در حال بارگذاری ──
-    if (auth.isLoading) {
-      return const _SplashScreen();
-    }
-
-    // ── رفتن به خانه ──
+    if (auth.isLoading) return const _SplashScreen();
     return const HomeScreen();
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Splash Screen ──
+// ─ـ Splash Screen ──
 // ─────────────────────────────────────────────────────────────────────────────
 class _SplashScreen extends StatefulWidget {
   const _SplashScreen();
@@ -213,8 +241,7 @@ class _SplashScreen extends StatefulWidget {
   State<_SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<_SplashScreen>
-    with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<_SplashScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _fadeAnim;
   late final Animation<double> _scaleAnim;
@@ -222,15 +249,9 @@ class _SplashScreenState extends State<_SplashScreen>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
-
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..forward();
     _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-    _scaleAnim = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
-    );
+    _scaleAnim = Tween<double>(begin: 0.8, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
   }
 
   @override
@@ -242,7 +263,6 @@ class _SplashScreenState extends State<_SplashScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
@@ -253,46 +273,23 @@ class _SplashScreenState extends State<_SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── آیکون ──
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: theme.colorScheme.secondary.withOpacity(0.12),
                   ),
-                  child: Icon(
-                    Icons.directions_car_filled_rounded,
-                    size: 72,
-                    color: theme.colorScheme.secondary,
-                  ),
+                  child: Icon(Icons.directions_car_filled_rounded, size: 72, color: theme.colorScheme.secondary),
                 ),
                 const SizedBox(height: 20),
-
-                // ── نام اپ ──
-                Text(
-                  Constants.appName,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.secondary,
-                  ),
-                ),
+                Text(Constants.appName, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: theme.colorScheme.secondary)),
                 const SizedBox(height: 8),
-                Text(
-                  'در حال بارگذاری...',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.hintColor,
-                  ),
-                ),
+                Text('در حال بارگذاری...', style: TextStyle(fontSize: 13, color: theme.hintColor)),
                 const SizedBox(height: 32),
-
-                // ── loading ──
                 SizedBox(
                   width: 120,
                   child: LinearProgressIndicator(
-                    backgroundColor:
-                        theme.colorScheme.secondary.withOpacity(0.15),
+                    backgroundColor: theme.colorScheme.secondary.withOpacity(0.15),
                     color: theme.colorScheme.secondary,
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -307,56 +304,7 @@ class _SplashScreenState extends State<_SplashScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Error Boundary ──
-// ─────────────────────────────────────────────────────────────────────────────
-class _ErrorBoundary extends StatelessWidget {
-  final Widget child;
-  const _ErrorBoundary({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    ErrorWidget.builder = (details) {
-      debugPrint('[ErrorBoundary] ${details.exception}');
-      return Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  size: 64,
-                  color: Colors.orange.shade400,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'مشکلی پیش آمد',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'لطفاً اپلیکیشن را مجدداً باز کنید.',
-                  style: TextStyle(color: theme.hintColor),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    };
-    return child;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── تم‌های اپ ──
+// ─ـ تم‌های اپ (تکمیل شده برای Material 3) ──
 // ─────────────────────────────────────────────────────────────────────────────
 class AppTheme {
   AppTheme._();
@@ -364,17 +312,20 @@ class AppTheme {
   static final ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    primaryColor: Colors.orange,
     scaffoldBackgroundColor: const Color(0xFF0D0D12),
     colorScheme: const ColorScheme.dark(
       primary: Colors.orange,
+      onPrimary: Colors.black, // ✅ متن روی دکمه نارنجی
       secondary: Colors.amber,
+      onSecondary: Colors.black, // ✅ متن روی دکمه کهربایی
       surface: Color(0xFF1A1A24),
+      onSurface: Colors.white, // ✅ متن روی کارت‌ها
       error: Colors.redAccent,
+      onError: Colors.white,
     ),
     cardColor: const Color(0xFF1A1A24),
     dividerColor: const Color(0xFF2A2A36),
-    textTheme: GoogleFonts.vazirmatnTextTheme().apply(
+    textTheme: GoogleFonts.vazirmatnTextTheme(ThemeData.dark().textTheme).apply(
       bodyColor: Colors.white,
       displayColor: Colors.white,
     ),
@@ -387,18 +338,13 @@ class AppTheme {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFF1A1A24),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
@@ -410,17 +356,20 @@ class AppTheme {
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    primaryColor: Colors.orange,
     scaffoldBackgroundColor: const Color(0xFFF5F5FA),
     colorScheme: const ColorScheme.light(
       primary: Colors.orange,
+      onPrimary: Colors.white,
       secondary: Colors.amber,
+      onSecondary: Colors.black,
       surface: Colors.white,
+      onSurface: Colors.black87,
       error: Colors.redAccent,
+      onError: Colors.white,
     ),
     cardColor: Colors.white,
     dividerColor: const Color(0xFFE0E0E0),
-    textTheme: GoogleFonts.vazirmatnTextTheme().apply(
+    textTheme: GoogleFonts.vazirmatnTextTheme(ThemeData.light().textTheme).apply(
       bodyColor: Colors.black87,
       displayColor: Colors.black87,
     ),
@@ -433,18 +382,13 @@ class AppTheme {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.amber,
         foregroundColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
