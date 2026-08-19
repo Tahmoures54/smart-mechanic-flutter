@@ -233,7 +233,7 @@ class AudioService implements IAudioService {
   // ─────────────────────────────────────────
   @override
   Future<void> startRecording({RecordingConfig? config}) async {
-   _config = config ?? RecordingConfig.engineAnalysis;
+    _config = config ?? RecordingConfig.engineAnalysis;
 
     if (!_isInitialized) {
       throw AudioServiceException(
@@ -261,8 +261,7 @@ class AudioService implements IAudioService {
       }
     }
 
-    // ── بررسی فضای دیسک ──
-    await _checkDiskSpace();
+    // ✅ بررسی فضای دیسک حذف شد (در فلاتر استاندارد دارای باگ است و برای فایل‌های کوچک اضافی است)
 
     try {
       // ── ساخت مسیر فایل ──
@@ -450,28 +449,6 @@ class AudioService implements IAudioService {
   }
 
   // ─────────────────────────────────────────
-  // ── بررسی فضای دیسک ──
-  // ─────────────────────────────────────────
-  Future<void> _checkDiskSpace() async {
-    try {
-      if (_tempDir == null) return;
-      final stat = await _tempDir!.stat();
-      // حداقل 50MB فضای آزاد
-      const minRequired = 50 * 1024 * 1024;
-      if (stat.size < minRequired) {
-        throw AudioServiceException(
-          'فضای ذخیره‌سازی کافی نیست.',
-          AudioServiceError.insufficientStorage,
-        );
-      }
-    } on AudioServiceException {
-      rethrow;
-    } catch (_) {
-      // اگر بررسی ممکن نبود، ادامه بده
-    }
-  }
-
-  // ─────────────────────────────────────────
   // ── تایمرها ──
   // ─────────────────────────────────────────
   void _startDurationTimer() {
@@ -555,7 +532,12 @@ class AudioService implements IAudioService {
       debugPrint('[AudioService] خطا در بستن recorder: $e');
     }
 
-    await _deleteCurrentFile();
+    // ✅ باگ بحرانی اصلاح شد: اگر کاربر فایل را گرفته و در حالت Done است، 
+    // نباید فایل را در dispose حذف کنیم. فقط در حالت Cancel حذف می‌شود.
+    if (_state == RecordingState.recording || _state == RecordingState.paused) {
+      await _deleteCurrentFile();
+    }
+    
     _resetState();
 
     await Future.wait([
