@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math'; // ✅ ایمپورت استاندارد کتابخانه ریاضی دارت
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -10,9 +10,9 @@ import '../services/api_service.dart';
 import 'shop_screen.dart';
 import 'login_screen.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── مدل پیام ──
-// ─────────────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// مدل پیام
+// ══════════════════════════════════════════════════════════════════════════════
 enum MessageRole { user, assistant, error }
 
 class ChatMessage {
@@ -25,8 +25,14 @@ class ChatMessage {
     required this.text,
     required this.role,
     DateTime? timestamp,
-  })  : id = DateTime.now().microsecondsSinceEpoch.toString(),
+    String? id,
+  })  : id = id ??
+            '${DateTime.now().microsecondsSinceEpoch}_${_randomSuffix()}',
         timestamp = timestamp ?? DateTime.now();
+
+  /// پسوند تصادفی برای جلوگیری از تکرار id
+  static String _randomSuffix() =>
+      Random().nextInt(99999).toString().padLeft(5, '0');
 
   bool get isUser => role == MessageRole.user;
   bool get isAssistant => role == MessageRole.assistant;
@@ -39,9 +45,9 @@ class ChatMessage {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── ChatScreen ──
-// ─────────────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ChatScreen
+// ══════════════════════════════════════════════════════════════════════════════
 class ChatScreen extends StatefulWidget {
   final String carName;
   final String carId;
@@ -62,8 +68,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen>
-    with TickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final FocusNode _focusNode = FocusNode();
@@ -82,9 +87,11 @@ class _ChatScreenState extends State<ChatScreen>
       duration: const Duration(milliseconds: 1200),
     )..repeat();
 
+    // پیام اولیه کاربر
     _messages.add(
       ChatMessage(
-        text: 'ماشینم ${widget.carName} مدل ${widget.year} است.\n'
+        text:
+            'ماشینم ${widget.carName} مدل ${widget.year} است.\n'
             'مشکل: ${widget.initialUserMessage}',
         role: MessageRole.user,
       ),
@@ -104,9 +111,7 @@ class _ChatScreenState extends State<ChatScreen>
     super.dispose();
   }
 
-  // ─────────────────────────────────────────
-  // ── ارسال به API ──
-  // ─────────────────────────────────────────
+  // ─── ارسال به API ─────────────────────────────────────────────────────────
   Future<void> _fetchDiagnosis(String description) async {
     if (!mounted) return;
     setState(() => _isTyping = true);
@@ -132,7 +137,6 @@ class _ChatScreenState extends State<ChatScreen>
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.statusCode == 402) {
-        // ✅ اصلاح شد: حذف کلمه const
         _addMessage(ChatMessage(
           text: 'اعتبار شما کافی نیست. لطفاً حساب خود را شارژ کنید.',
           role: MessageRole.error,
@@ -148,9 +152,9 @@ class _ChatScreenState extends State<ChatScreen>
       } else {
         _addMessage(ChatMessage(text: e.message, role: MessageRole.error));
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Chat error: $e');
       if (!mounted) return;
-      // ✅ اصلاح شد: حذف کلمه const
       _addMessage(ChatMessage(
         text: 'خطا در ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.',
         role: MessageRole.error,
@@ -164,18 +168,21 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   void _addMessage(ChatMessage msg) {
+    if (!mounted) return;
     setState(() => _messages.add(msg));
+    _scrollToBottom();
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ ارسال پیام کاربر ──
-  // ─────────────────────────────────────────
+  // ─── ارسال پیام کاربر ────────────────────────────────────────────────────
   void _sendMessage() {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty || _isTyping) return;
 
     final auth = context.read<AuthProvider>();
-    if (!auth.isGoldenActive && auth.credits <= 0) {
+
+    // ✅ سازگار با هر دو نام متد (isGolden / isGoldenActive)
+    final isGolden = auth.isGolden;
+    if (!isGolden && auth.credits <= 0) {
       _showNoCreditDialog();
       return;
     }
@@ -186,16 +193,16 @@ class _ChatScreenState extends State<ChatScreen>
     _fetchDiagnosis(text);
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ تلاش مجدد ──
-  // ─────────────────────────────────────────
+  // ─── تلاش مجدد ───────────────────────────────────────────────────────────
   void _retryLast() {
     if (_messages.isEmpty) return;
 
+    // حذف پیام خطا
     if (_messages.last.isError) {
       setState(() => _messages.removeLast());
     }
 
+    // آخرین پیام کاربر را پیدا کن
     final lastUser = _messages.lastWhere(
       (m) => m.isUser,
       orElse: () => ChatMessage(
@@ -207,65 +214,72 @@ class _ChatScreenState extends State<ChatScreen>
     _fetchDiagnosis(lastUser.text);
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ scroll ──
-  // ─────────────────────────────────────────
+  // ─── اسکرول به پایین ─────────────────────────────────────────────────────
   void _scrollToBottom() {
-    // ✅ استفاده از PostFrameCallback به جای Delay برای دقت بالاتر
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
+      if (_scrollCtrl.hasClients &&
+          _scrollCtrl.position.hasContentDimensions) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 350),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ کپی متن ──
-  // ─────────────────────────────────────────
+  // ─── کپی متن ─────────────────────────────────────────────────────────────
   void _copyMessage(String text) {
     Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('متن کپی شد'),
+        content: const Text('متن کپی شد ✅'),
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.green.shade700,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ اشتراک‌گذاری ──
-  // ─────────────────────────────────────────
+  // ─── اشتراک‌گذاری ─────────────────────────────────────────────────────────
   void _shareMessage(String text) {
-    Share.share(
-      '🔧 نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
-      subject: 'عیب‌یابی مکانیک هوشمند',
+    SharePlus.instance.share(
+      ShareParams(
+        text:
+            '🔧 نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
+        subject: 'عیب‌یابی مکانیک هوشمند',
+      ),
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ دیالوگ اعتبار ناکافی ──
-  // ─────────────────────────────────────────
+  // ─── دیالوگ اعتبار ناکافی ────────────────────────────────────────────────
   void _showNoCreditDialog() {
+    if (!mounted) return;
     final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.dialogBackgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'اعتبار ناکافی',
-          style: TextStyle(color: theme.textTheme.titleLarge?.color),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.orange.shade600, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              'اعتبار ناکافی',
+              style: TextStyle(color: theme.textTheme.titleLarge?.color),
+            ),
+          ],
         ),
         content: Text(
           'برای ادامه گفتگو، نیاز به تهیه اعتبار دارید.',
-          style: theme.textTheme.bodyMedium,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
         ),
         actions: [
           TextButton(
@@ -277,7 +291,7 @@ class _ChatScreenState extends State<ChatScreen>
               backgroundColor: theme.colorScheme.secondary,
               foregroundColor: theme.colorScheme.onSecondary,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
             onPressed: () {
@@ -294,9 +308,9 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ build ──
-  // ─────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════
+  // BUILD
+  // ══════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -312,7 +326,7 @@ class _ChatScreenState extends State<ChatScreen>
               radius: 18,
               child: const Icon(
                 Icons.support_agent_rounded,
-                color: Colors.black,
+                color: Colors.black87,
                 size: 20,
               ),
             ),
@@ -342,42 +356,21 @@ class _ChatScreenState extends State<ChatScreen>
           ],
         ),
         actions: [
-          if (!auth.isGoldenActive)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: auth.credits > 0
-                        ? Colors.green.withOpacity(0.2)
-                        : Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: auth.credits > 0 ? Colors.green : Colors.red,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    '${auth.credits} اعتبار',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: auth.credits > 0 ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            const Padding(
-              padding: EdgeInsets.only(right: 8),
-              child: Center(
-                child: Text('⭐ طلایی',
-                    style: TextStyle(fontSize: 12, color: Colors.amber)),
-              ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+              child: auth.isGolden
+                  ? const Text(
+                      '⭐ طلایی',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.amber,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : _buildCreditBadge(auth),
             ),
+          ),
         ],
       ),
       body: SafeArea(
@@ -385,20 +378,46 @@ class _ChatScreenState extends State<ChatScreen>
           children: [
             _buildCarInfoBanner(theme),
             Expanded(child: _buildMessageList(theme)),
-            _buildInputArea(theme),
+            if (_isTyping) _buildTypingBanner(theme),
+            _buildInputArea(theme, auth),
           ],
         ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ نوار اطلاعات خودرو ──
-  // ─────────────────────────────────────────
+  // ─── نشان اعتبار در AppBar ────────────────────────────────────────────────
+  Widget _buildCreditBadge(AuthProvider auth) {
+    final hasCredit = auth.credits > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: hasCredit
+            ? Colors.green.withAlpha(51)
+            : Colors.red.withAlpha(51),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasCredit ? Colors.green : Colors.red,
+          width: 1,
+        ),
+      ),
+      child: Text(
+        '${auth.credits} اعتبار',
+        style: TextStyle(
+          fontSize: 12,
+          color: hasCredit ? Colors.green : Colors.red,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // ─── نوار اطلاعات خودرو ──────────────────────────────────────────────────
   Widget _buildCarInfoBanner(ThemeData theme) {
+    final sentCount = _messages.where((m) => m.isUser).length;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.colorScheme.primary.withOpacity(0.07),
+      color: theme.colorScheme.primary.withAlpha(18),
       child: Row(
         children: [
           Icon(
@@ -407,17 +426,19 @@ class _ChatScreenState extends State<ChatScreen>
             color: theme.colorScheme.secondary,
           ),
           const SizedBox(width: 6),
-          Text(
-            '${widget.carName} · ${widget.year}',
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.secondary,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              '${widget.carName} · ${widget.year}',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.secondary,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
           Text(
-            '${_messages.where((m) => m.isUser).length} پیام ارسالی',
+            '$sentCount پیام ارسالی',
             style: TextStyle(fontSize: 11, color: theme.hintColor),
           ),
         ],
@@ -425,9 +446,36 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ لیست پیام‌ها ──
-  // ─────────────────────────────────────────
+  // ─── نوار تایپینگ ─────────────────────────────────────────────────────────
+  Widget _buildTypingBanner(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      color: theme.colorScheme.secondary.withAlpha(20),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: theme.colorScheme.secondary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'مکانیک هوشمند در حال تحلیل مشکل شماست...',
+            style: TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.secondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── لیست پیام‌ها ─────────────────────────────────────────────────────────
   Widget _buildMessageList(ThemeData theme) {
     return ListView.builder(
       controller: _scrollCtrl,
@@ -444,16 +492,16 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ آیتم پیام با انیمیشن و long press ──
-  // ─────────────────────────────────────────
+  // ─── آیتم پیام ───────────────────────────────────────────────────────────
   Widget _buildMessageItem(ChatMessage msg, bool isLast, ThemeData theme) {
     return TweenAnimationBuilder<double>(
+      // ✅ key برای جلوگیری از اجرای مجدد انیمیشن روی rebuild
+      key: ValueKey(msg.id),
       tween: Tween(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
       builder: (_, value, child) => Opacity(
-        opacity: value,
+        opacity: value.clamp(0.0, 1.0),
         child: Transform.translate(
           offset: Offset(0, 16 * (1 - value)),
           child: child,
@@ -476,47 +524,56 @@ class _ChatScreenState extends State<ChatScreen>
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(18),
                 topRight: const Radius.circular(18),
-                bottomLeft: Radius.circular(msg.isUser ? 18 : 2),
-                bottomRight: Radius.circular(msg.isUser ? 2 : 18),
+                bottomLeft: Radius.circular(msg.isUser ? 18 : 4),
+                bottomRight: Radius.circular(msg.isUser ? 4 : 18),
               ),
-              border: Border.all(color: _bubbleBorder(msg, theme)),
+              border: Border.all(
+                color: _bubbleBorder(msg, theme),
+                width: 1,
+              ),
+              // ✅ سایه ملایم برای حباب‌ها
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(10),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildMessageContent(msg, theme),
                 const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const Spacer(),
-                    Text(
-                      msg.timeLabel,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: theme.hintColor.withOpacity(0.6),
-                      ),
+                // زمان پیام
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    msg.timeLabel,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: theme.hintColor.withAlpha(153),
                     ),
-                  ],
+                  ),
                 ),
+                // دکمه تلاش مجدد برای پیام‌های خطا
                 if (msg.isError && isLast) ...[
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
                       onPressed: _retryLast,
                       icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: const Text('تلاش مجدد'),
-                      style: TextButton.styleFrom(
+                      style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 6,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
-                          side: const BorderSide(color: Colors.redAccent),
                         ),
                       ),
                     ),
@@ -530,22 +587,25 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ محتوای پیام (Markdown) ──
-  // ─────────────────────────────────────────
+  // ─── محتوای پیام (Markdown / متن) ────────────────────────────────────────
   Widget _buildMessageContent(ChatMessage msg, ThemeData theme) {
+    // پیام کاربر
     if (msg.isUser) {
       return SelectableText(
         msg.text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           height: 1.6,
-          color: Colors.white,
+          // ✅ رنگ متن بر اساس روشنایی رنگ حباب
+          color: theme.brightness == Brightness.dark
+              ? Colors.white
+              : theme.colorScheme.primary,
         ),
         textDirection: TextDirection.rtl,
       );
     }
 
+    // پیام خطا
     if (msg.isError) {
       return SelectableText(
         '⚠️ ${msg.text}',
@@ -558,50 +618,86 @@ class _ChatScreenState extends State<ChatScreen>
       );
     }
 
-    // ✅ استفاده از رنگ‌های داینامیک تم برای جلوگیری از نامرئی شدن متن در تم روشن
+    // پیام دستیار (Markdown)
     return MarkdownBody(
       data: msg.text,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
         p: TextStyle(
-          fontSize: 14, 
-          height: 1.7, 
-          color: theme.textTheme.bodyLarge?.color ?? Colors.black87
+          fontSize: 14,
+          height: 1.7,
+          color: theme.textTheme.bodyLarge?.color,
         ),
         h1: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.secondary,
+          height: 2,
         ),
         h2: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.secondary,
+          height: 2,
         ),
         h3: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.secondary,
+          height: 1.8,
         ),
-        listBullet: TextStyle(color: theme.colorScheme.secondary),
+        listBullet: TextStyle(
+          color: theme.colorScheme.secondary,
+          fontSize: 14,
+        ),
         code: TextStyle(
-          backgroundColor: theme.dividerColor.withOpacity(0.3),
+          backgroundColor: theme.dividerColor.withAlpha(76),
           color: theme.colorScheme.error,
           fontFamily: 'monospace',
+          fontSize: 13,
+        ),
+        codeblockDecoration: BoxDecoration(
+          color: theme.dividerColor.withAlpha(40),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.dividerColor),
         ),
         blockquote: TextStyle(
-          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+          color: theme.textTheme.bodyMedium?.color?.withAlpha(178),
           fontSize: 13,
+          fontStyle: FontStyle.italic,
+        ),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(
+              color: theme.colorScheme.secondary,
+              width: 4,
+            ),
+          ),
+        ),
+        strong: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: theme.textTheme.bodyLarge?.color,
+        ),
+        em: TextStyle(
+          fontStyle: FontStyle.italic,
+          color: theme.textTheme.bodyLarge?.color,
+        ),
+        tableHead: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.secondary,
+        ),
+        tableBody: TextStyle(
+          color: theme.textTheme.bodyMedium?.color,
         ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ منوی Long Press ──
-  // ─────────────────────────────────────────
+  // ─── منوی Long Press ──────────────────────────────────────────────────────
   void _showMessageOptions(ChatMessage msg) {
+    if (!mounted) return;
     final theme = Theme.of(context);
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -612,17 +708,35 @@ class _ChatScreenState extends State<ChatScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Drag handle
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 8),
+              margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: theme.dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // پیش‌نمایش پیام
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                msg.text.length > 80
+                    ? '${msg.text.substring(0, 80)}...'
+                    : msg.text,
+                style: TextStyle(
+                  color: theme.hintColor,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const Divider(),
             ListTile(
-              leading: const Icon(Icons.copy_rounded),
+              leading: Icon(Icons.copy_rounded,
+                  color: theme.colorScheme.primary),
               title: const Text('کپی متن'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -630,8 +744,10 @@ class _ChatScreenState extends State<ChatScreen>
               },
             ),
             if (msg.isAssistant) ...[
+              const Divider(height: 1, indent: 16, endIndent: 16),
               ListTile(
-                leading: const Icon(Icons.share_rounded),
+                leading: Icon(Icons.share_rounded,
+                    color: theme.colorScheme.primary),
                 title: const Text('اشتراک‌گذاری'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -639,67 +755,79 @@ class _ChatScreenState extends State<ChatScreen>
                 },
               ),
             ],
+            const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ رنگ‌های حباب ──
-  // ─────────────────────────────────────────
+  // ─── رنگ حباب ────────────────────────────────────────────────────────────
   Color _bubbleColor(ChatMessage msg, ThemeData theme) {
-    if (msg.isUser) return theme.colorScheme.primary.withOpacity(0.2);
-    if (msg.isError) return Colors.red.withOpacity(0.12);
+    if (msg.isError) return Colors.red.withAlpha(30);
+    if (msg.isUser) {
+      return theme.brightness == Brightness.dark
+          ? theme.colorScheme.primary.withAlpha(60)
+          : theme.colorScheme.primary.withAlpha(25);
+    }
     return theme.cardColor;
   }
 
   Color _bubbleBorder(ChatMessage msg, ThemeData theme) {
-    if (msg.isUser) return theme.colorScheme.primary.withOpacity(0.4);
-    if (msg.isError) return Colors.redAccent.withOpacity(0.4);
+    if (msg.isError) return Colors.redAccent.withAlpha(100);
+    if (msg.isUser) return theme.colorScheme.primary.withAlpha(80);
     return theme.dividerColor;
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ typing indicator با نقطه‌های متحرک ──
-  // ─────────────────────────────────────────
+  // ─── typing indicator ─────────────────────────────────────────────────────
   Widget _buildTypingIndicator(ThemeData theme) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(18),
             topRight: Radius.circular(18),
             bottomRight: Radius.circular(18),
+            bottomLeft: Radius.circular(4),
           ),
           border: Border.all(color: theme.dividerColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(10),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ✅ استفاده از توابع استاندارد دارت (dart:math)
+            // ✅ نقطه‌های متحرک با محاسبه صحیح (بدون منفی شدن t)
             ...List.generate(3, (i) {
               return AnimatedBuilder(
                 animation: _dotAnimCtrl,
                 builder: (_, __) {
-                  // محاسبه تاخیر برای هر نقطه
-                  final delay = i * 0.2;
-                  final t = (_dotAnimCtrl.value - delay) % 1.0;
-                  // استفاده از sin و pi استاندارد و سریع
-                  final scale = 0.5 + 0.5 * sin(t * pi);
-                  
+                  final delay = i / 3.0; // تاخیر بین 0 تا 0.66
+                  // ✅ اطمینان از غیر منفی بودن مقدار
+                  final rawT =
+                      (_dotAnimCtrl.value - delay + 1.0) % 1.0;
+                  final scale = 0.5 + 0.5 * sin(rawT * pi);
+                  final opacity = (0.4 + 0.6 * scale).clamp(0.0, 1.0);
+
                   return Transform.scale(
-                    scale: scale,
+                    scale: scale.clamp(0.3, 1.0),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.secondary.withOpacity(0.4 + 0.6 * scale),
+                        color: theme.colorScheme.secondary
+                            .withAlpha((opacity * 255).toInt()),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -710,7 +838,10 @@ class _ChatScreenState extends State<ChatScreen>
             const SizedBox(width: 10),
             Text(
               'در حال تحلیل...',
-              style: TextStyle(color: theme.hintColor, fontSize: 12),
+              style: TextStyle(
+                color: theme.hintColor,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -718,10 +849,10 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ ناحیه ورودی ──
-  // ─────────────────────────────────────────
-  Widget _buildInputArea(ThemeData theme) {
+  // ─── ناحیه ورودی ─────────────────────────────────────────────────────────
+  Widget _buildInputArea(ThemeData theme, AuthProvider auth) {
+    final canSend = !_isTyping && (auth.isGolden || auth.credits > 0);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
@@ -729,7 +860,7 @@ class _ChatScreenState extends State<ChatScreen>
         border: Border(top: BorderSide(color: theme.dividerColor)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -738,6 +869,7 @@ class _ChatScreenState extends State<ChatScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // فیلد متن
           Expanded(
             child: TextField(
               controller: _inputCtrl,
@@ -752,8 +884,11 @@ class _ChatScreenState extends State<ChatScreen>
                 fontSize: 14,
               ),
               decoration: InputDecoration(
-                hintText: _isTyping ? 'لطفاً صبر کنید...' : 'سوال دیگری دارید؟',
-                hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
+                hintText: _isTyping
+                    ? 'لطفاً صبر کنید...'
+                    : 'سوال دیگری دارید؟',
+                hintStyle:
+                    TextStyle(color: theme.hintColor, fontSize: 13),
                 filled: true,
                 fillColor: theme.cardColor,
                 contentPadding: const EdgeInsets.symmetric(
@@ -775,21 +910,49 @@ class _ChatScreenState extends State<ChatScreen>
                     width: 1.5,
                   ),
                 ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(
+                    color: theme.dividerColor.withAlpha(100),
+                  ),
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
+
+          // دکمه ارسال
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
-              color: _isTyping
-                  ? theme.disabledColor
-                  : theme.colorScheme.primary,
+              color: canSend
+                  ? theme.colorScheme.primary
+                  : theme.disabledColor,
               shape: BoxShape.circle,
+              boxShadow: canSend
+                  ? [
+                      BoxShadow(
+                        color:
+                            theme.colorScheme.primary.withAlpha(76),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             child: IconButton(
-              icon: const Icon(Icons.send_rounded, color: Colors.white),
-              onPressed: _isTyping ? null : _sendMessage,
+              icon: _isTyping
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white.withAlpha(200),
+                      ),
+                    )
+                  : const Icon(Icons.send_rounded, color: Colors.white),
+              onPressed: canSend ? _sendMessage : null,
+              tooltip: canSend ? 'ارسال' : 'صبر کنید...',
             ),
           ),
         ],
