@@ -21,10 +21,11 @@ class DiagnosticCode {
 
   factory DiagnosticCode.fromJson(Map<String, dynamic> json) {
     return DiagnosticCode(
+      // ✅ استفاده از ?.toString() برای جلوگیری از کرش
       code: json['code']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      severity: OBDSeverity.fromString(json['severity'] as String?),
-      system: json['system'] as String?,
+      severity: OBDSeverity.fromString(json['severity']?.toString()),
+      system: json['system']?.toString(),
     );
   }
 
@@ -54,12 +55,14 @@ enum OBDSeverity {
         OBDSeverity.unknown => 'نامشخص',
       };
 
+  // ✅ استفاده از حلقه for برای ایمنی و پرفورمنس بهتر
   static OBDSeverity fromString(String? value) {
     if (value == null) return OBDSeverity.unknown;
-    return OBDSeverity.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
-      orElse: () => OBDSeverity.unknown,
-    );
+    final lower = value.toLowerCase();
+    for (final sev in OBDSeverity.values) {
+      if (sev.name == lower) return sev;
+    }
+    return OBDSeverity.unknown;
   }
 }
 
@@ -118,10 +121,8 @@ class DiagnosticRequest {
     this.obdCodes,
   });
 
-  /// نوع ورودی بر اساس داده‌های موجود
   DiagnosticInputType get inputType {
-    final hasText =
-        userDescription != null && userDescription!.trim().isNotEmpty;
+    final hasText = userDescription != null && userDescription!.trim().isNotEmpty;
     final hasAudio = audioFeatures != null;
     final hasObd = obdCodes != null && obdCodes!.isNotEmpty;
 
@@ -131,7 +132,6 @@ class DiagnosticRequest {
     return DiagnosticInputType.textOnly;
   }
 
-  /// اعتبارسنجی
   String? validate() {
     if (token.isEmpty) return 'توکن الزامی است.';
     if (carId.isEmpty) return 'شناسه خودرو الزامی است.';
@@ -145,7 +145,7 @@ class DiagnosticRequest {
       return 'حداقل یکی از موارد (متن، صدا، یا کد OBD) الزامی است.';
     }
 
-    return null; // معتبر
+    return null;
   }
 }
 
@@ -155,11 +155,9 @@ class DiagnosticRequest {
 class AIDiagnosticService {
   final ApiService _apiService;
 
-  // ── تنظیمات ──
   final int _maxRetries;
   final Duration _retryDelay;
 
-  // ── cache ──
   final Map<String, DiagnosticResult> _cache = {};
   static const _cacheMaxSize = 20;
 
@@ -175,23 +173,20 @@ class AIDiagnosticService {
   // ── عیب‌یابی اصلی ──
   // ─────────────────────────────────────────
   Future<DiagnosticResult> diagnose(DiagnosticRequest request) async {
-    // ── اعتبارسنجی ──
     final validationError = request.validate();
     if (validationError != null) {
       throw DiagnosticException(validationError);
     }
 
-    // ── ساخت prompt ──
     final prompt = _buildPrompt(request);
 
-    // ── بررسی cache ──
+    // ✅ استفاده از خود متن Prompt به عنوان کلید (جلوگیری از Hash Collision)
     final cacheKey = _buildCacheKey(request, prompt);
     if (_cache.containsKey(cacheKey)) {
       debugPrint('[AIDiagnostic] نتیجه از cache برگشت داده شد.');
       return _cache[cacheKey]!;
     }
 
-    // ── ارسال به API با retry ──
     final responseText = await _sendWithRetry(
       token: request.token,
       carId: request.carId,
@@ -207,16 +202,11 @@ class AIDiagnosticService {
       type: request.inputType,
     );
 
-    // ── ذخیره در cache ──
     _saveToCache(cacheKey, result);
 
     return result;
   }
 
-  // ─────────────────────────────────────────
-  // ── shortcut برای استفاده ساده ──
-  // (سازگار با کد قدیمی)
-  // ─────────────────────────────────────────
   Future<String> diagnoseSimple({
     required String token,
     required String carId,
@@ -255,18 +245,10 @@ class AIDiagnosticService {
 
     while (attempt <= _maxRetries) {
       try {
-        debugPrint(
-          '[AIDiagnostic] تلاش ${attempt + 1}/${_maxRetries + 1}',
-        );
+        debugPrint('[AIDiagnostic] تلاش ${attempt + 1}/${_maxRetries + 1}');
 
         final response = await _apiService
-            .diagnose(
-              token,
-              carId,
-              prompt,
-              year: year,
-              carName: carName,
-            )
+            .diagnose(token, carId, prompt, year: year, carName: carName)
             .timeout(
               const Duration(seconds: 45),
               onTimeout: () => throw DiagnosticException(
@@ -276,10 +258,10 @@ class AIDiagnosticService {
 
         return response;
       } on DiagnosticException {
-        rethrow; // خطاهای منطقی را retry نکن
+        rethrow;
       } on ApiException catch (e) {
         if (e.statusCode == 402 || e.statusCode == 401) {
-          rethrow; // خطاهای اعتبارسنجی را retry نکن
+          rethrow;
         }
         lastError = e;
         debugPrint('[AIDiagnostic] خطای API (${e.statusCode}): ${e.message}');
@@ -290,15 +272,12 @@ class AIDiagnosticService {
 
       attempt++;
       if (attempt <= _maxRetries) {
-        debugPrint(
-          '[AIDiagnostic] ${_retryDelay.inSeconds} ثانیه صبر قبل از تلاش مجدد...',
-        );
+        debugPrint('[AIDiagnostic] ${_retryDelay.inSeconds} ثانیه صبر...');
         await Future.delayed(_retryDelay);
       }
     }
 
-    throw lastError ??
-        DiagnosticException('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
+    throw lastError ?? DiagnosticException('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
   }
 
   // ─────────────────────────────────────────
@@ -307,55 +286,35 @@ class AIDiagnosticService {
   String _buildPrompt(DiagnosticRequest req) {
     final buf = StringBuffer();
 
-    // ── بخش شرح مشکل ──
-    if (req.userDescription != null &&
-        req.userDescription!.trim().isNotEmpty) {
+    if (req.userDescription != null && req.userDescription!.trim().isNotEmpty) {
       buf.writeln('📋 شرح مشکل توسط راننده:');
       buf.writeln(req.userDescription!.trim());
       buf.writeln();
     }
 
-    // ── بخش کدهای OBD ──
     if (req.obdCodes != null && req.obdCodes!.isNotEmpty) {
       buf.writeln('🔌 کدهای خطای OBD-II استخراج‌شده از دستگاه دیاگ:');
       for (final c in req.obdCodes!) {
-        final sevLabel = c.severity != OBDSeverity.unknown
-            ? ' [${c.severity.label}]'
-            : '';
-        final sysLabel =
-            c.system != null ? ' (سیستم: ${c.system})' : '';
+        final sevLabel = c.severity != OBDSeverity.unknown ? ' [${c.severity.label}]' : '';
+        final sysLabel = c.system != null ? ' (سیستم: ${c.system})' : '';
         buf.writeln('  • ${c.code}$sevLabel$sysLabel: ${c.description}');
       }
       buf.writeln();
     }
 
-    // ── بخش آنالیز صوتی ──
     if (req.audioFeatures != null) {
       final af = req.audioFeatures!;
       buf.writeln('🎙️ نتایج آنالیز صوتی موتور (ضبط‌شده توسط میکروفون گوشی):');
-      buf.writeln(
-        '  • بلندی صدا (RMS): ${af.rms.toStringAsFixed(4)} '
-        '(${_rmsDescription(af.rms)})',
-      );
-      buf.writeln(
-        '  • فرکانس غالب: ${af.dominantFrequency.toStringAsFixed(1)} Hz '
-        '(${_freqDescription(af.dominantFrequency)})',
-      );
-      buf.writeln(
-        '  • مرکز طیف: ${af.spectralCentroid.toStringAsFixed(1)} Hz',
-      );
-      buf.writeln(
-        '  • نرخ عبور از صفر: ${af.zeroCrossingRate.toStringAsFixed(4)}',
-      );
+      buf.writeln('  • بلندی صدا (RMS): ${af.rms.toStringAsFixed(4)} (${_rmsDescription(af.rms)})');
+      buf.writeln('  • فرکانس غالب: ${af.dominantFrequency.toStringAsFixed(1)} Hz (${_freqDescription(af.dominantFrequency)})');
+      buf.writeln('  • مرکز طیف: ${af.spectralCentroid.toStringAsFixed(1)} Hz');
+      buf.writeln('  • نرخ عبور از صفر: ${af.zeroCrossingRate.toStringAsFixed(4)}');
       if (af.spectralRolloff > 0) {
-        buf.writeln(
-          '  • Spectral Rolloff: ${af.spectralRolloff.toStringAsFixed(1)} Hz',
-        );
+        buf.writeln('  • Spectral Rolloff: ${af.spectralRolloff.toStringAsFixed(1)} Hz');
       }
       buf.writeln();
     }
 
-    // ── دستورالعمل به AI ──
     buf.writeln('─────────────────────────────');
     buf.writeln(
       'لطفاً با توجه به اطلاعات بالا، به‌صورت دقیق و حرفه‌ای در قالب زیر پاسخ بده:\n'
@@ -369,9 +328,6 @@ class AIDiagnosticService {
     return buf.toString().trim();
   }
 
-  // ─────────────────────────────────────────
-  // ── توصیف مقادیر عددی به فارسی ──
-  // ─────────────────────────────────────────
   String _rmsDescription(double rms) {
     if (rms < 0.05) return 'خیلی آرام';
     if (rms < 0.15) return 'نرمال';
@@ -391,12 +347,12 @@ class AIDiagnosticService {
   // ── cache ──
   // ─────────────────────────────────────────
   String _buildCacheKey(DiagnosticRequest req, String prompt) {
-    return '${req.carId}_${req.year}_${prompt.hashCode}';
+    // ✅ استفاده از خود Prompt به جای HashCode برای جلوگیری از تصادم
+    return '${req.carId}_${req.year}_$prompt';
   }
 
   void _saveToCache(String key, DiagnosticResult result) {
     if (_cache.length >= _cacheMaxSize) {
-      // حذف قدیمی‌ترین آیتم
       _cache.remove(_cache.keys.first);
     }
     _cache[key] = result;
