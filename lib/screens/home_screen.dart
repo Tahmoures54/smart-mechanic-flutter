@@ -9,6 +9,10 @@ import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'chat_screen.dart';
 import 'record_screen.dart';
+// ✅ برای باز کردن لینک‌ها
+import 'package:url_launcher/url_launcher.dart';
+// ✅ برای اشتراک گذاری
+import 'package:share_plus/share_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isRefreshing = false;
   bool _hasCarLoadError = false;
   bool _isCustomCar = false;
+  bool _showCommonIssues = false;
 
   @override
   void initState() {
@@ -59,7 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final cars = await api.getCars();
       if (!mounted) return;
 
-      // ✅ مرتب‌سازی لیست خودروها بر اساس نام (حروف الفبا)
       cars.sort((a, b) => a.fullName.compareTo(b.fullName));
 
       setState(() {
@@ -229,6 +233,178 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     });
+  }
+
+  // ✅ متد باز کردن لینک شبکه های اجتماعی
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showSnack('امکان باز کردن لینک وجود ندارد', color: Colors.red);
+    }
+  }
+
+  // ✅ متد اشتراک گذاری اپلیکیشن
+  void _shareApp() {
+    Share.share(
+      'سلام! اگه ماشینت مشکل داره، حتما اپلیکیشن "مکانیک هوشمند" رو نصب کن. خیلی عالی عیب‌یابی می‌کنه! 🚗🔧',
+      subject: 'اپلیکیشن مکانیک هوشمند',
+    );
+  }
+
+  // ✅ مودال حمایت از ما
+  void _showSupportModal(ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: theme.dividerColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Icon(Icons.favorite, color: Colors.red.shade400, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'حمایت از تیم استارتاپی',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'سلام رفیق! ما یک تیم نوپا هستیم و با عشق این اپلیکیشن رو براتون ساختیم. برای ادامه این مسیر و بهبود اپلیکیشن، به حمایت‌های کوچک شما نیاز داریم. 🙏',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // دکمه اینستاگرام
+                  _buildSupportButton(
+                    theme: theme,
+                    icon: Icons.camera_alt_rounded,
+                    label: 'ما را در اینستاگرام دنبال کنید',
+                    gradientColors: [Colors.purple.shade400, Colors.pink.shade400],
+                    onTap: () {
+                      Navigator.pop(context);
+                      _launchUrl('https://instagram.com/smart_mec_app'); // آیدی را تغییر دهید
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // دکمه تلگرام
+                  _buildSupportButton(
+                    theme: theme,
+                    icon: Icons.send_rounded,
+                    label: 'عضو کانال تلگرام ما شوید',
+                    gradientColors: [Colors.lightBlue.shade400, Colors.blue.shade500],
+                    onTap: () {
+                      Navigator.pop(context);
+                      _launchUrl('https://t.me/smart_mec_app'); // آیدی را تغییر دهید
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // دکمه اشتراک گذاری
+                  _buildSupportButton(
+                    theme: theme,
+                    icon: Icons.share_rounded,
+                    label: 'معرفی اپلیکیشن به دوستان',
+                    gradientColors: [Colors.green.shade400, Colors.teal.shade500],
+                    onTap: () {
+                      Navigator.pop(context);
+                      _shareApp();
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // دکمه دادن امتیاز یا خرید اعتبار
+                  _buildSupportButton(
+                    theme: theme,
+                    icon: Icons.star_rounded,
+                    label: 'حمایت مالی (خرید اعتبار)',
+                    gradientColors: [Colors.amber.shade400, Colors.orange.shade500],
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ویجت دکمه‌های مودال حمایت
+  Widget _buildSupportButton({
+    required ThemeData theme,
+    required IconData icon,
+    required String label,
+    required List<Color> gradientColors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: gradientColors),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors.last.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 24),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -426,11 +602,92 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 36),
                 _buildPromoSection(theme),
+                const SizedBox(height: 24),
+                // ✅ بنر حمایت از ما
+                _buildSupportBanner(theme),
                 const SizedBox(height: 30),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ✅ بنر صادقانه حمایت از ما
+  Widget _buildSupportBanner(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // آیکون قلب
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.redAccent.withOpacity(0.1),
+            ),
+            child: const Icon(
+              Icons.favorite_rounded,
+              color: Colors.redAccent,
+              size: 40,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'ما یک تیم استارتاپی هستیم 🙏',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.textTheme.bodyLarge?.color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'صادقانه بگیم، این پروژه بدون حمایت شما دوستان عزیز پیشرفت نمی‌کنه. اگه از کارمون راضی بودید، لطفاً با یه فالو یا معرفی به دوستاتون، دلتون به ما گرمه.",
+            style: theme.textTheme.bodySmall?.copyWith(
+              height: 1.6,
+              color: theme.hintColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: theme.colorScheme.onSecondary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 2,
+              ),
+              icon: const Icon(Icons.volunteer_activism_rounded, size: 22),
+              label: const Text(
+                'حمایت از ما',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => _showSupportModal(theme),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -478,9 +735,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ─────────────────────────────────────────
-  // ✅ بخش انتخاب خودرو (دکمه باز کردن مودال جستجو)
-  // ─────────────────────────────────────────
   Widget _buildCarSelector(ThemeData theme) {
     if (_isCustomCar) {
       return SizedBox(
@@ -566,7 +820,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // ✅ تبدیل به دکمه برای باز کردن Bottom Sheet جستجو
     return InkWell(
       onTap: () => _showCarSearchModal(theme),
       borderRadius: BorderRadius.circular(16),
@@ -604,9 +857,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ─────────────────────────────────────────
-  // ✅ مودال جستجو و فیلتر خودروها
-  // ─────────────────────────────────────────
   void _showCarSearchModal(ThemeData theme) {
     FocusManager.instance.primaryFocus?.unfocus();
     
@@ -647,44 +897,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (issues.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'مشکلات شایع این خودرو (برای انتخاب ضربه بزنید):',
-            style: TextStyle(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _showCommonIssues = !_showCommonIssues;
+              });
+            },
+            icon: Icon(
+              _showCommonIssues ? Icons.expand_less_rounded : Icons.expand_more_rounded,
               color: theme.colorScheme.secondary,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
+            ),
+            label: Text(
+              _showCommonIssues ? 'بستن مشکلات شایع' : 'نمایش مشکلات شایع این خودرو',
+              style: TextStyle(
+                color: theme.colorScheme.secondary,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: issues.map((issue) {
-              return ActionChip(
-                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                side: BorderSide(
-                  color: theme.colorScheme.primary.withOpacity(0.3),
-                ),
-                labelStyle: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 13,
-                ),
-                label: Text(issue),
-                onPressed: () {
-                  setState(() {
-                    _descController.text = issue;
-                  });
-                },
-              );
-            }).toList(),
+        ),
+        if (_showCommonIssues)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: issues.map((issue) {
+                return ActionChip(
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  side: BorderSide(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                  ),
+                  labelStyle: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontSize: 13,
+                  ),
+                  label: Text(issue),
+                  onPressed: () {
+                    setState(() {
+                      _descController.text = issue;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -982,7 +1245,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ✅ ویجت مجزا برای شیت پایین صفحه (جستجوی خودرو)
+// ✅ ویجت مجزا برای شیت پایین صفحه (جستجوی خودرو با الگوریتم بهینه فارسی)
 // ─────────────────────────────────────────────────────────────────────────────
 class _CarSearchSheet extends StatefulWidget {
   final List<Car> cars;
@@ -1019,11 +1282,31 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     super.dispose();
   }
 
+  // ✅ تابع نرمال‌سازی حروف فارسی و عربی برای جستجوی دقیق‌تر
+  String _normalizeText(String text) {
+    return text
+        .replaceAll('ي', 'ی')
+        .replaceAll('ك', 'ک')
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('ؤ', 'و')
+        .replaceAll('ئ', 'ی')
+        .replaceAll('ة', 'ه')
+        .replaceAll(' ', '')
+        .toLowerCase();
+  }
+
   void _filterCars() {
-    final query = _searchController.text.toLowerCase().trim();
+    final query = _normalizeText(_searchController.text);
     setState(() {
       _filteredCars = widget.cars.where((car) {
-        return car.fullName.toLowerCase().contains(query);
+        final carName = _normalizeText(car.fullName);
+        final carBrand = _normalizeText(car.brand);
+        final carModel = _normalizeText(car.model);
+        
+        return carName.contains(query) || 
+               carBrand.contains(query) || 
+               carModel.contains(query);
       }).toList();
     });
   }
@@ -1034,7 +1317,6 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
       height: MediaQuery.of(context).size.height * 0.75,
       child: Column(
         children: [
-          // ── هدر شیت ──
           Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             decoration: BoxDecoration(
@@ -1086,7 +1368,6 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
               ],
             ),
           ),
-          // ── لیست خودروها ──
           Expanded(
             child: _filteredCars.isEmpty
                 ? Center(
