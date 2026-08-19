@@ -20,7 +20,7 @@ enum AppEnvironment {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── کانفیگ محیط ──
+// ─ـ کانفیگ محیط ──
 // ─────────────────────────────────────────────────────────────────────────────
 class EnvironmentConfig {
   final AppEnvironment environment;
@@ -35,10 +35,10 @@ class EnvironmentConfig {
     this.enableCrashReporting = true,
   });
 
-  // ── تعریف هر محیط (اصلاح شده با آدرس Vercel) ──
-  // نکته: اگر بک‌اند شما مسیر /api را ندارد، آن را از انتهای آدرس‌ها حذف کنید
+  // ── تعریف هر محیط ──
   static const development = EnvironmentConfig(
     environment: AppEnvironment.development,
+    // اگر لوکال هاست دارید میتوانید اینجا قرار دهید: 'http://10.0.2.2:3000/api'
     baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
     enableLogging: true,
     enableCrashReporting: false,
@@ -67,7 +67,7 @@ class EnvironmentConfig {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── ثابت‌های اصلی ──
+// ─ـ ثابت‌های اصلی ──
 // ─────────────────────────────────────────────────────────────────────────────
 class Constants {
   Constants._();
@@ -80,47 +80,47 @@ class Constants {
 
   // ── آدرس پایه با version ──
   static String get baseUrl => env.baseUrl;
-  static String get apiUrl => '${env.baseUrl}/$_apiVersion';
+  // ✅ ترکیب ایمن آدرس پایه و نسخه API
+  static String get apiUrl => '$baseUrl/$_apiVersion';
 
   // ─────────────────────────────────────────
-  // ── Endpoints: Account ──
+  // ─ـ Endpoints: Account ──
   // ─────────────────────────────────────────
-  // نکته: در کد قبلی endpoints از baseUrl استفاده میکردند. اگر بک‌اند شما v1 را نیاز دارد،
-  // بهتر است از apiUrl استفاده کنند. فعلا برای جلوگیری از تغییر ناگهانی، روی baseUrl نگه داشته‌ام.
-  static String get account => '$baseUrl/account';
-  static String get sendOtp => '$baseUrl/account';          // POST {action: send}
-  static String get verifyOtp => '$baseUrl/account';        // POST {action: verify}
-  static String get credits => '$baseUrl/account/credits';  // GET
-  static String get profile => '$baseUrl/account/credits';  // alias
-  static String get withdraw => '$baseUrl/account/withdraw'; // POST
+  // ✅ استفاده از apiUrl به جای baseUrl برای هماهنگی با نسخه API
+  static String get account => '$apiUrl/account';
+  static String get sendOtp => '$apiUrl/account';          // POST {action: send}
+  static String get verifyOtp => '$apiUrl/account';         // POST {action: verify}
+  static String get credits => '$apiUrl/account/credits';   // GET
+  static String get profile => '$apiUrl/account/credits';   // alias
+  static String get withdraw => '$apiUrl/account/withdraw'; // POST
 
   // ─────────────────────────────────────────
-  // ── Endpoints: Diagnose ──
+  // ─ـ Endpoints: Diagnose ──
   // ─────────────────────────────────────────
-  static String get diagnose => '$baseUrl/diagnose';
-  static String get diagnoseHistory => '$baseUrl/diagnose';  // GET ?history=true
-  static String get diagnoseAudio => '$baseUrl/diagnose/audio'; // POST multipart
-  static String deleteDiagnose(String id) => '$baseUrl/diagnose/$id'; // DELETE
+  static String get diagnose => '$apiUrl/diagnose';
+  static String get diagnoseHistory => '$apiUrl/diagnose';  // GET ?history=true
+  static String get diagnoseAudio => '$apiUrl/diagnose/audio'; // POST multipart
+  static String deleteDiagnose(String id) => '$apiUrl/diagnose/$id'; // DELETE
 
   // ─────────────────────────────────────────
-  // ── Endpoints: Purchase ──
+  // ─ـ Endpoints: Purchase ──
   // ─────────────────────────────────────────
-  static String get purchase => '$baseUrl/purchase';
-  static String get verifyPurchase => '$baseUrl/purchase/verify';
+  static String get purchase => '$apiUrl/purchase';
+  static String get verifyPurchase => '$apiUrl/purchase/verify';
 
   // ─────────────────────────────────────────
-  // ── Endpoints: Static ──
+  // ─ـ Endpoints: Static ──
   // ─────────────────────────────────────────
   static String get carsJson {
-    // حذف /api از انتهای آدرس برای دسترسی به فایل‌های استاتیک در ریشه دامنه
-    final publicBase = baseUrl.replaceAll('/api', '');
-    return '$publicBase/cars.json';
+    // ✅ استفاده از Uri برای حذف ایمن مسیر /api (جلوگیری از باگ در دامنه‌هایی که کلمه api دارند)
+    final uri = Uri.parse(baseUrl);
+    return uri.replace(path: '/cars.json').toString();
   }
 
-  static String get health => '$baseUrl/health';
+  static String get health => '$apiUrl/health';
 
   // ─────────────────────────────────────────
-  // ── Timeouts ──
+  // ─ـ Timeouts ──
   // ─────────────────────────────────────────
   static const Duration defaultTimeout = Duration(seconds: 20);
   static const Duration diagnoseTimeout = Duration(seconds: 60);
@@ -128,14 +128,14 @@ class Constants {
   static const Duration longPollTimeout = Duration(minutes: 2);
 
   // ─────────────────────────────────────────
-  // ── Cache ──
+  // ─ـ Cache ──
   // ─────────────────────────────────────────
   static const Duration carsCacheDuration = Duration(hours: 6);
   static const Duration profileCacheDuration = Duration(seconds: 30);
   static const Duration placesCacheDuration = Duration(minutes: 10);
 
   // ─────────────────────────────────────────
-  // ── App Info ──
+  // ─ـ App Info ──
   // ─────────────────────────────────────────
   static const String appName = 'مکانیک هوشمند';
   static const String appVersion = '1.0.0';
@@ -144,7 +144,7 @@ class Constants {
   static const String supportEmail = 'support@smart-mec.ir';
 
   // ─────────────────────────────────────────
-  // ── Storage Keys ──
+  // ─ـ Storage Keys ──
   // ─────────────────────────────────────────
   static const String keyJwtToken = 'jwt_token';
   static const String keySelectedLocale = 'selected_locale';
@@ -154,14 +154,14 @@ class Constants {
   static const String keyThemeMode = 'theme_mode';
 
   // ─────────────────────────────────────────
-  // ── Hive Box Names ──
+  // ─ـ Hive Box Names ──
   // ─────────────────────────────────────────
   static const String boxDiagnostics = 'diagnostics';
   static const String boxHistory = 'history';
   static const String boxUserProfile = 'user_profile';
 
   // ─────────────────────────────────────────
-  // ── Limits ──
+  // ─ـ Limits ──
   // ─────────────────────────────────────────
   static const int maxDescriptionLength = 300;
   static const int minDescriptionLength = 5;
@@ -172,7 +172,7 @@ class Constants {
   static const int phoneLength = 11;
 
   // ─────────────────────────────────────────
-  // ── Feature Flags ──
+  // ─ـ Feature Flags ──
   // ─────────────────────────────────────────
   static const bool featureAudioDiagnosis = true;
   static const bool featureGarageMap = true;
@@ -181,13 +181,13 @@ class Constants {
   static const bool featureObdDiagnosis = false;  // هنوز آماده نیست
 
   // ─────────────────────────────────────────
-  // ── Rate Limiting ──
+  // ─ـ Rate Limiting ──
   // ─────────────────────────────────────────
   static const Duration minRequestInterval = Duration(milliseconds: 500);
   static const Duration otpResendCooldown = Duration(seconds: 60);
 
   // ─────────────────────────────────────────
-  // ── دیباگ ──
+  // ─ـ دیباگ ──
   // ─────────────────────────────────────────
   static void printInfo() {
     if (!env.enableLogging) return;
@@ -195,6 +195,7 @@ class Constants {
     debugPrint('🚗 $appName v$appVersion+$appBuildNumber');
     debugPrint('🌐 Env: ${env.environment.label}');
     debugPrint('🔗 BaseUrl: $baseUrl');
+    debugPrint('🔗 ApiUrl: $apiUrl');
     debugPrint('📝 Logging: ${env.enableLogging}');
     debugPrint('════════════════════════════════');
   }
