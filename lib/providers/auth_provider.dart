@@ -91,7 +91,6 @@ class AuthProvider with ChangeNotifier {
     try {
       _token = await _storage.read(key: 'jwt_token');
       if (_token != null) {
-        // ✅ باز کردن باکس اگر بسته است
         if (!Hive.isBoxOpen('user_profile')) {
           await Hive.openBox('user_profile');
         }
@@ -112,11 +111,9 @@ class AuthProvider with ChangeNotifier {
   // ─────────────────────────────────────────
   Future<void> _loadCachedProfile() async {
     try {
-      // ✅ اطمینان از باز بودن باکس
       if (!Hive.isBoxOpen('user_profile')) return;
       final box = Hive.box('user_profile');
 
-      // ✅ ایمن‌سازی کست‌ها با ?? و as int?
       _userId = box.get('userId') as String?;
       _userName = box.get('userName') as String?;
       _phone = box.get('phone') as String?;
@@ -323,9 +320,9 @@ class AuthProvider with ChangeNotifier {
     for (final name in boxNames) {
       try {
         if (Hive.isBoxOpen(name)) {
-          // ✅ بستن کامل باکس برای آزادسازی کامل RAM
           await Hive.box(name).clear();
-          await Hive.closeBox(name);
+          // ✅ اصلاح شد: بستن باکس با متد close روی خود شیء
+          await Hive.box(name).close();
         } else {
           // اگر بسته بود، باز و پاک می‌کنیم تا داده‌های stale پاک شوند
           final box = await Hive.openBox(name);
