@@ -9,9 +9,7 @@ import 'shop_screen.dart';
 import 'history_screen.dart';
 import 'chat_screen.dart';
 import 'record_screen.dart';
-// ✅ برای باز کردن لینک‌ها
 import 'package:url_launcher/url_launcher.dart';
-// ✅ برای اشتراک گذاری
 import 'package:share_plus/share_plus.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -49,7 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // ─── بارگذاری لیست خودروها ───────────────────────────────────────────────
   Future<void> _loadCars({bool isRefresh = false}) async {
+    if (!mounted) return;
     setState(() {
       if (isRefresh) {
         _isRefreshing = true;
@@ -68,7 +68,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _cars = cars;
-        if (cars.isNotEmpty && _selectedCar == null && !_isCustomCar) {
+        // اگر قبلاً خودرویی انتخاب شده، آن را در لیست جدید پیدا کن
+        if (_selectedCar != null) {
+          final found = cars.where((c) => c.id == _selectedCar!.id);
+          _selectedCar = found.isNotEmpty ? found.first : cars.firstOrNull;
+        } else if (cars.isNotEmpty && !_isCustomCar) {
           _selectedCar = cars.first;
         }
       });
@@ -88,22 +92,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ─── نمایش اسنک‌بار ──────────────────────────────────────────────────────
   void _showSnack(String message, {Color? color}) {
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
+      ),
     );
   }
 
+  // ─── اعتبارسنجی سال ──────────────────────────────────────────────────────
   bool _validateYear(String year) {
     final n = int.tryParse(year);
     if (n == null) return false;
-    final shamsi = n >= 1340 && n <= 1410;
-    final gregorian = n >= 1960 && n <= 2030;
+    final shamsi = n >= 1340 && n <= 1420;
+    final gregorian = n >= 1960 && n <= 2040;
     return shamsi || gregorian;
   }
 
+  // ─── اعتبارسنجی ورودی‌ها ─────────────────────────────────────────────────
   bool _validateInputs({required bool requireDescription}) {
     final auth = context.read<AuthProvider>();
 
@@ -121,18 +135,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_isCustomCar && _customCarController.text.trim().length < 2) {
-      _showSnack('لطفاً نام و مدل خودروی خود را بنویسید.');
+      _showSnack('لطفاً نام و مدل خودروی خود را بنویسید (حداقل ۲ حرف).');
       return false;
     }
 
     final year = _yearController.text.trim();
     if (year.isEmpty || !_validateYear(year)) {
-      _showSnack('سال ساخت را وارد کنید (مثلاً ۱۴۰۳ شمسی یا ۲۰۲۴ میلادی).');
+      _showSnack(
+        'سال ساخت را وارد کنید (مثلاً ۱۴۰۳ شمسی یا ۲۰۲۴ میلادی).',
+      );
       return false;
     }
 
     if (requireDescription && _descController.text.trim().length < 5) {
-      _showSnack('لطفاً مشکل را کمی واضح‌تر بنویسید.');
+      _showSnack('لطفاً مشکل را کمی واضح‌تر بنویسید (حداقل ۵ حرف).');
       return false;
     }
 
@@ -144,19 +160,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return true;
   }
 
+  // ─── اطلاعات خودروی انتخاب‌شده ──────────────────────────────────────────
   ({String id, String name, String year}) _getCarInfo() {
     return (
-      id: _isCustomCar ? 'custom' : _selectedCar!.id,
+      id: _isCustomCar ? 'custom' : (_selectedCar?.id ?? 'custom'),
       name: _isCustomCar
           ? _customCarController.text.trim()
-          : _selectedCar!.fullName,
+          : (_selectedCar?.fullName ?? ''),
       year: _yearController.text.trim(),
     );
   }
 
+  // ─── عیب‌یابی متنی ───────────────────────────────────────────────────────
   void _diagnose() {
     FocusManager.instance.primaryFocus?.unfocus();
-
     if (!_validateInputs(requireDescription: true)) return;
 
     final car = _getCarInfo();
@@ -177,13 +194,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── ضبط صدا ─────────────────────────────────────────────────────────────
   void _onVoiceRecordTap() {
     FocusManager.instance.primaryFocus?.unfocus();
-
     if (!_validateInputs(requireDescription: false)) return;
 
     final car = _getCarInfo();
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -196,19 +212,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── دیالوگ اعتبار ناکافی ────────────────────────────────────────────────
   void _showNoCreditDialog() {
     final theme = Theme.of(context);
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.dialogBackgroundColor,
-        title: Text(
-          'اعتبار ناکافی',
-          style: TextStyle(color: theme.textTheme.titleLarge?.color),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.orange.shade600, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              'اعتبار ناکافی',
+              style: TextStyle(color: theme.textTheme.titleLarge?.color),
+            ),
+          ],
         ),
         content: Text(
           'برای ادامه گفتگو و عیب‌یابی دقیق، نیاز به تهیه اعتبار دارید.',
-          style: theme.textTheme.bodyMedium,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
         ),
         actions: [
           TextButton(
@@ -219,6 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.colorScheme.secondary,
               foregroundColor: theme.colorScheme.onSecondary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('تهیه اعتبار'),
@@ -235,25 +263,34 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ✅ متد باز کردن لینک شبکه های اجتماعی
+  // ─── باز کردن لینک ───────────────────────────────────────────────────────
   Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      _showSnack('امکان باز کردن لینک وجود ندارد', color: Colors.red);
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showSnack('امکان باز کردن لینک وجود ندارد', color: Colors.red);
+      }
+    } catch (e) {
+      _showSnack('خطا در باز کردن لینک', color: Colors.red);
     }
   }
 
-  // ✅ متد اشتراک گذاری اپلیکیشن
+  // ─── اشتراک‌گذاری اپ ─────────────────────────────────────────────────────
   void _shareApp() {
-    Share.share(
-      'سلام! اگه ماشینت مشکل داره، حتما اپلیکیشن "مکانیک هوشمند" رو نصب کن. خیلی عالی عیب‌یابی می‌کنه! 🚗🔧',
-      subject: 'اپلیکیشن مکانیک هوشمند',
+    SharePlus.instance.share(
+      ShareParams(
+        text:
+            'سلام! اگه ماشینت مشکل داره، حتما اپلیکیشن "مکانیک هوشمند" رو نصب کن.'
+            ' خیلی عالی عیب‌یابی می‌کنه! 🚗🔧\n'
+            'دانلود: https://example.com/app', // ← لینک واقعی را جایگزین کنید
+        subject: 'اپلیکیشن مکانیک هوشمند',
+      ),
     );
   }
 
-  // ✅ مودال حمایت از ما
+  // ─── مودال حمایت ─────────────────────────────────────────────────────────
   void _showSupportModal(ThemeData theme) {
     showModalBottomSheet(
       context: context,
@@ -263,7 +300,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return Container(
           decoration: BoxDecoration(
             color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
             child: Padding(
@@ -271,16 +309,18 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Drag handle
                   Container(
                     width: 40,
                     height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
+                    margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
                       color: theme.dividerColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  Icon(Icons.favorite, color: Colors.red.shade400, size: 48),
+                  Icon(Icons.favorite_rounded,
+                      color: Colors.red.shade400, size: 48),
                   const SizedBox(height: 16),
                   Text(
                     'حمایت از تیم استارتاپی',
@@ -291,44 +331,51 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'سلام رفیق! ما یک تیم نوپا هستیم و با عشق این اپلیکیشن رو براتون ساختیم. برای ادامه این مسیر و بهبود اپلیکیشن، به حمایت‌های کوچک شما نیاز داریم. 🙏',
+                    'سلام رفیق! ما یک تیم نوپا هستیم و با عشق این اپلیکیشن رو براتون ساختیم.'
+                    ' برای ادامه این مسیر و بهبود اپلیکیشن، به حمایت‌های کوچک شما نیاز داریم. 🙏',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                   ),
                   const SizedBox(height: 24),
-                  
-                  // دکمه اینستاگرام
+
                   _buildSupportButton(
                     theme: theme,
                     icon: Icons.camera_alt_rounded,
                     label: 'ما را در اینستاگرام دنبال کنید',
-                    gradientColors: [Colors.purple.shade400, Colors.pink.shade400],
+                    gradientColors: [
+                      Colors.purple.shade400,
+                      Colors.pink.shade400
+                    ],
                     onTap: () {
                       Navigator.pop(context);
-                      _launchUrl('https://instagram.com/smart_mec_app'); // آیدی را تغییر دهید
+                      _launchUrl('https://instagram.com/smart_mec_app');
                     },
                   ),
                   const SizedBox(height: 12),
 
-                  // دکمه تلگرام
                   _buildSupportButton(
                     theme: theme,
                     icon: Icons.send_rounded,
                     label: 'عضو کانال تلگرام ما شوید',
-                    gradientColors: [Colors.lightBlue.shade400, Colors.blue.shade500],
+                    gradientColors: [
+                      Colors.lightBlue.shade400,
+                      Colors.blue.shade500
+                    ],
                     onTap: () {
                       Navigator.pop(context);
-                      _launchUrl('https://t.me/smart_mec_app'); // آیدی را تغییر دهید
+                      _launchUrl('https://t.me/smart_mec_app');
                     },
                   ),
                   const SizedBox(height: 12),
 
-                  // دکمه اشتراک گذاری
                   _buildSupportButton(
                     theme: theme,
                     icon: Icons.share_rounded,
                     label: 'معرفی اپلیکیشن به دوستان',
-                    gradientColors: [Colors.green.shade400, Colors.teal.shade500],
+                    gradientColors: [
+                      Colors.green.shade400,
+                      Colors.teal.shade500
+                    ],
                     onTap: () {
                       Navigator.pop(context);
                       _shareApp();
@@ -336,15 +383,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // دکمه دادن امتیاز یا خرید اعتبار
                   _buildSupportButton(
                     theme: theme,
                     icon: Icons.star_rounded,
                     label: 'حمایت مالی (خرید اعتبار)',
-                    gradientColors: [Colors.amber.shade400, Colors.orange.shade500],
+                    gradientColors: [
+                      Colors.amber.shade400,
+                      Colors.orange.shade500
+                    ],
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ShopScreen()),
+                      );
                     },
                   ),
                   const SizedBox(height: 16),
@@ -357,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ویجت دکمه‌های مودال حمایت
+  // ─── دکمه‌های مودال حمایت ────────────────────────────────────────────────
   Widget _buildSupportButton({
     required ThemeData theme,
     required IconData icon,
@@ -367,6 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return Material(
       color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
@@ -376,14 +429,15 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: gradientColors.last.withOpacity(0.3),
+                color: gradientColors.last.withAlpha(76), // 0.3 * 255 ≈ 76
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
               children: [
                 Icon(icon, color: Colors.white, size: 24),
@@ -398,7 +452,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+                const Icon(Icons.chevron_left_rounded,
+                    color: Colors.white70),
               ],
             ),
           ),
@@ -407,6 +462,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // BUILD
+  // ══════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -427,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             if (auth.isAuthenticated)
               IconButton(
-                icon: const Icon(Icons.history),
+                icon: const Icon(Icons.history_rounded),
                 tooltip: 'تاریخچه عیب‌یابی',
                 onPressed: () => Navigator.push(
                   context,
@@ -459,15 +517,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // ── بنر بالا ──────────────────────────────────────────────
                 if (auth.isAuthenticated)
                   _buildCreditCard(auth, theme)
                 else
                   _buildGuestBanner(theme),
+
                 const SizedBox(height: 20),
+
+                // ── انتخاب خودرو ──────────────────────────────────────────
                 Text(
                   '۱. مشخصات خودروی خود را وارد کنید:',
-                  style: TextStyle(
-                    color: theme.textTheme.bodyLarge?.color,
+                  style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -487,8 +548,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () {
                       setState(() {
                         _isCustomCar = !_isCustomCar;
+                        _showCommonIssues = false; // ← reset
                         if (!_isCustomCar) {
                           _customCarController.clear();
+                          if (_cars.isNotEmpty) {
+                            _selectedCar = _cars.first;
+                          }
                         } else {
                           _selectedCar = null;
                         }
@@ -507,12 +572,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+
                 _buildCommonIssues(theme),
                 const SizedBox(height: 24),
+
+                // ── شرح خرابی ─────────────────────────────────────────────
                 Text(
                   '۲. شرح خرابی را بنویسید:',
-                  style: TextStyle(
-                    color: theme.textTheme.bodyLarge?.color,
+                  style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -520,8 +587,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 _buildDescriptionField(theme),
                 const SizedBox(height: 24),
+
+                // ── دکمه عیب‌یابی متنی ────────────────────────────────────
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 28),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 24),
+                  label: Text(
+                    'ارسال به مکانیک هوشمند',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSecondary,
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -531,55 +608,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     elevation: 4,
                   ),
                   onPressed: _diagnose,
-                  label: Text(
-                    'ارسال به مکانیک هوشمند',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSecondary,
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Divider(
-                        color: theme.hintColor.withOpacity(0.2),
-                        thickness: 1.5,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.cardColor,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: theme.hintColor.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Text(
-                        'یا روش دقیق‌تر',
-                        style: TextStyle(
-                          color: theme.colorScheme.secondary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Divider(
-                        color: theme.hintColor.withOpacity(0.2),
-                        thickness: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
+
+                // ── جداکننده ──────────────────────────────────────────────
+                _buildDivider(theme),
                 const SizedBox(height: 20),
+
+                // ── دکمه ضبط صدا ──────────────────────────────────────────
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.mic_none_rounded, size: 30),
+                  icon: const Icon(Icons.mic_none_rounded, size: 28),
                   label: const Text('شروع ضبط صدای موتور / خودرو'),
                   onPressed: _onVoiceRecordTap,
                   style: ElevatedButton.styleFrom(
@@ -601,9 +639,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 36),
+
+                // ── بخش تبلیغاتی ──────────────────────────────────────────
                 _buildPromoSection(theme),
                 const SizedBox(height: 24),
-                // ✅ بنر حمایت از ما
+
+                // ── بنر حمایت ─────────────────────────────────────────────
                 _buildSupportBanner(theme),
                 const SizedBox(height: 30),
               ],
@@ -614,7 +655,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ✅ بنر صادقانه حمایت از ما
+  // ─── جداکننده "یا روش دقیق‌تر" ──────────────────────────────────────────
+  Widget _buildDivider(ThemeData theme) {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: theme.hintColor.withAlpha(50),
+            thickness: 1.5,
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: theme.hintColor.withAlpha(50)),
+          ),
+          child: Text(
+            'یا روش دقیق‌تر',
+            style: TextStyle(
+              color: theme.colorScheme.secondary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(
+            color: theme.hintColor.withAlpha(50),
+            thickness: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── بنر حمایت ───────────────────────────────────────────────────────────
   Widget _buildSupportBanner(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -622,12 +700,12 @@ class _HomeScreenState extends State<HomeScreen> {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.2),
+          color: theme.colorScheme.secondary.withAlpha(50),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -635,12 +713,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
-          // آیکون قلب
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.redAccent.withOpacity(0.1),
+              color: Colors.redAccent.withAlpha(26),
             ),
             child: const Icon(
               Icons.favorite_rounded,
@@ -653,13 +730,14 @@ class _HomeScreenState extends State<HomeScreen> {
             'ما یک تیم استارتاپی هستیم 🙏',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: theme.textTheme.bodyLarge?.color,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'صادقانه بگیم، این پروژه بدون حمایت شما دوستان عزیز پیشرفت نمی‌کنه. اگه از کارمون راضی بودید، لطفاً با یه فالو یا معرفی به دوستاتون، دلتون به ما گرمه.',
+            'صادقانه بگیم، این پروژه بدون حمایت شما دوستان عزیز پیشرفت نمی‌کنه.'
+            ' اگه از کارمون راضی بودید، لطفاً با یه فالو یا معرفی به دوستاتون'
+            ' کمکمون کنید. 🙏',
             style: theme.textTheme.bodySmall?.copyWith(
               height: 1.6,
               color: theme.hintColor,
@@ -682,7 +760,8 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.volunteer_activism_rounded, size: 22),
               label: const Text(
                 'حمایت از ما',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               onPressed: () => _showSupportModal(theme),
             ),
@@ -692,6 +771,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── فیلد سال ────────────────────────────────────────────────────────────
   Widget _buildYearField(ThemeData theme) {
     return SizedBox(
       height: 56,
@@ -730,18 +810,26 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 1.5,
             ),
           ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide:
+                const BorderSide(color: Colors.redAccent, width: 1.5),
+          ),
         ),
       ),
     );
   }
 
+  // ─── انتخاب‌گر خودرو ─────────────────────────────────────────────────────
   Widget _buildCarSelector(ThemeData theme) {
+    // حالت خودرو دلخواه
     if (_isCustomCar) {
       return SizedBox(
         height: 56,
         child: TextField(
           controller: _customCarController,
           style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+          textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             hintText: 'مثال: تویوتا کمری',
             hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
@@ -752,7 +840,7 @@ class _HomeScreenState extends State<HomeScreen> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: theme.colorScheme.secondary.withOpacity(0.5),
+                color: theme.colorScheme.secondary.withAlpha(128),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -767,6 +855,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    // در حال بارگذاری
     if (_isLoadingCars && !_isRefreshing) {
       return Container(
         height: 56,
@@ -774,10 +863,20 @@ class _HomeScreenState extends State<HomeScreen> {
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: theme.colorScheme.secondary,
+            ),
+          ),
+        ),
       );
     }
 
+    // خطا در بارگذاری
     if (_hasCarLoadError && _cars.isEmpty) {
       return Container(
         height: 56,
@@ -785,11 +884,13 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+          border: Border.all(color: Colors.redAccent.withAlpha(128)),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            const Icon(Icons.error_outline,
+                color: Colors.redAccent, size: 20),
+            const SizedBox(width: 8),
             const Expanded(
               child: Text(
                 'خطا در بارگذاری',
@@ -797,15 +898,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.refresh, size: 18),
-              onPressed: () => _loadCars(),
-            )
+              icon: Icon(Icons.refresh_rounded,
+                  size: 20, color: theme.colorScheme.secondary),
+              tooltip: 'تلاش مجدد',
+              onPressed: _loadCars,
+            ),
           ],
         ),
       );
     }
 
-    if (_cars.isEmpty && !_isLoadingCars) {
+    // لیست خالی
+    if (_cars.isEmpty) {
       return Container(
         height: 56,
         padding: const EdgeInsets.all(16),
@@ -820,6 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    // لیست خودرو (قابل کلیک)
     return InkWell(
       onTap: () => _showCarSearchModal(theme),
       borderRadius: BorderRadius.circular(16),
@@ -832,7 +937,6 @@ class _HomeScreenState extends State<HomeScreen> {
           color: theme.cardColor,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
               child: Text(
@@ -857,9 +961,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── مودال جستجوی خودرو ──────────────────────────────────────────────────
   void _showCarSearchModal(ThemeData theme) {
     FocusManager.instance.primaryFocus?.unfocus();
-    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -877,7 +981,10 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedCar: _selectedCar,
             theme: theme,
             onCarSelected: (car) {
-              setState(() => _selectedCar = car);
+              setState(() {
+                _selectedCar = car;
+                _showCommonIssues = false; // ← reset هنگام تغییر خودرو
+              });
               Navigator.pop(context);
             },
           ),
@@ -886,10 +993,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── مشکلات شایع ─────────────────────────────────────────────────────────
   Widget _buildCommonIssues(ThemeData theme) {
-    if (_isCustomCar || _selectedCar == null) {
-      return const SizedBox.shrink();
-    }
+    if (_isCustomCar || _selectedCar == null) return const SizedBox.shrink();
 
     final issues = _selectedCar!.commonIssues
         .where((issue) => !issue.contains('اطلاعات دقیقی'))
@@ -902,17 +1008,19 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Center(
           child: TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _showCommonIssues = !_showCommonIssues;
-              });
-            },
+            onPressed: () =>
+                setState(() => _showCommonIssues = !_showCommonIssues),
             icon: Icon(
-              _showCommonIssues ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              _showCommonIssues
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
               color: theme.colorScheme.secondary,
+              size: 20,
             ),
             label: Text(
-              _showCommonIssues ? 'بستن مشکلات شایع' : 'نمایش مشکلات شایع این خودرو',
+              _showCommonIssues
+                  ? 'بستن مشکلات شایع'
+                  : 'نمایش مشکلات شایع این خودرو',
               style: TextStyle(
                 color: theme.colorScheme.secondary,
                 fontWeight: FontWeight.bold,
@@ -921,45 +1029,51 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        if (_showCommonIssues)
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: issues.map((issue) {
-                return ActionChip(
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  side: BorderSide(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _showCommonIssues
+              ? Padding(
+                  key: ValueKey(_selectedCar!.id),
+                  padding: const EdgeInsets.only(top: 8, bottom: 16),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: issues.map((issue) {
+                      return ActionChip(
+                        backgroundColor:
+                            theme.colorScheme.primary.withAlpha(26),
+                        side: BorderSide(
+                          color: theme.colorScheme.primary.withAlpha(76),
+                        ),
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontSize: 13,
+                        ),
+                        label: Text(issue),
+                        onPressed: () =>
+                            setState(() => _descController.text = issue),
+                      );
+                    }).toList(),
                   ),
-                  labelStyle: TextStyle(
-                    color: theme.colorScheme.primary,
-                    fontSize: 13,
-                  ),
-                  label: Text(issue),
-                  onPressed: () {
-                    setState(() {
-                      _descController.text = issue;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-          ),
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }
 
+  // ─── فیلد شرح خرابی ──────────────────────────────────────────────────────
   Widget _buildDescriptionField(ThemeData theme) {
     return TextField(
       controller: _descController,
       maxLines: 4,
       maxLength: 300,
-      style: TextStyle(color: theme.textTheme.bodyLarge?.color, height: 1.5),
+      textInputAction: TextInputAction.done,
+      style: TextStyle(
+          color: theme.textTheme.bodyLarge?.color, height: 1.5),
       decoration: InputDecoration(
         hintText:
-            'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ میزنه...',
+            'مثال: صبح‌ها که هوا سرده، موقع استارت زدن ماشین ریپ می‌زنه...',
         hintStyle: TextStyle(color: theme.hintColor, fontSize: 14),
         filled: true,
         fillColor: theme.cardColor,
@@ -979,21 +1093,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── بنر مهمان ───────────────────────────────────────────────────────────
   Widget _buildGuestBanner(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.5)),
+        border: Border.all(
+          color: theme.colorScheme.primary.withAlpha(128),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: theme.colorScheme.primary, size: 28),
+          Icon(Icons.info_outline_rounded,
+              color: theme.colorScheme.primary, size: 28),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'برای استفاده از هوش مصنوعی و دریافت ۱ اعتبار رایگان، وارد حساب کاربری خود شوید.',
+              'برای استفاده از هوش مصنوعی و دریافت ۱ اعتبار رایگان،'
+              ' وارد حساب کاربری خود شوید.',
               style: TextStyle(fontSize: 13, height: 1.5),
             ),
           ),
@@ -1004,37 +1123,43 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute(builder: (_) => const LoginScreen()),
             ),
             style: TextButton.styleFrom(
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.15),
+              backgroundColor: theme.colorScheme.primary.withAlpha(38),
               foregroundColor: theme.colorScheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            child: const Text('ورود',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          )
+            child: const Text(
+              'ورود',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  // ─── بخش تبلیغاتی ────────────────────────────────────────────────────────
   Widget _buildPromoSection(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.primary.withOpacity(0.9),
-            theme.colorScheme.primary.withOpacity(0.7),
+            theme.colorScheme.primary.withAlpha(230),
+            theme.colorScheme.primary.withAlpha(179),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.3),
+          color: theme.colorScheme.secondary.withAlpha(76),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(0.1),
+            color: theme.colorScheme.primary.withAlpha(26),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -1065,9 +1190,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده است تا دقیق‌ترین تشخیص را به شما ارائه دهد.',
+            'هوش مصنوعی ما با تحلیل میلیون‌ها دادهٔ تعمیرگاهی آموزش دیده'
+            ' است تا دقیق‌ترین تشخیص را به شما ارائه دهد.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withAlpha(230),
               fontSize: 14,
               height: 1.6,
             ),
@@ -1078,7 +1204,8 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.savings_rounded,
             title: 'پیشگیری بهتر از تعمیر',
             desc:
-                'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور آسیب جدی وارد کند.',
+                'با آگاهی و تشخیص زودهنگام، نگذارید یک ایراد کوچک به موتور'
+                ' آسیب جدی وارد کند.',
           ),
           const SizedBox(height: 16),
           _buildPromoItem(
@@ -1086,7 +1213,8 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.handshake_rounded,
             title: 'دستیار هوشمند مکانیک شما',
             desc:
-                'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک خود کمک کنید.',
+                'تشخیص دقیق اولین قدم است؛ با داشتن گزارش کامل، به مکانیک'
+                ' خود کمک کنید.',
           ),
           const SizedBox(height: 16),
           _buildPromoItem(
@@ -1113,7 +1241,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withAlpha(38),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: Colors.white, size: 24),
@@ -1135,7 +1263,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 desc,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withAlpha(204),
                   fontSize: 13,
                   height: 1.4,
                 ),
@@ -1147,79 +1275,80 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ─── کارت اعتبار ─────────────────────────────────────────────────────────
   Widget _buildCreditCard(AuthProvider auth, ThemeData theme) {
+    final isGolden = auth.isGolden;
+
+    // رنگ‌بندی بر اساس وضعیت
+    final textColor = isGolden ? Colors.white : theme.textTheme.bodyLarge?.color;
+    final subTextColor = isGolden ? Colors.white70 : theme.textTheme.bodySmall?.color;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: auth.isGolden
+          colors: isGolden
               ? [Colors.amber.shade700, Colors.orange.shade900]
-              : [theme.cardColor, theme.cardColor.withOpacity(0.8)],
+              : [theme.cardColor, theme.cardColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: auth.isGolden ? Colors.amberAccent : theme.dividerColor,
-          width: auth.isGolden ? 1.5 : 1,
+          color: isGolden ? Colors.amberAccent : theme.dividerColor,
+          width: isGolden ? 1.5 : 1,
         ),
         boxShadow: const [
           BoxShadow(
-              color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+            color: Colors.black26,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isGolden
+                  ? Colors.white.withAlpha(51)
+                  : theme.colorScheme.primary.withAlpha(26),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isGolden
+                  ? Icons.workspace_premium_rounded
+                  : Icons.account_balance_wallet_rounded,
+              color: isGolden ? Colors.white : theme.colorScheme.primary,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    auth.isGolden
-                        ? Icons.workspace_premium_rounded
-                        : Icons.account_balance_wallet_rounded,
-                    color: Colors.white,
-                    size: 28,
+                Text(
+                  isGolden ? 'اشتراک طلایی' : 'موجودی اعتبار شما',
+                  style: TextStyle(
+                    color: subTextColor,
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        auth.isGolden
-                            ? 'اشتراک طلایی'
-                            : 'موجودی اعتبار شما',
-                        style: TextStyle(
-                          color: auth.isGolden
-                              ? Colors.white
-                              : theme.textTheme.bodySmall?.color,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        auth.isGolden
-                            ? 'فعال می‌باشد'
-                            : '${auth.credits} بار عیب‌یابی',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 4),
+                Text(
+                  isGolden ? 'فعال می‌باشد' : '${auth.credits} بار عیب‌یابی',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               ],
             ),
           ),
-          if (!auth.isGolden)
+          if (!isGolden)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.secondary,
@@ -1231,7 +1360,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ShopScreen()),
+                MaterialPageRoute(builder: (_) => const ShopScreen()),
               ),
               child: const Text(
                 'شارژ حساب',
@@ -1244,14 +1373,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ✅ ویجت مجزا برای شیت پایین صفحه (جستجوی خودرو با الگوریتم بهینه فارسی)
-// ─────────────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ویجت مجزا برای شیت جستجوی خودرو
+// ══════════════════════════════════════════════════════════════════════════════
 class _CarSearchSheet extends StatefulWidget {
   final List<Car> cars;
   final Car? selectedCar;
   final ThemeData theme;
-  final Function(Car) onCarSelected;
+  final void Function(Car) onCarSelected;
 
   const _CarSearchSheet({
     required this.cars,
@@ -1266,7 +1395,7 @@ class _CarSearchSheet extends StatefulWidget {
 
 class _CarSearchSheetState extends State<_CarSearchSheet> {
   final _searchController = TextEditingController();
-  List<Car> _filteredCars = [];
+  late List<Car> _filteredCars;
 
   @override
   void initState() {
@@ -1282,8 +1411,8 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     super.dispose();
   }
 
-  // ✅ تابع نرمال‌سازی حروف فارسی و عربی برای جستجوی دقیق‌تر
-  String _normalizeText(String text) {
+  /// نرمال‌سازی حروف فارسی/عربی برای جستجوی دقیق‌تر
+  String _normalize(String text) {
     return text
         .replaceAll('ي', 'ی')
         .replaceAll('ك', 'ک')
@@ -1292,45 +1421,58 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         .replaceAll('ؤ', 'و')
         .replaceAll('ئ', 'ی')
         .replaceAll('ة', 'ه')
+        .replaceAll('\u200c', '') // حذف نیم‌فاصله
         .replaceAll(' ', '')
         .toLowerCase();
   }
 
   void _filterCars() {
-    final query = _normalizeText(_searchController.text);
+    final query = _normalize(_searchController.text);
     setState(() {
-      _filteredCars = widget.cars.where((car) {
-        final carName = _normalizeText(car.fullName);
-        final carBrand = _normalizeText(car.brand);
-        final carModel = _normalizeText(car.model);
-        
-        return carName.contains(query) || 
-               carBrand.contains(query) || 
-               carModel.contains(query);
-      }).toList();
+      if (query.isEmpty) {
+        _filteredCars = widget.cars;
+      } else {
+        _filteredCars = widget.cars.where((car) {
+          return _normalize(car.fullName).contains(query) ||
+              _normalize(car.brand).contains(query) ||
+              _normalize(car.model).contains(query);
+        }).toList();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = widget.theme;
+
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.75,
       child: Column(
         children: [
+          // ── هدر + جستجو ─────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             decoration: BoxDecoration(
-              color: widget.theme.cardColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              color: theme.cardColor,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(13),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               children: [
+                // Drag handle
                 Container(
                   width: 40,
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: widget.theme.dividerColor,
+                    color: theme.dividerColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1339,68 +1481,109 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: widget.theme.textTheme.titleLarge?.color,
+                    color: theme.textTheme.titleLarge?.color,
                   ),
                 ),
                 const SizedBox(height: 16),
+                // فیلد جستجو
                 TextField(
                   controller: _searchController,
                   autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                   decoration: InputDecoration(
                     hintText: 'نام خودرو را جستجو کنید... (مثلاً پژو ۲۰۶)',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded),
-                            onPressed: () {
-                              _searchController.clear();
-                            },
-                          )
-                        : null,
+                    hintStyle:
+                        TextStyle(color: theme.hintColor, fontSize: 13),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: theme.hintColor),
+                    // ✅ اصلاح: استفاده از ValueListenableBuilder برای rebuild صحیح
+                    suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _searchController,
+                      builder: (_, value, __) => value.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded),
+                              onPressed: _searchController.clear,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    fillColor: widget.theme.scaffoldBackgroundColor,
+                    fillColor: theme.scaffoldBackgroundColor,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // تعداد نتایج
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${_filteredCars.length} خودرو یافت شد',
+                    style: TextStyle(
+                      color: theme.hintColor,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+
+          // ── لیست خودروها ────────────────────────────────────────────────
           Expanded(
             child: _filteredCars.isEmpty
                 ? Center(
-                    child: Text(
-                      'خودرویی با این نام یافت نشد',
-                      style: TextStyle(color: widget.theme.hintColor),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off_rounded,
+                            size: 48, color: theme.hintColor),
+                        const SizedBox(height: 12),
+                        Text(
+                          'خودرویی با این نام یافت نشد',
+                          style: TextStyle(color: theme.hintColor),
+                        ),
+                      ],
                     ),
                   )
-                : ListView.builder(
+                : ListView.separated(
                     itemCount: _filteredCars.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: theme.dividerColor.withAlpha(76),
+                    ),
                     itemBuilder: (context, index) {
                       final car = _filteredCars[index];
-                      final isSelected = car.id == widget.selectedCar?.id;
-                      return Container(
-                        color: isSelected
-                            ? widget.theme.colorScheme.primary.withOpacity(0.1)
-                            : Colors.transparent,
-                        child: ListTile(
-                          title: Text(
-                            car.fullName,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected
-                                  ? widget.theme.colorScheme.primary
-                                  : widget.theme.textTheme.bodyLarge?.color,
-                            ),
+                      final isSelected =
+                          car.id == widget.selectedCar?.id;
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
+                        tileColor: isSelected
+                            ? theme.colorScheme.primary.withAlpha(20)
+                            : null,
+                        title: Text(
+                          car.fullName,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.textTheme.bodyLarge?.color,
                           ),
-                          trailing: isSelected
-                              ? Icon(Icons.check_circle_rounded,
-                                  color: widget.theme.colorScheme.primary)
-                              : null,
-                          onTap: () => widget.onCarSelected(car),
                         ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded,
+                                color: theme.colorScheme.primary)
+                            : null,
+                        onTap: () => widget.onCarSelected(car),
                       );
                     },
                   ),
