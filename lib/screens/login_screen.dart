@@ -84,9 +84,13 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── اعتبارسنجی شماره ──
   String? _validatePhone(String phone) {
-    if (phone.length != 11) return 'شماره باید ۱۱ رقم باشد';
-    if (!phone.startsWith('09')) return 'شماره باید با ۰۹ شروع شود';
-    if (!RegExp(r'^\d+$').hasMatch(phone)) return 'فقط عدد وارد کنید';
+    // حذف فاصله‌های احتمالی
+    final cleanPhone = phone.replaceAll(' ', '').trim();
+    if (cleanPhone.length != 11) return 'شماره باید ۱۱ رقم باشد';
+    // بررسی با Regex استاندارد ایرانی
+    if (!RegExp(r'^09\d{9}$').hasMatch(cleanPhone)) {
+      return 'شماره موبایل نامعتبر است (مثال: 09123456789)';
+    }
     return null;
   }
 
@@ -119,10 +123,12 @@ class _LoginScreenState extends State<LoginScreen>
         isResend ? 'کد جدید ارسال شد.' : 'کد تأیید ارسال شد.',
         isError: false,
       );
-    } catch (e) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-      final msg = e is ApiException ? e.message : 'خطا در ارتباط با سرور';
-      _showSnack(msg, isError: true);
+      _showSnack(e.message, isError: true);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnack('خطا در ارتباط با سرور. اینترنت را بررسی کنید.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -149,16 +155,17 @@ class _LoginScreenState extends State<LoginScreen>
           );
       if (!mounted) return;
 
+      // ورود موفقیت‌آمیز و پاک کردن استک صفحات
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
       );
-    } catch (e) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-      _showSnack(
-        e.toString().replaceAll('Exception: ', ''),
-        isError: true,
-      );
+      _showSnack(e.message, isError: true);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnack('خطای ناشناخته‌ای در ورود رخ داد.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -177,9 +184,12 @@ class _LoginScreenState extends State<LoginScreen>
     });
   }
 
+  // ✅ متد کمکی برای جلوگیری از انباشت Snackbar
   void _showSnack(String msg, {required bool isError}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(msg),
         backgroundColor: isError ? Colors.redAccent : Colors.green,
@@ -291,7 +301,6 @@ class _LoginScreenState extends State<LoginScreen>
       key: const ValueKey('phone'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── فیلد شماره ──
         TextField(
           controller: _phoneController,
           focusNode: _phoneFocus,
@@ -603,12 +612,13 @@ class _LoginScreenState extends State<LoginScreen>
     return ElevatedButton.icon(
       onPressed: _isLoading ? null : onPressed,
       icon: _isLoading
-          ? const SizedBox(
+          ? SizedBox(
               height: 20,
               width: 20,
+              // ✅ اصلاح رنگ اسپینر برای سازگاری با تم تاریک و روشن
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.black54,
+                color: theme.colorScheme.onSecondary.withOpacity(0.8),
               ),
             )
           : Icon(icon, size: 20),
@@ -624,6 +634,7 @@ class _LoginScreenState extends State<LoginScreen>
         backgroundColor: theme.colorScheme.secondary,
         foregroundColor: theme.colorScheme.onSecondary,
         disabledBackgroundColor: theme.colorScheme.secondary.withOpacity(0.5),
+        disabledForegroundColor: theme.colorScheme.onSecondary.withOpacity(0.6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
