@@ -62,27 +62,23 @@ class AuthProvider with ChangeNotifier {
   int get referralPercentage => _referralPercentage;
   int get minWithdrawal => _minWithdrawal;
 
-  /// آیا اشتراک طلایی هنوز معتبر است
   bool get isGoldenActive {
     if (!_isGolden) return false;
     if (_goldenExpiry == null) return true;
     return _goldenExpiry!.isAfter(DateTime.now());
   }
 
-  /// روزهای باقی‌مانده اشتراک طلایی
   int? get goldenDaysLeft {
     if (!isGoldenActive || _goldenExpiry == null) return null;
     return _goldenExpiry!.difference(DateTime.now()).inDays;
   }
 
-  /// نمایش نام کاربر یا شماره
   String get displayName {
     if (_userName != null && _userName!.isNotEmpty) return _userName!;
     if (_phone != null && _phone!.isNotEmpty) return _phone!;
     return 'کاربر';
   }
 
-  /// آیا می‌توان عیب‌یابی انجام داد
   bool get canDiagnose => isAuthenticated && (isGoldenActive || _credits > 0);
 
   // ─────────────────────────────────────────
@@ -95,9 +91,11 @@ class AuthProvider with ChangeNotifier {
     try {
       _token = await _storage.read(key: 'jwt_token');
       if (_token != null) {
-        // بارگذاری cache محلی اول (سریع‌تر)
+        // ✅ باز کردن باکس اگر بسته است
+        if (!Hive.isBoxOpen('user_profile')) {
+          await Hive.openBox('user_profile');
+        }
         await _loadCachedProfile();
-        // بعد از سرور آپدیت کن
         await fetchProfile(force: true);
       }
     } catch (e) {
@@ -114,21 +112,21 @@ class AuthProvider with ChangeNotifier {
   // ─────────────────────────────────────────
   Future<void> _loadCachedProfile() async {
     try {
+      // ✅ اطمینان از باز بودن باکس
       if (!Hive.isBoxOpen('user_profile')) return;
       final box = Hive.box('user_profile');
 
+      // ✅ ایمن‌سازی کست‌ها با ?? و as int?
       _userId = box.get('userId') as String?;
       _userName = box.get('userName') as String?;
       _phone = box.get('phone') as String?;
-      _credits = box.get('credits', defaultValue: 0) as int;
-      _isGolden = box.get('isGolden', defaultValue: false) as bool;
+      _credits = box.get('credits', defaultValue: 0) as int? ?? 0;
+      _isGolden = box.get('isGolden', defaultValue: false) as bool? ?? false;
       _referralCode = box.get('referralCode') as String?;
-      _earnings = box.get('earnings', defaultValue: 0) as int;
-      _referredCount = box.get('referredCount', defaultValue: 0) as int;
-      _referralPercentage =
-          box.get('referralPercentage', defaultValue: 10) as int;
-      _minWithdrawal =
-          box.get('minWithdrawal', defaultValue: 50000) as int;
+      _earnings = box.get('earnings', defaultValue: 0) as int? ?? 0;
+      _referredCount = box.get('referredCount', defaultValue: 0) as int? ?? 0;
+      _referralPercentage = box.get('referralPercentage', defaultValue: 10) as int? ?? 10;
+      _minWithdrawal = box.get('minWithdrawal', defaultValue: 50000) as int? ?? 50000;
 
       final expiryStr = box.get('goldenExpiry') as String?;
       if (expiryStr != null) {
@@ -167,8 +165,7 @@ class AuthProvider with ChangeNotifier {
         'referredCount': _referredCount,
         'referralPercentage': _referralPercentage,
         'minWithdrawal': _minWithdrawal,
-        if (_goldenExpiry != null)
-          'goldenExpiry': _goldenExpiry!.toIso8601String(),
+        if (_goldenExpiry != null) 'goldenExpiry': _goldenExpiry!.toIso8601String(),
       });
     } catch (e) {
       debugPrint('خطا در ذخیره cache: $e');
@@ -181,7 +178,6 @@ class AuthProvider with ChangeNotifier {
   Future<void> fetchProfile({bool force = false}) async {
     if (_token == null) return;
 
-    // ── throttle: اگر خیلی زود صدا زده شده، رد کن ──
     if (!force && _isFetchingProfile) return;
     if (!force && _profileLastFetched != null) {
       final elapsed = DateTime.now().difference(_profileLastFetched!);
@@ -218,48 +214,31 @@ class AuthProvider with ChangeNotifier {
   // ─────────────────────────────────────────
   void _updateProfileFromData(Map<String, dynamic> data) {
     _userId = data['id']?.toString() ?? data['userId']?.toString() ?? _userId;
-    _userName = data['name']?.toString() ??
-        data['userName']?.toString() ??
-        data['username']?.toString();
+    _userName = data['name']?.toString() ?? data['userName']?.toString() ?? data['username']?.toString();
     _phone = data['phone']?.toString() ?? _phone;
     _credits = (data['credits'] as num?)?.toInt() ?? _credits;
     _isGolden = data['isGolden'] == true || data['is_golden'] == true;
     _referralCode = data['referralCode']?.toString() ?? _referralCode;
     _earnings = (data['earnings'] as num?)?.toInt() ?? _earnings;
     _referredCount = (data['referredCount'] as num?)?.toInt() ?? _referredCount;
-    _referralPercentage =
-        (data['referralPercentage'] as num?)?.toInt() ?? _referralPercentage;
-    _minWithdrawal =
-        (data['minWithdrawal'] as num?)?.toInt() ?? _minWithdrawal;
+    _referralPercentage = (data['referralPercentage'] as num?)?.toInt() ?? _referralPercentage;
+    _minWithdrawal = (data['minWithdrawal'] as num?)?.toInt() ?? _minWithdrawal;
 
-    // ── تاریخ انقضای اشتراک طلایی ──
-    final expiryStr = data['goldenExpiry']?.toString() ??
-        data['golden_expiry']?.toString();
+    final expiryStr = data['goldenExpiry']?.toString() ?? data['golden_expiry']?.toString();
     if (expiryStr != null) {
       _goldenExpiry = DateTime.tryParse(expiryStr);
     }
   }
 
   // ─────────────────────────────────────────
-  // ── ارسال OTP ──
+  // ── ارسال OTP و ورود ──
   // ─────────────────────────────────────────
   Future<void> sendOtp(String phone) async {
     await apiService.sendOtp(phone);
   }
 
-  // ─────────────────────────────────────────
-  // ── ورود ──
-  // ─────────────────────────────────────────
-  Future<void> login(
-    String phone,
-    String code, {
-    String? referralCode,
-  }) async {
-    final res = await apiService.verifyOtp(
-      phone,
-      code,
-      referralCode: referralCode,
-    );
+  Future<void> login(String phone, String code, {String? referralCode}) async {
+    final res = await apiService.verifyOtp(phone, code, referralCode: referralCode);
 
     if (res['success'] == true) {
       _token = res['token'] as String?;
@@ -268,17 +247,14 @@ class AuthProvider with ChangeNotifier {
         throw Exception('توکن دریافت نشد. لطفاً دوباره تلاش کنید.');
       }
 
-      // ── ذخیره token ──
       await _storage.write(key: 'jwt_token', value: _token!);
 
-      // ── آپدیت اولیه از response ورود ──
       final user = res['user'];
       if (user is Map<String, dynamic>) {
         _phone = phone;
         _updateProfileFromData(user);
       }
 
-      // ── دریافت پروفایل کامل ──
       await fetchProfile(force: true);
       notifyListeners();
     } else {
@@ -288,7 +264,6 @@ class AuthProvider with ChangeNotifier {
 
   // ─────────────────────────────────────────
   // ── آپدیت اعتبار محلی ──
-  // (بعد از خرید، بدون نیاز به fetch مجدد)
   // ─────────────────────────────────────────
   void updateCredits(int newCredits) {
     _credits = newCredits;
@@ -321,7 +296,6 @@ class AuthProvider with ChangeNotifier {
   // ── خروج ──
   // ─────────────────────────────────────────
   Future<void> logout() async {
-    // ── ریست تمام فیلدها ──
     _token = null;
     _userId = null;
     _userName = null;
@@ -338,10 +312,7 @@ class AuthProvider with ChangeNotifier {
     _profileLastFetched = null;
     _isFetchingProfile = false;
 
-    // ── حذف token ──
     await _storage.delete(key: 'jwt_token');
-
-    // ── پاکسازی cache ──
     await _clearLocalCache();
 
     notifyListeners();
@@ -352,7 +323,14 @@ class AuthProvider with ChangeNotifier {
     for (final name in boxNames) {
       try {
         if (Hive.isBoxOpen(name)) {
+          // ✅ بستن کامل باکس برای آزادسازی کامل RAM
           await Hive.box(name).clear();
+          await Hive.closeBox(name);
+        } else {
+          // اگر بسته بود، باز و پاک می‌کنیم تا داده‌های stale پاک شوند
+          final box = await Hive.openBox(name);
+          await box.clear();
+          await box.close();
         }
       } catch (e) {
         debugPrint('خطا در پاکسازی box "$name": $e');
