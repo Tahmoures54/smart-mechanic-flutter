@@ -43,7 +43,7 @@ class AppLocale {
 // ── کانفیگ زبان‌های پشتیبانی‌شده ──
 // ─────────────────────────────────────────────────────────────────────────────
 class LocaleConfig {
-  LocaleConfig._();
+  LocaleConfig._(); // جلوگیری از نمونه‌سازی
 
   // ── زبان پیش‌فرض ──
   static const AppLocale defaultLocale = _persian;
@@ -133,18 +133,16 @@ class LocaleConfig {
       supportedLocales.map((l) => l.locale).toList();
 
   // ─────────────────────────────────────────
-  // ── پیدا کردن زبان ──
+  // ─ـ پیدا کردن زبان ──
   // ─────────────────────────────────────────
 
-  /// پیدا کردن AppLocale از Locale
   static AppLocale? findByLocale(Locale locale) {
     for (final l in supportedLocales) {
-      if (l.locale.languageCode == locale.languageCode) return l;
+      if (l.locale == locale) return l;
     }
     return null;
   }
 
-  /// پیدا کردن از کد زبان
   static AppLocale? findByLanguageCode(String code) {
     for (final l in supportedLocales) {
       if (l.languageCode == code) return l;
@@ -152,7 +150,6 @@ class LocaleConfig {
     return null;
   }
 
-  /// پیدا کردن از کلید ذخیره‌سازی
   static AppLocale? findByStorageKey(String key) {
     for (final l in supportedLocales) {
       if (l.storageKey == key) return l;
@@ -161,16 +158,16 @@ class LocaleConfig {
   }
 
   // ─────────────────────────────────────────
-  // ── تشخیص زبان دستگاه ──
+  // ─ـ تشخیص زبان دستگاه ──
   // ─────────────────────────────────────────
   static AppLocale getDeviceLocale() {
-    final deviceLang =
+    final deviceLang = 
         WidgetsBinding.instance.platformDispatcher.locale.languageCode;
     return findByLanguageCode(deviceLang) ?? defaultLocale;
   }
 
   // ─────────────────────────────────────────
-  // ── ذخیره‌سازی و بارگذاری ──
+  // ─ـ ذخیره‌سازی و بارگذاری ──
   // ─────────────────────────────────────────
   static Future<void> saveLocale(AppLocale locale) async {
     try {
@@ -192,6 +189,7 @@ class LocaleConfig {
     } catch (e) {
       debugPrint('[LocaleConfig] خطا در بارگذاری زبان: $e');
     }
+    // اگر چیزی ذخیره نشده بود، زبان دستگاه را بگیر
     return getDeviceLocale();
   }
 
@@ -205,14 +203,12 @@ class LocaleConfig {
   }
 
   // ─────────────────────────────────────────
-  // ── اطلاعات RTL ──
+  // ─ـ اطلاعات RTL ──
   // ─────────────────────────────────────────
 
-  /// زبان‌های RTL
   static List<AppLocale> get rtlLocales =>
       supportedLocales.where((l) => l.isRTL).toList();
 
-  /// زبان‌های LTR
   static List<AppLocale> get ltrLocales =>
       supportedLocales.where((l) => !l.isRTL).toList();
 
@@ -222,7 +218,7 @@ class LocaleConfig {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Provider مدیریت زبان ──
+// ─ـ Provider مدیریت زبان ──
 // ─────────────────────────────────────────────────────────────────────────────
 class LocaleProvider with ChangeNotifier {
   AppLocale _currentLocale;
@@ -231,7 +227,7 @@ class LocaleProvider with ChangeNotifier {
   LocaleProvider(AppLocale initialLocale) : _currentLocale = initialLocale;
 
   // ─────────────────────────────────────────
-  // ── Getters ──
+  // ─ـ Getters ──
   // ─────────────────────────────────────────
   AppLocale get currentLocale => _currentLocale;
   Locale get locale => _currentLocale.locale;
@@ -244,7 +240,7 @@ class LocaleProvider with ChangeNotifier {
   List<AppLocale> get availableLocales => LocaleConfig.supportedLocales;
 
   // ─────────────────────────────────────────
-  // ── ساخت با بارگذاری از حافظه ──
+  // ─ـ ساخت با بارگذاری از حافظه ──
   // ─────────────────────────────────────────
   static Future<LocaleProvider> create() async {
     final saved = await LocaleConfig.loadSavedLocale();
@@ -252,7 +248,7 @@ class LocaleProvider with ChangeNotifier {
   }
 
   // ─────────────────────────────────────────
-  // ── تغییر زبان ──
+  // ─ـ تغییر زبان ──
   // ─────────────────────────────────────────
   Future<void> setLocale(AppLocale newLocale) async {
     if (_currentLocale == newLocale) return;
@@ -285,7 +281,7 @@ class LocaleProvider with ChangeNotifier {
   }
 
   // ─────────────────────────────────────────
-  // ── بازگشت به پیش‌فرض ──
+  // ─ـ بازگشت به پیش‌فرض ──
   // ─────────────────────────────────────────
   Future<void> resetToDefault() async {
     await LocaleConfig.clearSavedLocale();
@@ -299,7 +295,7 @@ class LocaleProvider with ChangeNotifier {
   }
 
   // ─────────────────────────────────────────
-  // ── بررسی انتخاب ──
+  // ─ـ بررسی انتخاب ──
   // ─────────────────────────────────────────
   bool isSelected(AppLocale locale) => _currentLocale == locale;
   bool isSelectedByCode(String code) => _currentLocale.languageCode == code;
