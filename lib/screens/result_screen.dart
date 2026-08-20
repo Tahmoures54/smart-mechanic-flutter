@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart'; // ✅ اضافه شد
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/audio_features.dart';
-import '../services/ai_diagnostic_service.dart';
+import '../providers/auth_provider.dart';
+import 'shop_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   final String? resultText;
@@ -61,7 +63,6 @@ class _ResultScreenState extends State<ResultScreen>
     super.dispose();
   }
 
-  // ✅ متد کمکی برای مدیریت Snackbar
   void _showSnack(String msg, Color color) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -71,7 +72,7 @@ class _ResultScreenState extends State<ResultScreen>
           children: [
             const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
             const SizedBox(width: 8),
-            Text(msg),
+            Expanded(child: Text(msg)),
           ],
         ),
         backgroundColor: color,
@@ -84,8 +85,16 @@ class _ResultScreenState extends State<ResultScreen>
 
   void _shareResult() {
     if (widget.resultText == null) return;
+    final auth = context.read<AuthProvider>();
+    final code = auth.referralCode;
+    final referralLine = (code != null && code.isNotEmpty)
+        ? '\n\nبا کد معرف $code در مکانیک هوشمند ثبت‌نام کن و اعتبار هدیه بگیر.'
+        : '\n\nاپ مکانیک هوشمند — عیب‌یابی خودرو با کمک AI';
+
     Share.share(
-      '🔧 نتیجه عیب‌یابی مکانیک هوشمند:\n\n${widget.resultText!}',
+      '🔧 نتیجه عیب‌یابی من با مکانیک هوشمند:\n\n'
+      '${widget.resultText!}'
+      '$referralLine',
       subject: 'نتیجه عیب‌یابی خودرو',
     );
   }
@@ -94,6 +103,26 @@ class _ResultScreenState extends State<ResultScreen>
     if (widget.resultText == null) return;
     Clipboard.setData(ClipboardData(text: widget.resultText!));
     _showSnack('متن نتیجه کپی شد', Colors.green.shade700);
+  }
+
+  void _shareReferral() {
+    final auth = context.read<AuthProvider>();
+    final code = auth.referralCode;
+    if (code == null || code.isEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ShopScreen()),
+      );
+      return;
+    }
+    Share.share(
+      '🚗 مکانیک هوشمند — عیب‌یابی ماشین با AI\n\n'
+      'من همین الان ازش استفاده کردم و واقعاً کمکم کرد.\n'
+      'با کد معرف من ثبت‌نام کن تا اعتبار هدیه بگیری:\n'
+      '🎁 کد: $code\n\n'
+      'https://smart-mec.ir',
+      subject: 'دعوت به مکانیک هوشمند',
+    );
   }
 
   _AudioLevel _interpretRms(double rms) {
@@ -108,7 +137,7 @@ class _ResultScreenState extends State<ResultScreen>
     if (freq < 500) return 'پایین (موتور در دور آرام)';
     if (freq < 2000) return 'متوسط (دور معمول)';
     if (freq < 5000) return 'بالا (دور زیاد)';
-    return 'بسیار بالا (ناکوبی)';
+    return 'بسیار بالا (ناکوبی احتمالی)';
   }
 
   @override
@@ -116,17 +145,18 @@ class _ResultScreenState extends State<ResultScreen>
     final theme = Theme.of(context);
     final hasResult = widget.resultText != null;
     final hasAudio = widget.audioFeatures != null;
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('نتیجه عیب‌یابی هوشمند'),
+        title: const Text('نتیجه عیب‌یابی'),
         centerTitle: true,
         elevation: 0,
         actions: [
           if (hasResult) ...[
             IconButton(
-              tooltip: 'کپی نتیجه',
+              tooltip: 'کپی',
               icon: const Icon(Icons.copy_rounded),
               onPressed: () => _copyResult(context),
             ),
@@ -151,14 +181,17 @@ class _ResultScreenState extends State<ResultScreen>
                   if (hasResult || hasAudio) _buildSuccessBanner(theme),
 
                   if (hasResult) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    _buildCalmDisclaimer(theme),
+                    const SizedBox(height: 16),
                     _buildSectionTitle(
                       Icons.medical_information_rounded,
-                      'تشخیص و راهکار نهایی',
+                      'تشخیص و راهکار پیشنهادی',
                       theme,
                     ),
                     _buildResultCard(theme),
                   ],
+
                   if (hasAudio) ...[
                     const SizedBox(height: 24),
                     _buildSectionTitle(
@@ -168,9 +201,20 @@ class _ResultScreenState extends State<ResultScreen>
                     ),
                     _buildAudioCard(theme),
                   ],
+
                   if (!hasResult && !hasAudio) _buildEmptyState(theme),
 
-                  const SizedBox(height: 32),
+                  // لحظه طلایی معرفی — بعد از ارزش دریافتی
+                  if (hasResult) ...[
+                    const SizedBox(height: 20),
+                    _buildPostSuccessReferral(theme, auth),
+                    if (!auth.isGoldenActive && auth.credits <= 2) ...[
+                      const SizedBox(height: 12),
+                      _buildSoftCreditNudge(theme, auth),
+                    ],
+                  ],
+
+                  const SizedBox(height: 28),
                   _buildActionButtons(theme),
                   const SizedBox(height: 20),
                 ],
@@ -215,7 +259,7 @@ class _ResultScreenState extends State<ResultScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'عیب‌یابی با موفقیت انجام شد',
+                  'تحلیل انجام شد',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
@@ -224,13 +268,148 @@ class _ResultScreenState extends State<ResultScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'نتیجه زیر توسط هوش مصنوعی تولید شده است.',
-                  style: TextStyle(color: theme.hintColor, fontSize: 12),
+                  'این یک پیشنهاد هوشمند است؛ برای تصمیم نهایی با مکانیک مشورت کنید.',
+                  style: TextStyle(color: theme.hintColor, fontSize: 12, height: 1.35),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// لحن آرام — کاهش اضطراب (نه هشدار ترسناک)
+  Widget _buildCalmDisclaimer(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 18, color: theme.hintColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'نتیجه زیر ابزار کمکی است و جایگزین معاینه تخصصی نیست. '
+              'اگر علائم شدید است (دود غلیظ، صدای برخورد فلز، از دست رفتن قدرت ناگهانی) '
+              'رانندگی را متوقف کرده و به تعمیرگاه مراجعه کنید.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: theme.hintColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Reciprocity + Identity بعد از دریافت ارزش
+  Widget _buildPostSuccessReferral(ThemeData theme, AuthProvider auth) {
+    final hasCode = auth.referralCode != null && auth.referralCode!.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withOpacity(0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.favorite_rounded, color: Colors.pink.shade400, size: 22),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'این نتیجه برات مفید بود؟',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasCode
+                ? 'دوستت هم ممکنه همین دغدغه رو داشته باشه. با کد معرف، هر دو اعتبار هدیه می‌گیرید.'
+                : 'می‌تونی نتیجه رو برای دوستت بفرستی یا اپ رو بهش معرفی کنی.',
+            style: TextStyle(fontSize: 13, height: 1.45, color: theme.hintColor),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _shareResult,
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('ارسال نتیجه'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: _shareReferral,
+                  icon: const Icon(Icons.card_giftcard_rounded, size: 18),
+                  label: Text(hasCode ? 'دعوت با کد' : 'معرفی اپ'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Loss aversion ملایم — نه فشار فروش
+  Widget _buildSoftCreditNudge(ThemeData theme, AuthProvider auth) {
+    final credits = auth.credits;
+    final msg = credits <= 0
+        ? 'اعتبارت تمام شده. برای عیب‌یابی بعدی می‌تونی بسته مناسب انتخاب کنی.'
+        : credits == 1
+            ? '۱ اعتبار باقی مانده — قبل از نیاز بعدی شارژ کن تا وسط کار متوقف نشی.'
+            : '$credits اعتبار باقی مانده. بسته ۱۰تایی معمولاً به‌صرفه‌تره.';
+
+    return Material(
+      color: theme.cardColor,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ShopScreen()),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.bolt_rounded, color: theme.colorScheme.secondary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  msg,
+                  style: TextStyle(fontSize: 13, height: 1.4, color: theme.hintColor),
+                ),
+              ),
+              Icon(Icons.chevron_left_rounded, color: theme.hintColor),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -248,7 +427,6 @@ class _ResultScreenState extends State<ResultScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✅ استفاده از MarkdownBody برای نمایش درست فرمت‌های هوش مصنوعی
             MarkdownBody(
               data: widget.resultText!,
               selectable: true,
@@ -256,20 +434,19 @@ class _ResultScreenState extends State<ResultScreen>
                 p: TextStyle(
                   fontSize: 15,
                   height: 1.9,
-                  // ✅ رنگ داینامیک برای سازگاری با تم تاریک و روشن
                   color: theme.textTheme.bodyLarge?.color ?? Colors.black87,
                 ),
                 h1: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                   color: theme.colorScheme.secondary,
                 ),
                 h2: TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
                   color: theme.colorScheme.secondary,
                 ),
-                listBullet: TextStyle(
-                  color: theme.colorScheme.secondary,
-                ),
+                listBullet: TextStyle(color: theme.colorScheme.secondary),
               ),
             ),
             const SizedBox(height: 16),
@@ -566,7 +743,7 @@ class _ResultScreenState extends State<ResultScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'متأسفانه پاسخی از سرور دریافت نشد.\nلطفاً اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید.',
+            'لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.\nنگران نباشید — اعتبار شما کسر نشده است.',
             style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.6),
             textAlign: TextAlign.center,
           ),
@@ -582,7 +759,10 @@ class _ResultScreenState extends State<ResultScreen>
         ElevatedButton.icon(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.home_rounded),
-          label: const Text('بازگشت به صفحه اصلی', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          label: const Text(
+            'بازگشت به صفحه اصلی',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
             backgroundColor: theme.colorScheme.secondary,
@@ -591,19 +771,6 @@ class _ResultScreenState extends State<ResultScreen>
             elevation: 2,
           ),
         ),
-        const SizedBox(height: 10),
-        if (widget.resultText != null)
-          OutlinedButton.icon(
-            onPressed: _shareResult,
-            icon: const Icon(Icons.share_rounded),
-            label: const Text('اشتراک‌گذاری نتیجه', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              side: BorderSide(color: theme.colorScheme.secondary, width: 1.5),
-              foregroundColor: theme.colorScheme.secondary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
       ],
     );
   }
