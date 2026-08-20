@@ -3,7 +3,18 @@ name: Build Flutter APK
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - appbundle
 
 jobs:
   build:
@@ -24,101 +35,48 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.FLUTTER_ROOT }}/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pub-
 
       - name: Create Android project files if missing
         run: |
           if [ ! -d "android" ]; then
-            flutter create --platforms android --project-name smart_mechanic .
+            flutter create --platforms android --project-name smart_mechanic --org ir.smartmec .
           fi
 
       - name: Force Fix Android Configurations
         run: |
-          sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.1.0" apply false/' android/settings.gradle
-          sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle
-          sed -i -E 's/gradle-[0-9\.]+-all\.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties
+          # Gradle & Kotlin
+          sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.1.0" apply false/' android/settings.gradle || true
+          sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle || true
+          sed -i -E 's/gradle-[0-9\.]+-all\.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties || true
 
-          sed -i -E 's/^.*compileSdk.*$/    compileSdk = 36/g' android/app/build.gradle
-          sed -i -E 's/^.*minSdk.*$/    minSdk = 24/g' android/app/build.gradle
-          sed -i -E 's/^.*targetSdk.*$/    targetSdk = 36/g' android/app/build.gradle
-          if grep -q "ndkVersion" android/app/build.gradle; then
-            sed -i -E 's/^.*ndkVersion.*$/    ndkVersion = "26.1.10909125"/g' android/app/build.gradle
-          else
-            sed -i '/compileSdk = 36/a \    ndkVersion = "26.1.10909125"' android/app/build.gradle
-          fi
+          # SDK versions
+          sed -i -E 's/^.*compileSdk.*$/    compileSdk = 35/g' android/app/build.gradle || true
+          sed -i -E 's/^.*minSdk.*$/    minSdk = 24/g' android/app/build.gradle || true
+          sed -i -E 's/^.*targetSdk.*$/    targetSdk = 35/g' android/app/build.gradle || true
 
-          sed -i -E 's/VERSION_1_8/VERSION_17/g' android/app/build.gradle
-          sed -i -E "s/jvmTarget = '1.8'/jvmTarget = '17'/g" android/app/build.gradle
-          sed -i -E 's/jvmTarget = "1.8"/jvmTarget = "17"/g' android/app/build.gradle
+          # Java 17
+          sed -i -E 's/VERSION_1_8/VERSION_17/g' android/app/build.gradle || true
+          sed -i -E "s/jvmTarget = '1.8'/jvmTarget = '17'/g" android/app/build.gradle || true
+          sed -i -E 's/jvmTarget = "1.8"/jvmTarget = "17"/g' android/app/build.gradle || true
 
+          # Application ID
+          sed -i -E 's/applicationId ".*"/applicationId "ir.smartmec.app"/' android/app/build.gradle || true
+
+          # Permissions
           if ! grep -q "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml; then
-            sed -i '/<manifest /a \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+            sed -i '/<manifest /a \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
           fi
 
-      - name: Setup Java for keytool
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Generate release keystore
+      - name: Inject Google Maps API Key
+        if: ${{ secrets.GOOGLE_MAPS_API_KEY != '' }}
+        env:
+          MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
-          STORE_PASS="YourStrongPassword123"
-          KEY_ALIAS="release"
-          keytool -genkey -v \
-            -keystore android/app/release-keystore.jks \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -alias "$KEY_ALIAS" \
-            -storepass "$STORE_PASS" \
-            -keypass "$STORE_PASS" \
-            -dname "CN=Mechanic, OU=Dev, O=Smart, L=City, ST=State, C=IR"
-
-          cat > android/key.properties <<EOF
-          storePassword=$STORE_PASS
-          keyPassword=$STORE_PASS
-          keyAlias=$KEY_ALIAS
-          storeFile=release-keystore.jks
-          EOF
-
-      - name: Inject signing configuration into build.gradle
-        run: |
-          sed -i '/buildTypes {/i \
-          def keystoreProperties = new Properties()\
-          def keystorePropertiesFile = rootProject.file('\''key.properties'\'')\
-          if (keystorePropertiesFile.exists()) {\
-              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\
-          }\
-          \
-          signingConfigs {\
-              release {\
-                  keyAlias keystoreProperties['\''keyAlias'\'']\
-                  keyPassword keystoreProperties['\''keyPassword'\'']\
-                  storeFile keystoreProperties['\''storeFile'\''] ? file(keystoreProperties['\''storeFile'\'']) : null\
-                  storePassword keystoreProperties['\''storePassword'\'']\
-              }\
-          }' android/app/build.gradle
-
-          sed -i '/buildTypes {/,/}/ s/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' android/app/build.gradle
-
-      - name: Install Flutter dependencies
-        run: flutter pub get
-
-      - name: Accept Android licenses
-        run: yes | flutter doctor --android-licenses
-
-      - name: Build APK
-        run: flutter build apk --release
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Upload release keystore artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-keystore
-          path: android/app/release-keystore.jks
+          # AndroidManifest meta-data
+          if grep -q "com.google.android.geo.API_KEY" android/app/src/main/AndroidManifest.xml; then
+            sed -i "s/android:value=\"[^"]*\"/android:value=\"$MAPS_KEY\"/" android/app/src/main/AndroidManifest.xml || true
+          else
+            sed -i '/<application /a \        <meta-data android:name="com.google.android.geo.API_KEY" android:value="'
