@@ -21,7 +21,6 @@ class DiagnosticCode {
 
   factory DiagnosticCode.fromJson(Map<String, dynamic> json) {
     return DiagnosticCode(
-      // ✅ استفاده از ?.toString() برای جلوگیری از کرش
       code: json['code']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       severity: OBDSeverity.fromString(json['severity']?.toString()),
@@ -41,11 +40,11 @@ class DiagnosticCode {
 }
 
 enum OBDSeverity {
-  low,      // پایین
-  medium,   // متوسط
-  high,     // بالا
-  critical, // بحرانی
-  unknown;  // ناشناخته
+  low,
+  medium,
+  high,
+  critical,
+  unknown;
 
   String get label => switch (this) {
         OBDSeverity.low => 'کم‌اهمیت',
@@ -55,7 +54,6 @@ enum OBDSeverity {
         OBDSeverity.unknown => 'نامشخص',
       };
 
-  // ✅ استفاده از حلقه for برای ایمنی و پرفورمنس بهتر
   static OBDSeverity fromString(String? value) {
     if (value == null) return OBDSeverity.unknown;
     final lower = value.toLowerCase();
@@ -70,10 +68,10 @@ enum OBDSeverity {
 // ── نتیجه عیب‌یابی ──
 // ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticResult {
-  final String text;              // متن پاسخ AI
-  final String prompt;            // prompt ارسال‌شده (برای دیباگ)
-  final DateTime timestamp;       // زمان دریافت پاسخ
-  final DiagnosticInputType type; // نوع ورودی
+  final String text;
+  final String prompt;
+  final DateTime timestamp;
+  final DiagnosticInputType type;
 
   const DiagnosticResult({
     required this.text,
@@ -86,10 +84,10 @@ class DiagnosticResult {
 }
 
 enum DiagnosticInputType {
-  textOnly,     // فقط متن
-  audioOnly,    // فقط صدا
-  obdOnly,      // فقط OBD
-  combined;     // ترکیبی
+  textOnly,
+  audioOnly,
+  obdOnly,
+  combined;
 
   String get label => switch (this) {
         DiagnosticInputType.textOnly => 'متنی',
@@ -169,9 +167,6 @@ class AIDiagnosticService {
         _maxRetries = maxRetries,
         _retryDelay = retryDelay;
 
-  // ─────────────────────────────────────────
-  // ── عیب‌یابی اصلی ──
-  // ─────────────────────────────────────────
   Future<DiagnosticResult> diagnose(DiagnosticRequest request) async {
     final validationError = request.validate();
     if (validationError != null) {
@@ -180,7 +175,6 @@ class AIDiagnosticService {
 
     final prompt = _buildPrompt(request);
 
-    // ✅ استفاده از خود متن Prompt به عنوان کلید (جلوگیری از Hash Collision)
     final cacheKey = _buildCacheKey(request, prompt);
     if (_cache.containsKey(cacheKey)) {
       debugPrint('[AIDiagnostic] نتیجه از cache برگشت داده شد.');
@@ -230,9 +224,6 @@ class AIDiagnosticService {
     return result.text;
   }
 
-  // ─────────────────────────────────────────
-  // ── ارسال با retry ──
-  // ─────────────────────────────────────────
   Future<String> _sendWithRetry({
     required String token,
     required String carId,
@@ -280,11 +271,21 @@ class AIDiagnosticService {
     throw lastError ?? DiagnosticException('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
   }
 
-  // ─────────────────────────────────────────
-  // ── ساخت prompt ──
-  // ─────────────────────────────────────────
+  /// ساخت پرامپت حرفه‌ای‌تر برای عیب‌یابی
   String _buildPrompt(DiagnosticRequest req) {
     final buf = StringBuffer();
+
+    buf.writeln('تو یک مکانیک خودرو با تجربه و متخصص عیب‌یابی هستی.');
+    buf.writeln('پاسخ را به زبان ساده، دقیق و قابل فهم برای راننده بنویس.');
+    buf.writeln('هرگز ادعا نکن که تشخیص ۱۰۰٪ قطعی است. همیشه احتمال خطا را ذکر کن.');
+    buf.writeln();
+
+    if (req.carName != null && req.carName!.trim().isNotEmpty) {
+      buf.writeln('🚗 خودرو: ${req.carName} (${req.year})');
+    } else {
+      buf.writeln('🚗 سال ساخت: ${req.year}');
+    }
+    buf.writeln();
 
     if (req.userDescription != null && req.userDescription!.trim().isNotEmpty) {
       buf.writeln('📋 شرح مشکل توسط راننده:');
@@ -293,7 +294,7 @@ class AIDiagnosticService {
     }
 
     if (req.obdCodes != null && req.obdCodes!.isNotEmpty) {
-      buf.writeln('🔌 کدهای خطای OBD-II استخراج‌شده از دستگاه دیاگ:');
+      buf.writeln('🔌 کدهای خطای OBD-II:');
       for (final c in req.obdCodes!) {
         final sevLabel = c.severity != OBDSeverity.unknown ? ' [${c.severity.label}]' : '';
         final sysLabel = c.system != null ? ' (سیستم: ${c.system})' : '';
@@ -304,7 +305,7 @@ class AIDiagnosticService {
 
     if (req.audioFeatures != null) {
       final af = req.audioFeatures!;
-      buf.writeln('🎙️ نتایج آنالیز صوتی موتور (ضبط‌شده توسط میکروفون گوشی):');
+      buf.writeln('🎙️ نتایج آنالیز صوتی موتور (ضبط‌شده با میکروفون گوشی):');
       buf.writeln('  • بلندی صدا (RMS): ${af.rms.toStringAsFixed(4)} (${_rmsDescription(af.rms)})');
       buf.writeln('  • فرکانس غالب: ${af.dominantFrequency.toStringAsFixed(1)} Hz (${_freqDescription(af.dominantFrequency)})');
       buf.writeln('  • مرکز طیف: ${af.spectralCentroid.toStringAsFixed(1)} Hz');
@@ -312,18 +313,22 @@ class AIDiagnosticService {
       if (af.spectralRolloff > 0) {
         buf.writeln('  • Spectral Rolloff: ${af.spectralRolloff.toStringAsFixed(1)} Hz');
       }
+      if (af.snr != 0) {
+        buf.writeln('  • نسبت سیگنال به نویز تقریبی: ${af.snr.toStringAsFixed(1)} dB');
+      }
+      buf.writeln('  (توجه: این مقادیر تقریبی هستند و جایگزین دیاگ تخصصی نیستند)');
       buf.writeln();
     }
 
     buf.writeln('─────────────────────────────');
-    buf.writeln(
-      'لطفاً با توجه به اطلاعات بالا، به‌صورت دقیق و حرفه‌ای در قالب زیر پاسخ بده:\n'
-      '1. تشخیص احتمالی مشکل\n'
-      '2. دلیل احتمالی\n'
-      '3. راهکار پیشنهادی\n'
-      '4. اورژانسی بودن (فوری / غیر فوری)\n\n'
-      'پاسخ را به فارسی و ساده بنویس تا راننده بفهمد.',
-    );
+    buf.writeln('لطفاً دقیقاً در قالب زیر پاسخ بده:\n');
+    buf.writeln('۱. تشخیص احتمالی مشکل (با ذکر احتمال تقریبی)');
+    buf.writeln('۲. دلایل محتمل (حداکثر ۳ مورد اصلی)');
+    buf.writeln('۳. راهکار پیشنهادی گام‌به‌گام');
+    buf.writeln('۴. سطح فوریت: فوری / نیمه‌فوری / غیر فوری');
+    buf.writeln('۵. توصیه نهایی (آیا نیاز به مراجعه فوری به تعمیرگاه هست؟)');
+    buf.writeln();
+    buf.writeln('پاسخ را کوتاه، شفاف و کاربردی بنویس. از اصطلاحات خیلی تخصصی بدون توضیح خودداری کن.');
 
     return buf.toString().trim();
   }
@@ -343,11 +348,7 @@ class AIDiagnosticService {
     return 'بسیار بالا / ناکوبی احتمالی';
   }
 
-  // ─────────────────────────────────────────
-  // ── cache ──
-  // ─────────────────────────────────────────
   String _buildCacheKey(DiagnosticRequest req, String prompt) {
-    // ✅ استفاده از خود Prompt به جای HashCode برای جلوگیری از تصادم
     return '${req.carId}_${req.year}_$prompt';
   }
 
