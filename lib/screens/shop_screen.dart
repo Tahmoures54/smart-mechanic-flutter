@@ -6,6 +6,103 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ── مدل بسته فروشگاهی ──
+// ─────────────────────────────────────────────────────────────────────────────
+class _ShopPackage {
+  final String id;
+  final String title;
+  final String subtitle;
+  final int priceToman;
+  final int? credits;
+  final int? days;
+  final bool isGold;
+  final bool isPopular;
+  final bool isBestValue;
+  final List<String> benefits;
+
+  const _ShopPackage({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.priceToman,
+    this.credits,
+    this.days,
+    this.isGold = false,
+    this.isPopular = false,
+    this.isBestValue = false,
+    this.benefits = const [],
+  });
+
+  int? get unitPrice {
+    if (credits != null && credits! > 0) {
+      return (priceToman / credits!).round();
+    }
+    if (days != null && days! > 0) {
+      return (priceToman / days!).round();
+    }
+    return null;
+  }
+}
+
+const _packages = <_ShopPackage>[
+  _ShopPackage(
+    id: 'credit_5',
+    title: '۵ عیب‌یابی',
+    subtitle: 'شروع سریع',
+    priceToman: 65000,
+    credits: 5,
+    benefits: [
+      '۵ بار عیب‌یابی هوشمند',
+      'مناسب تست اولیه',
+      'بدون تاریخ انقضا',
+    ],
+  ),
+  _ShopPackage(
+    id: 'credit_10',
+    title: '۱۰ عیب‌یابی',
+    subtitle: 'انتخاب اکثر کاربران',
+    priceToman: 120000,
+    credits: 10,
+    isPopular: true,
+    benefits: [
+      '۱۰ بار عیب‌یابی هوشمند',
+      'حدود ۲۰٪ به‌صرفه‌تر',
+      'بدون تاریخ انقضا',
+    ],
+  ),
+  _ShopPackage(
+    id: 'golden_30',
+    title: 'طلایی ۳۰ روزه',
+    subtitle: 'عیب‌یابی نامحدود',
+    priceToman: 199000,
+    days: 30,
+    isGold: true,
+    benefits: [
+      'عیب‌یابی نامحدود ۳۰ روز',
+      'اولویت پشتیبانی',
+      'مناسب استفاده روزانه',
+    ],
+  ),
+  _ShopPackage(
+    id: 'golden_90',
+    title: 'طلایی ۹۰ روزه',
+    subtitle: 'به‌صرفه‌ترین اشتراک',
+    priceToman: 499000,
+    days: 90,
+    isGold: true,
+    isBestValue: true,
+    benefits: [
+      'عیب‌یابی نامحدود ۹۰ روز',
+      'حدود ۱۶٪ تخفیف نسبت به ماهانه',
+      'بهترین انتخاب تعمیرکاران',
+    ],
+  ),
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── صفحه فروشگاه ──
+// ─────────────────────────────────────────────────────────────────────────────
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
 
@@ -25,7 +122,6 @@ class _ShopScreenState extends State<ShopScreen> {
     });
   }
 
-  // ✅ متد کمکی برای مدیریت Snackbar
   void _showSnack(String msg, {Color color = Colors.green}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -41,7 +137,10 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Future<void> _buyProduct(String productId) async {
     final auth = context.read<AuthProvider>();
-    if (!auth.isAuthenticated || auth.token == null) return;
+    if (!auth.isAuthenticated || auth.token == null) {
+      _showSnack('ابتدا وارد حساب شوید.', color: Colors.orange);
+      return;
+    }
 
     setState(() => _loadingProductId = productId);
 
@@ -51,13 +150,19 @@ class _ShopScreenState extends State<ShopScreen> {
 
       if (!mounted) return;
 
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => PaymentWebView(url: url)),
       );
+
+      // بعد از برگشت از درگاه، پروفایل را تازه کن
+      if (mounted) await auth.fetchProfile(force: true);
     } catch (e) {
       if (!mounted) return;
-      _showSnack('خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.', color: Colors.redAccent);
+      _showSnack(
+        'خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.',
+        color: Colors.redAccent,
+      );
     } finally {
       if (mounted) setState(() => _loadingProductId = null);
     }
@@ -65,14 +170,17 @@ class _ShopScreenState extends State<ShopScreen> {
 
   void _copyReferralCode(String code) {
     Clipboard.setData(ClipboardData(text: code));
-    _showSnack('کد معرف کپی شد');
+    _showSnack('کد معرف کپی شد ✨');
   }
 
   void _shareReferral(String code, int percent) {
     Share.share(
-      'با اپلیکیشن مکانیک هوشمند، ماشینتو هوشمند عیب‌یابی کن!\n'
-      'با کد معرف من ($code) ثبت‌نام کن تا اعتبار هدیه بگیری.\n'
-      'من هم $percent٪ از خریدت پاداش می‌گیرم 🎁',
+      '🚗 مکانیک هوشمند — عیب‌یابی ماشین با AI\n\n'
+      'با کد معرف من ثبت‌نام کن و اعتبار هدیه بگیر:\n'
+      '🎁 کد: $code\n\n'
+      'من هم $percent٪ از خریدت پاداش می‌گیرم.\n'
+      'لینک اپ: https://smart-mec.ir',
+      subject: 'دعوت به مکانیک هوشمند',
     );
   }
 
@@ -99,31 +207,41 @@ class _ShopScreenState extends State<ShopScreen> {
       builder: (ctx) {
         final theme = Theme.of(ctx);
         return AlertDialog(
-          backgroundColor: theme.dialogBackgroundColor,
-          title: const Text('درخواست برداشت دستی'),
+          title: const Text('برداشت درآمد معرفی'),
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'موجودی: ${_formatToman(auth.earnings)}\nحداقل: ${_formatToman(auth.minWithdrawal)}',
-                    style: TextStyle(color: theme.hintColor, fontSize: 13),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'موجودی قابل برداشت: ${_formatToman(auth.earnings)}\n'
+                      'حداقل: ${_formatToman(auth.minWithdrawal)}',
+                      style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.5),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   TextFormField(
                     controller: amountCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'مبلغ (تومان)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'مبلغ (تومان)',
+                      border: OutlineInputBorder(),
+                    ),
                     validator: (v) {
                       final val = int.tryParse(v ?? '');
                       if (val == null || val < auth.minWithdrawal) {
                         return 'حداقل مبلغ: ${auth.minWithdrawal}';
                       }
-                      if (val > auth.earnings) {
-                        return 'موجودی شما کافی نیست';
-                      }
+                      if (val > auth.earnings) return 'موجودی کافی نیست';
                       return null;
                     },
                   ),
@@ -132,9 +250,14 @@ class _ShopScreenState extends State<ShopScreen> {
                     controller: cardCtrl,
                     keyboardType: TextInputType.number,
                     maxLength: 16,
-                    decoration: const InputDecoration(labelText: 'شماره کارت ۱۶ رقمی', border: OutlineInputBorder(), counterText: ''),
+                    decoration: const InputDecoration(
+                      labelText: 'شماره کارت ۱۶ رقمی',
+                      border: OutlineInputBorder(),
+                      counterText: '',
+                    ),
                     validator: (v) {
-                      if (v == null || v.replaceAll(RegExp(r'\s|-'), '').length != 16) {
+                      if (v == null ||
+                          v.replaceAll(RegExp(r'\s|-'), '').length != 16) {
                         return 'شماره کارت باید ۱۶ رقم باشد';
                       }
                       return null;
@@ -143,12 +266,16 @@ class _ShopScreenState extends State<ShopScreen> {
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'نام صاحب حساب', border: OutlineInputBorder()),
-                    validator: (v) => (v == null || v.trim().length < 3) ? 'نام را درست وارد کنید' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'نام صاحب حساب',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().length < 3) ? 'نام را درست وارد کنید' : null,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'پس از بررسی ادمین، مبلغ به‌صورت دستی واریز می‌شود.',
+                    'پس از تأیید، مبلغ طی ۱ تا ۳ روز کاری واریز می‌شود.',
                     style: TextStyle(color: theme.hintColor, fontSize: 11),
                   ),
                 ],
@@ -173,16 +300,15 @@ class _ShopScreenState extends State<ShopScreen> {
       },
     );
 
-    // ✅ پاکسازی حافظه کنترلرها
+    final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
+    final card = cardCtrl.text.replaceAll(RegExp(r'\s|-'), '');
+    final name = nameCtrl.text.trim();
+
     amountCtrl.dispose();
     cardCtrl.dispose();
     nameCtrl.dispose();
 
     if (ok != true || !mounted) return;
-
-    final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
-    final card = cardCtrl.text.replaceAll(RegExp(r'\s|-'), '');
-    final name = nameCtrl.text.trim();
 
     setState(() => _withdrawLoading = true);
     try {
@@ -192,9 +318,9 @@ class _ShopScreenState extends State<ShopScreen> {
             cardNumber: card,
             fullName: name,
           );
-      await auth.fetchProfile();
+      await auth.fetchProfile(force: true);
       if (!mounted) return;
-      _showSnack('درخواست برداشت ثبت شد و در انتظار بررسی ادمین است.');
+      _showSnack('درخواست برداشت ثبت شد ✅');
     } on ApiException catch (e) {
       if (!mounted) return;
       _showSnack(e.message, color: Colors.redAccent);
@@ -214,96 +340,336 @@ class _ShopScreenState extends State<ShopScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('فروشگاه اعتبار و اشتراک'),
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+        title: const Text('اعتبار و اشتراک'),
+        centerTitle: true,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (auth.referralCode != null && auth.referralCode!.isNotEmpty)
-            _buildReferralCard(auth, theme),
-          _buildPackage(context, 'بسته ۵ عیب‌یابی', '۶۵,۰۰۰ تومان', 'credit_5'),
-          _buildPackage(context, 'بسته ۱۰ عیب‌یابی (محبوب)', '۱۲۰,۰۰۰ تومان', 'credit_10'),
-          _buildPackage(context, 'اشتراک طلایی (۳۰ روزه)', '۱۹۹,۰۰۰ تومان', 'golden_30', isGold: true),
-          _buildPackage(context, 'اشتراک طلایی (۹۰ روزه)', '۴۹۹,۰۰۰ تومان', 'golden_90', isGold: true),
-        ],
+      body: RefreshIndicator(
+        onRefresh: () => auth.fetchProfile(force: true),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          children: [
+            _buildWalletCard(auth, theme),
+            const SizedBox(height: 20),
+            if (auth.referralCode != null && auth.referralCode!.isNotEmpty) ...[
+              _buildReferralCard(auth, theme),
+              const SizedBox(height: 20),
+            ],
+            Text(
+              'بسته‌ها',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'هرچه بیشتر بخرید، هر عیب‌یابی ارزان‌تر تمام می‌شود',
+              style: TextStyle(color: theme.hintColor, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            ..._packages.map((p) => _buildPackageCard(p, theme)),
+            const SizedBox(height: 12),
+            _buildTrustFooter(theme),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildReferralCard(AuthProvider auth, ThemeData theme) {
-    final code = auth.referralCode!;
-    final canWithdraw = auth.earnings >= auth.minWithdrawal;
+  // ── کارت وضعیت کیف پول ──
+  Widget _buildWalletCard(AuthProvider auth, ThemeData theme) {
+    final isGold = auth.isGoldenActive;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [theme.colorScheme.primary.withOpacity(0.25), theme.cardColor],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: isGold
+              ? [const Color(0xFFFFB300), const Color(0xFFFF8F00)]
+              : [
+                  theme.colorScheme.primary.withOpacity(0.85),
+                  theme.colorScheme.secondary.withOpacity(0.75),
+                ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.4)),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: (isGold ? Colors.amber : theme.colorScheme.primary)
+                .withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.card_giftcard, color: theme.colorScheme.secondary),
-              const SizedBox(width: 8),
-              Text(
-                'دعوت از دوستان',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: theme.colorScheme.secondary,
+              Icon(
+                isGold ? Icons.workspace_premium : Icons.account_balance_wallet_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isGold ? 'اشتراک طلایی فعال' : 'کیف اعتبار شما',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (isGold && auth.goldenDaysLeft != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${auth.goldenDaysLeft} روز باقی',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _walletStat(
+                  label: 'اعتبار باقی‌مانده',
+                  value: isGold ? 'نامحدود' : '${auth.credits}',
+                  icon: Icons.bolt_rounded,
+                ),
+              ),
+              Container(width: 1, height: 40, color: Colors.white24),
+              Expanded(
+                child: _walletStat(
+                  label: 'وضعیت',
+                  value: auth.canDiagnose ? 'آماده عیب‌یابی' : 'نیاز به شارژ',
+                  icon: auth.canDiagnose
+                      ? Icons.check_circle_rounded
+                      : Icons.warning_amber_rounded,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'با معرفی دوستان، ${auth.referralPercentage}٪ از مبلغ خرید آن‌ها به حساب شما اضافه می‌شود.',
-            style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
+          if (!auth.canDiagnose) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'برای ادامه عیب‌یابی یکی از بسته‌های زیر را انتخاب کنید.',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _walletStat({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white70, size: 20),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
           ),
-          const SizedBox(height: 12),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
+        ),
+      ],
+    );
+  }
+
+  // ── کارت معرفی ویروسی ──
+  Widget _buildReferralCard(AuthProvider auth, ThemeData theme) {
+    final code = auth.referralCode!;
+    final canWithdraw = auth.earnings >= auth.minWithdrawal;
+    final progress = (auth.earnings / auth.minWithdrawal).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withOpacity(0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.card_giftcard_rounded,
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'دوستانت را دعوت کن',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'تو ${auth.referralPercentage}٪ پاداش می‌گیری · دوستت اعتبار هدیه می‌گیرد',
+                      style: TextStyle(color: theme.hintColor, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // کد معرف
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(10),
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.dividerColor),
             ),
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    code,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'کد اختصاصی شما',
+                        style: TextStyle(color: theme.hintColor, fontSize: 11),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        code,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          letterSpacing: 2,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
                   tooltip: 'کپی',
                   onPressed: () => _copyReferralCode(code),
-                  icon: const Icon(Icons.copy, size: 20),
+                  icon: const Icon(Icons.copy_rounded),
                 ),
-                IconButton(
-                  tooltip: 'اشتراک‌گذاری',
+                FilledButton.tonalIcon(
                   onPressed: () => _shareReferral(code, auth.referralPercentage),
-                  icon: const Icon(Icons.share, size: 20),
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('ارسال'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 14),
+
+          // آمار
           Row(
             children: [
-              Expanded(child: _statChip(theme, 'دعوت‌شده‌ها', '${auth.referredCount} نفر')),
+              Expanded(
+                child: _statChip(theme, 'دعوت‌شده‌ها', '${auth.referredCount} نفر'),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _statChip(theme, 'درآمد شما', _formatToman(auth.earnings))),
+              Expanded(
+                child: _statChip(theme, 'درآمد شما', _formatToman(auth.earnings)),
+              ),
             ],
           ),
+
           const SizedBox(height: 12),
+
+          // پیشرفت تا برداشت
+          if (!canWithdraw) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'پیشرفت تا برداشت',
+                  style: TextStyle(color: theme.hintColor, fontSize: 12),
+                ),
+                Text(
+                  '${(progress * 100).toStringAsFixed(0)}٪',
+                  style: TextStyle(
+                    color: theme.colorScheme.secondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: theme.dividerColor,
+                color: theme.colorScheme.secondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${_formatToman(auth.minWithdrawal - auth.earnings)} تا حداقل برداشت باقی مانده',
+              style: TextStyle(color: theme.hintColor, fontSize: 11),
+            ),
+            const SizedBox(height: 10),
+          ],
+
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -311,12 +677,24 @@ class _ShopScreenState extends State<ShopScreen> {
                   ? null
                   : () => _showWithdrawDialog(auth),
               icon: _withdrawLoading
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.account_balance_wallet_outlined),
               label: Text(
-                canWithdraw ? 'درخواست برداشت دستی' : 'حداقل برداشت: ${_formatToman(auth.minWithdrawal)}',
+                canWithdraw
+                    ? 'درخواست برداشت'
+                    : 'حداقل برداشت: ${_formatToman(auth.minWithdrawal)}',
               ),
             ),
+          ),
+
+          const SizedBox(height: 8),
+          Text(
+            '💡 هر دوست با کد تو ثبت‌نام کند، هر دو نفر سود می‌برید.',
+            style: TextStyle(color: theme.hintColor, fontSize: 12, height: 1.4),
           ),
         ],
       ),
@@ -325,10 +703,10 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Widget _statChip(ThemeData theme, String label, String value) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
@@ -336,100 +714,223 @@ class _ShopScreenState extends State<ShopScreen> {
         children: [
           Text(label, style: TextStyle(color: theme.hintColor, fontSize: 11)),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPackage(
-    BuildContext context,
-    String title,
-    String price,
-    String id, {
-    bool isGold = false,
-  }) {
-    final theme = Theme.of(context);
-    // ✅ اگر هر محصولی در حال لودینگ باشد، دکمه‌های دیگر غیرفعال شوند
-    final bool isLoadingThis = _loadingProductId == id;
-    final bool isAnyLoading = _loadingProductId != null;
+  // ── کارت بسته ──
+  Widget _buildPackageCard(_ShopPackage pkg, ThemeData theme) {
+    final isLoadingThis = _loadingProductId == pkg.id;
+    final isAnyLoading = _loadingProductId != null;
+    final unit = pkg.unitPrice;
 
-    return Card(
-      color: isGold ? Colors.amber[800] : theme.cardColor,
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
+      decoration: BoxDecoration(
+        color: pkg.isGold
+            ? Colors.amber.withOpacity(theme.brightness == Brightness.dark ? 0.12 : 0.18)
+            : theme.cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: pkg.isPopular || pkg.isBestValue
+              ? theme.colorScheme.secondary
+              : theme.dividerColor,
+          width: pkg.isPopular || pkg.isBestValue ? 1.5 : 1,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: pkg.isGold
+                            ? Colors.amber.withOpacity(0.25)
+                            : theme.colorScheme.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        pkg.isGold
+                            ? Icons.workspace_premium_rounded
+                            : Icons.auto_awesome_rounded,
+                        color: pkg.isGold
+                            ? Colors.amber.shade700
+                            : theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pkg.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            pkg.subtitle,
+                            style: TextStyle(
+                              color: theme.hintColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _formatToman(pkg.priceToman),
+                            style: TextStyle(
+                              color: theme.colorScheme.secondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 17,
+                            ),
+                          ),
+                          if (unit != null)
+                            Text(
+                              pkg.credits != null
+                                  ? 'حدود ${_formatToman(unit)} به‌ازای هر عیب‌یابی'
+                                  : 'حدود ${_formatToman(unit)} در روز',
+                              style: TextStyle(
+                                color: theme.hintColor,
+                                fontSize: 11,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...pkg.benefits.map(
+                  (b) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 16,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            b,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurface.withOpacity(0.85),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: pkg.isGold
+                          ? Colors.amber.shade700
+                          : theme.colorScheme.secondary,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed:
+                        (isLoadingThis || isAnyLoading) ? null : () => _buyProduct(pkg.id),
+                    child: isLoadingThis
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black54,
+                            ),
+                          )
+                        : Text(
+                            pkg.isGold ? 'فعال‌سازی اشتراک' : 'خرید بسته',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // بج
+          if (pkg.isPopular || pkg.isBestValue)
+            Positioned(
+              top: 0,
+              left: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  pkg.isBestValue ? 'به‌صرفه‌ترین' : 'محبوب‌ترین',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrustFooter(ThemeData theme) {
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isGold ? Colors.black26 : theme.colorScheme.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isGold ? Icons.workspace_premium : Icons.build_circle,
-                color: isGold ? Colors.white : theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: isGold ? Colors.black : theme.textTheme.titleMedium?.color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    price,
-                    style: TextStyle(
-                      color: isGold ? Colors.black87 : theme.colorScheme.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isGold ? Colors.black : theme.colorScheme.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              // ✅ جلوگیری از خرید همزمان
-              onPressed: (isLoadingThis || isAnyLoading) ? null : () => _buyProduct(id),
-              child: isLoadingThis
-                  ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        color: isGold ? Colors.amber : theme.colorScheme.onPrimary,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      'خرید',
-                      style: TextStyle(
-                        color: isGold ? Colors.amber : theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            Icon(Icons.lock_rounded, size: 14, color: theme.hintColor),
+            const SizedBox(width: 6),
+            Text(
+              'پرداخت امن · فعال‌سازی آنی پس از پرداخت',
+              style: TextStyle(color: theme.hintColor, fontSize: 12),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 6),
+        Text(
+          'عیب‌یابی‌ها ابزار کمکی هستند و جایگزین نظر مکانیک متخصص نیستند.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: theme.hintColor, fontSize: 11),
+        ),
+      ],
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── WebView برای پرداخت ──
+// ── WebView پرداخت ──
 // ─────────────────────────────────────────────────────────────────────────────
 class PaymentWebView extends StatefulWidget {
   final String url;
@@ -488,29 +989,33 @@ class _PaymentWebViewState extends State<PaymentWebView> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.orange)),
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Colors.orange),
+      ),
     );
 
     try {
-      await context.read<AuthProvider>().fetchProfile();
+      await context.read<AuthProvider>().fetchProfile(force: true);
       if (!mounted) return;
 
-      Navigator.pop(context); // بستن دیالوگ لودینگ
-      Navigator.pop(context); // خروج از وب‌ویو
+      Navigator.pop(context);
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('پرداخت با موفقیت انجام شد. موجودی شما بروزرسانی شد.'),
+          content: Text('پرداخت موفق ✅ موجودی شما به‌روز شد.'),
           backgroundColor: Colors.green,
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       Navigator.pop(context);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('پرداخت انجام شد اما در بروزرسانی صفحه خطایی رخ داد. لطفاً صفحه را رفرش کنید.'),
+          content: Text(
+            'پرداخت انجام شد اما بروزرسانی با تأخیر مواجه شد. صفحه را بکشید تا تازه شود.',
+          ),
         ),
       );
     }
@@ -520,7 +1025,7 @@ class _PaymentWebViewState extends State<PaymentWebView> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         if (await _controller.canGoBack()) {
           _controller.goBack();
