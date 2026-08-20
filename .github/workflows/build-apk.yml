@@ -45,38 +45,121 @@ jobs:
             flutter create --platforms android --project-name smart_mechanic --org ir.smartmec .
           fi
 
-      - name: Force Fix Android Configurations
+      - name: Configure Android project
         run: |
-          # Gradle & Kotlin
           sed -i -E 's/id "org.jetbrains.kotlin.android" version ".*" apply false/id "org.jetbrains.kotlin.android" version "2.1.0" apply false/' android/settings.gradle || true
           sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle || true
           sed -i -E 's/gradle-[0-9\.]+-all\.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties || true
 
-          # SDK versions
           sed -i -E 's/^.*compileSdk.*$/    compileSdk = 35/g' android/app/build.gradle || true
           sed -i -E 's/^.*minSdk.*$/    minSdk = 24/g' android/app/build.gradle || true
           sed -i -E 's/^.*targetSdk.*$/    targetSdk = 35/g' android/app/build.gradle || true
 
-          # Java 17
           sed -i -E 's/VERSION_1_8/VERSION_17/g' android/app/build.gradle || true
           sed -i -E "s/jvmTarget = '1.8'/jvmTarget = '17'/g" android/app/build.gradle || true
           sed -i -E 's/jvmTarget = "1.8"/jvmTarget = "17"/g' android/app/build.gradle || true
 
-          # Application ID
           sed -i -E 's/applicationId ".*"/applicationId "ir.smartmec.app"/' android/app/build.gradle || true
 
-          # Permissions
           if ! grep -q "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml; then
             sed -i '/<manifest /a \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
           fi
 
       - name: Inject Google Maps API Key
-        if: ${{ secrets.GOOGLE_MAPS_API_KEY != '' }}
         env:
           MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
-          # AndroidManifest meta-data
-          if grep -q "com.google.android.geo.API_KEY" android/app/src/main/AndroidManifest.xml; then
-            sed -i "s/android:value=\"[^"]*\"/android:value=\"$MAPS_KEY\"/" android/app/src/main/AndroidManifest.xml || true
+          if [ -z "$MAPS_KEY" ]; then
+            echo "Warning: GOOGLE_MAPS_API_KEY secret is empty"
+            exit 0
+          fi
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if grep -q "com.google.android.geo.API_KEY" "$MANIFEST"; then
+            sed -i "s|android:value=\"[^\"]*\"|android:value=\"${MAPS_KEY}\"|g" "$MANIFEST"
           else
-            sed -i '/<application /a \        <meta-data android:name="com.google.android.geo.API_KEY" android:value="'
+            sed -i "/<application/a\        <meta-data android:name=\"com.google.android.geo.API_KEY\" android:value=\"${MAPS_KEY}\" />" "$MANIFEST"
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release-keystore.jks
+            cat > android/key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=release-keystore.jks
+          EOF
+
+            # Inject signingConfigs if missing
+            if ! grep -q "signingConfigs" android/app/build.gradle; then
+              sed -i '/android {/a\
+              signingConfigs {\
+                  release {\
+                      def keystoreProperties = new Properties()\
+                      def keystorePropertiesFile = rootProject.file("key.properties")\
+                      if (keystorePropertiesFile.exists()) {\
+                          keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\
+                      }\
+                      keyAlias keystoreProperties["keyAlias"]\
+                      keyPassword keystoreProperties["keyPassword"]\
+                      storeFile keystoreProperties["storeFile"] ? file(keystoreProperties["storeFile"]) : null\
+                      storePassword keystoreProperties["storePassword"]\
+                  }\
+              }' android/app/build.gradle
+            fi
+
+            sed -i '/buildTypes {/,/}/ s/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' android/app/build.gradle || true
+            echo "Release signing configured from secrets"
+          else
+            echo "No RELEASE_KEYSTORE_BASE64 secret found — building with debug signing"
+          fi
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses || true
+
+      - name: Build APK
+        if: ${{ github.event.inputs.build_type != 'appbundle' }}
+        run: flutter build apk --release --obfuscate --split-debug-info=build/symbols
+
+      - name: Build App Bundle
+        if: ${{ github.event.inputs.build_type == 'appbundle' }}
+        run: flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+
+      - name: Upload APK
+        if: ${{ github.event.inputs.build_type != 'appbundle' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Upload App Bundle
+        if: ${{ github.event.inputs.build_type == 'appbundle' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols
+          path: build/symbols
+          retention-days: 30
+          if-no-files-found: ignore
