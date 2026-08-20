@@ -26,12 +26,10 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
   bool _showReferral = false;
 
-  // ── Countdown برای ارسال مجدد ──
-  static const int _resendCooldown = 60; // ثانیه
+  static const int _resendCooldown = 60;
   int _secondsLeft = 0;
   Timer? _countdownTimer;
 
-  // ── انیمیشن ورود صفحه ──
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
@@ -63,7 +61,6 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  // ── شروع تایمر ──
   void _startCountdown() {
     _secondsLeft = _resendCooldown;
     _countdownTimer?.cancel();
@@ -82,19 +79,15 @@ class _LoginScreenState extends State<LoginScreen>
     });
   }
 
-  // ── اعتبارسنجی شماره ──
   String? _validatePhone(String phone) {
-    // حذف فاصله‌های احتمالی
     final cleanPhone = phone.replaceAll(' ', '').trim();
     if (cleanPhone.length != 11) return 'شماره باید ۱۱ رقم باشد';
-    // بررسی با Regex استاندارد ایرانی
     if (!RegExp(r'^09\d{9}$').hasMatch(cleanPhone)) {
       return 'شماره موبایل نامعتبر است (مثال: 09123456789)';
     }
     return null;
   }
 
-  // ── ارسال OTP ──
   Future<void> _sendOtp({bool isResend = false}) async {
     FocusScope.of(context).unfocus();
 
@@ -114,7 +107,6 @@ class _LoginScreenState extends State<LoginScreen>
       _startCountdown();
       _codeController.clear();
 
-      // auto-focus روی فیلد کد
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) FocusScope.of(context).requestFocus(_codeFocus);
       });
@@ -134,7 +126,6 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  // ── تأیید OTP ──
   Future<void> _verifyOtp() async {
     FocusScope.of(context).unfocus();
 
@@ -155,7 +146,6 @@ class _LoginScreenState extends State<LoginScreen>
           );
       if (!mounted) return;
 
-      // ورود موفقیت‌آمیز و پاک کردن استک صفحات
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
@@ -171,7 +161,6 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  // ── برگشت به مرحله شماره ──
   void _goBackToPhone() {
     _countdownTimer?.cancel();
     setState(() {
@@ -184,7 +173,6 @@ class _LoginScreenState extends State<LoginScreen>
     });
   }
 
-  // ✅ متد کمکی برای جلوگیری از انباشت Snackbar
   void _showSnack(String msg, {required bool isError}) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -210,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen>
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: theme.colorScheme.onBackground,
+        foregroundColor: theme.colorScheme.onSurface,
       ),
       body: SafeArea(
         child: GestureDetector(
@@ -256,7 +244,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── هدر ──
   Widget _buildHeader(ThemeData theme) {
     return Column(
       children: [
@@ -295,7 +282,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── مرحله ۱: ورود شماره ──
   Widget _buildPhoneSection(ThemeData theme) {
     return Column(
       key: const ValueKey('phone'),
@@ -341,12 +327,32 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 12),
 
-        // ── کد معرف ──
+        // کد معرف — طراحی جذاب‌تر برای رشد ویروسی
         AnimatedCrossFade(
-          firstChild: TextButton.icon(
-            onPressed: () => setState(() => _showReferral = true),
-            icon: const Icon(Icons.card_giftcard_rounded, size: 18),
-            label: const Text('کد معرف دارید؟ (اختیاری)'),
+          firstChild: Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.secondary.withOpacity(0.25),
+              ),
+            ),
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showReferral = true),
+              icon: Icon(
+                Icons.card_giftcard_rounded,
+                size: 20,
+                color: theme.colorScheme.secondary,
+              ),
+              label: Text(
+                'کد معرف داری؟ اعتبار هدیه بگیر 🎁',
+                style: TextStyle(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
           secondChild: Column(
             children: [
@@ -382,24 +388,33 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.star_rounded,
-                    size: 14,
-                    color: Colors.amber.shade600,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'با کد معرف، ۱ اعتبار اضافه هدیه می‌گیرید.',
-                    style: TextStyle(
-                      color: theme.hintColor,
-                      fontSize: 12,
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.withOpacity(0.35)),
+                ),
+                child: const Column(
+                  children: [
+                    Text(
+                      '🎁 با کد معرف، اعتبار هدیه می‌گیری',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                ],
+                    SizedBox(height: 4),
+                    Text(
+                      'دوستت هم از خریدهای بعدی‌ات پاداش می‌گیرد — هر دو برنده می‌شوید',
+                      style: TextStyle(fontSize: 12, height: 1.4),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
               TextButton(
                 onPressed: () {
@@ -422,7 +437,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 24),
 
-        // ── دکمه ارسال کد ──
         _buildPrimaryButton(
           label: 'ارسال کد تأیید',
           icon: Icons.send_rounded,
@@ -430,7 +444,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 40),
 
-        // ── راهنما ──
         _buildInfoRow(
           theme,
           icon: Icons.lock_outline_rounded,
@@ -440,13 +453,11 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── مرحله ۲: تأیید کد ──
   Widget _buildOtpSection(ThemeData theme) {
     return Column(
       key: const ValueKey('otp'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── اطلاعات شماره ──
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -484,7 +495,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 24),
 
-        // ── فیلد کد OTP ──
         TextField(
           controller: _codeController,
           focusNode: _codeFocus,
@@ -519,7 +529,6 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-          // ── auto-submit بعد از ۶ رقم ──
           onChanged: (val) {
             if (val.length == 6 && !_isLoading) {
               _verifyOtp();
@@ -529,7 +538,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 24),
 
-        // ── دکمه ورود ──
         _buildPrimaryButton(
           label: 'ورود به حساب',
           icon: Icons.login_rounded,
@@ -537,7 +545,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 16),
 
-        // ── ارسال مجدد + countdown ──
         _buildResendRow(theme),
         const SizedBox(height: 24),
 
@@ -550,7 +557,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── ردیف ارسال مجدد با countdown ──
   Widget _buildResendRow(ThemeData theme) {
     final canResend = _secondsLeft == 0 && !_isLoading;
 
@@ -562,7 +568,6 @@ class _LoginScreenState extends State<LoginScreen>
           style: TextStyle(color: theme.hintColor, fontSize: 13),
         ),
         if (_secondsLeft > 0)
-          // ── نمایش countdown ──
           Row(
             children: [
               const SizedBox(width: 4),
@@ -602,7 +607,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── دکمه اصلی ──
   Widget _buildPrimaryButton({
     required String label,
     required IconData icon,
@@ -615,7 +619,6 @@ class _LoginScreenState extends State<LoginScreen>
           ? SizedBox(
               height: 20,
               width: 20,
-              // ✅ اصلاح رنگ اسپینر برای سازگاری با تم تاریک و روشن
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 color: theme.colorScheme.onSecondary.withOpacity(0.8),
@@ -643,9 +646,11 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── ردیف اطلاعات ──
-  Widget _buildInfoRow(ThemeData theme,
-      {required IconData icon, required String text}) {
+  Widget _buildInfoRow(
+    ThemeData theme, {
+    required IconData icon,
+    required String text,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
