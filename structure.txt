@@ -33,6 +33,9 @@ smart-mechanic-flutter/
 │       └── car_selector_widget.dart
 ├── analysis_options.yaml
 ├── DISCLAIMER.md
+├── LICENSE
+├── PRIVACY.md
 ├── pubspec.yaml
 ├── README.md
+├── RELEASE.md
 └── structure.txt
