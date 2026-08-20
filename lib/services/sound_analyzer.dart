@@ -33,6 +33,13 @@ class AnalyzerConfig {
 // ─────────────────────────────────────────────────────────────────────────────
 // ─ـ تحلیل‌کننده صدا ──
 // ─────────────────────────────────────────────────────────────────────────────
+///
+/// توجه مهم:
+/// این کلاس برای فایل‌های خام PCM / WAV طراحی شده است.
+/// فایل‌های AAC/M4A که توسط flutter_sound ضبط می‌شوند،
+/// به صورت کامل دیکد نمی‌شوند و نتایج تقریبی خواهند بود.
+/// برای دقت بالاتر در نسخه‌های بعدی از ffmpeg_kit_flutter یا
+/// تغییر کدک ضبط به PCM/WAV استفاده شود.
 class SoundAnalyzer {
   final AnalyzerConfig config;
 
@@ -48,10 +55,20 @@ class SoundAnalyzer {
       throw AnalyzerException('فایل صوتی یافت نشد: $filePath');
     }
 
-    // ✅ readAsBytes مستقیماً Uint8List برمی‌گرداند (جلوگیری از کپی حافظه)
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       throw AnalyzerException('فایل صوتی خالی است.');
+    }
+
+    // هشدار در مورد فرمت فشرده
+    final lowerPath = filePath.toLowerCase();
+    if (lowerPath.endsWith('.aac') ||
+        lowerPath.endsWith('.m4a') ||
+        lowerPath.endsWith('.mp3')) {
+      debugPrint(
+        '[SoundAnalyzer] هشدار: فایل فشرده ($filePath). '
+        'نتایج تقریبی خواهند بود. بهتر است از WAV/PCM استفاده شود.',
+      );
     }
 
     try {
@@ -60,18 +77,22 @@ class SoundAnalyzer {
         throw AnalyzerException('نمونه‌های صوتی استخراج نشدند.');
       }
 
-      // ── محاسبات ──
-      final rms = _calculateRMS(samples);
-      final zcrRate = _calculateZeroCrossingRate(samples);
-      
-      // محاسبه طیف فرکانسی برای فریم اصلی
-      final spectrum = _calculateSpectrum(samples);
-      
+      // محدود کردن طول نمونه‌ها برای جلوگیری از مصرف بیش از حد حافظه
+      final maxSamples = config.sampleRate * 30; // حداکثر ۳۰ ثانیه
+      final limitedSamples = samples.length > maxSamples
+          ? samples.sublist(0, maxSamples)
+          : samples;
+
+      final rms = _calculateRMS(limitedSamples);
+      final zcrRate = _calculateZeroCrossingRate(limitedSamples);
+
+      final spectrum = _calculateSpectrum(limitedSamples);
+
       final dominantFreq = _findDominantFrequency(spectrum);
       final spectralCentroid = _calculateSpectralCentroid(spectrum);
       final spectralRolloff = _calculateSpectralRolloff(spectrum, 0.95);
-      final spectralFlux = _calculateSpectralFlux(samples);
-      final snr = _estimateSNR(samples);
+      final spectralFlux = _calculateSpectralFlux(limitedSamples);
+      final snr = _estimateSNR(limitedSamples);
 
       return AudioFeatures(
         rms: rms,
@@ -83,7 +104,7 @@ class SoundAnalyzer {
         spectralFlux: spectralFlux,
         snr: snr,
         sampleRate: config.sampleRate,
-        durationMs: (samples.length / config.sampleRate * 1000).toInt(),
+        durationMs: (limitedSamples.length / config.sampleRate * 1000).toInt(),
       );
     } catch (e) {
       if (e is AnalyzerException) rethrow;
@@ -95,24 +116,54 @@ class SoundAnalyzer {
   // ─ـ تبدیل Bytes به Samples ──
   // ─────────────────────────────────────────
   List<double> _bytesToSamples(Uint8List bytes) {
+    // تلاش برای تشخیص هدر WAV
+    if (bytes.length > 44 &&
+        bytes[0] == 0x52 && // R
+        bytes[1] == 0x49 && // I
+        bytes[2] == 0x46 && // F
+        bytes[3] == 0x46) { // F
+      try {
+        return _decodeWav(bytes);
+      } catch (_) {}
+    }
+
+    // تلاش برای PCM16 خام
     if (bytes.length >= 2) {
       try {
         return _decodePCM16(bytes);
       } catch (_) {}
     }
-    // fallback: normalize bytes مستقیم
+
+    // fallback: normalize bytes مستقیم (تقریبی برای AAC)
     return bytes.map((b) => (b - 128) / 128.0).toList();
   }
 
-  /// دیکد PCM 16-bit (کمون‌ترین فرمت)
+  List<double> _decodeWav(Uint8List bytes) {
+    // رد کردن ۴۴ بایت هدر استاندارد WAV
+    final dataOffset = 44;
+    if (bytes.length <= dataOffset) return [];
+
+    final buffer = ByteData.view(
+      bytes.buffer,
+      bytes.offsetInBytes + dataOffset,
+      bytes.length - dataOffset,
+    );
+
+    final samples = <double>[];
+    for (int i = 0; i + 1 < buffer.lengthInBytes; i += 2) {
+      final sample = buffer.getInt16(i, Endian.little);
+      samples.add(sample / 32768.0);
+    }
+    return samples;
+  }
+
   List<double> _decodePCM16(Uint8List bytes) {
-    // ✅ استفاده مستقیم از buffer بدون کپی گرفتن
     final buffer = ByteData.view(bytes.buffer, bytes.offsetInBytes, bytes.length);
     final samples = <double>[];
 
     for (int i = 0; i + 1 < bytes.length; i += 2) {
       final sample = buffer.getInt16(i, Endian.little);
-      samples.add(sample / 32768.0); // تبدیل به -1 تا 1
+      samples.add(sample / 32768.0);
     }
 
     return samples;
@@ -122,7 +173,6 @@ class SoundAnalyzer {
   // ── محاسبات آماری ──
   // ─────────────────────────────────────────
 
-  /// RMS (Root Mean Square) - قدرت سیگنال
   double _calculateRMS(List<double> samples) {
     if (samples.isEmpty) return 0.0;
     double sumSquares = 0.0;
@@ -132,7 +182,6 @@ class SoundAnalyzer {
     return math.sqrt(sumSquares / samples.length);
   }
 
-  /// نرخ عبور از صفر
   double _calculateZeroCrossingRate(List<double> samples) {
     if (samples.length < 2) return 0.0;
     int crossings = 0;
@@ -149,32 +198,27 @@ class SoundAnalyzer {
   // ── پردازش طیف فرکانسی (FFT) ──
   // ─────────────────────────────────────────
 
-  /// محاسبه طیف فرکانسی (Magnitude Spectrum)
   List<double> _calculateSpectrum(List<double> samples) {
     final windowed = _applyWindow(samples);
     final fftSize = config.fftSize;
 
-    // آماده‌سازی آرایه‌های حقیقی و موهومی
     final real = List<double>.filled(fftSize, 0.0);
     final imag = List<double>.filled(fftSize, 0.0);
-    
+
     for (int i = 0; i < math.min(fftSize, windowed.length); i++) {
       real[i] = windowed[i];
     }
 
-    // ✅ اجرای الگوریتم صحیح FFT مبتنی بر اعداد مختلط
     _fft(real, imag);
 
-    // محاسبه بزرگی (Magnitude) نیمی از طیف (به دلیل تقارن)
     final spectrum = List<double>.filled(fftSize ~/ 2, 0.0);
     for (int i = 0; i < fftSize ~/ 2; i++) {
       spectrum[i] = math.sqrt(real[i] * real[i] + imag[i] * imag[i]);
     }
-    
+
     return spectrum;
   }
 
-  /// اعمال Hann Window
   List<double> _applyWindow(List<double> samples) {
     final n = math.min(config.fftSize, samples.length);
     if (n <= 1) return samples.sublist(0, n);
@@ -187,8 +231,7 @@ class SoundAnalyzer {
     return window;
   }
 
-  /// ✅ پیاده‌سازی صحیح FFT تکرارشونده (Iterative Cooley-Tukey)
-  /// این الگوریتم از Stack Overflow جلوگیری می‌کند و دارای دقت ریاضی است.
+  /// پیاده‌سازی Iterative Cooley-Tukey FFT
   void _fft(List<double> real, List<double> imag) {
     final n = real.length;
     if (n <= 1) return;
@@ -197,16 +240,16 @@ class SoundAnalyzer {
     int j = 0;
     for (int i = 1; i < n; i++) {
       int bit = n >> 1;
-      for (; j & bit != 0; bit >>= 1) {
+      for (; (j & bit) != 0; bit >>= 1) {
         j ^= bit;
       }
       j ^= bit;
       if (i < j) {
-        double tempR = real[i];
+        final tempR = real[i];
         real[i] = real[j];
         real[j] = tempR;
-        
-        double tempI = imag[i];
+
+        final tempI = imag[i];
         imag[i] = imag[j];
         imag[j] = tempI;
       }
@@ -214,28 +257,30 @@ class SoundAnalyzer {
 
     // Cooley-Tukey butterfly
     for (int len = 2; len <= n; len <<= 1) {
-      double angle = -2 * math.pi / len;
-      double wReal = math.cos(angle);
-      double wImag = math.sin(angle);
+      final angle = -2 * math.pi / len;
+      final wReal = math.cos(angle);
+      final wImag = math.sin(angle);
 
       for (int i = 0; i < n; i += len) {
         double curReal = 1.0;
         double curImag = 0.0;
 
         for (int k = 0; k < len ~/ 2; k++) {
-          double evenReal = real[i + k];
-          double evenImag = imag[i + k];
-          
-          double oddReal = real[i + k + len ~/ 2] * curReal - imag[i + k + len ~/ 2] * curImag;
-          double oddImag = real[i + k + len ~/ 2] * curImag + imag[i + k + len ~/ 2] * curReal;
+          final evenReal = real[i + k];
+          final evenImag = imag[i + k];
+
+          final oddReal = real[i + k + len ~/ 2] * curReal -
+              imag[i + k + len ~/ 2] * curImag;
+          final oddImag = real[i + k + len ~/ 2] * curImag +
+              imag[i + k + len ~/ 2] * curReal;
 
           real[i + k] = evenReal + oddReal;
           imag[i + k] = evenImag + oddImag;
-          
+
           real[i + k + len ~/ 2] = evenReal - oddReal;
           imag[i + k + len ~/ 2] = evenImag - oddImag;
 
-          double nextReal = curReal * wReal - curImag * wImag;
+          final nextReal = curReal * wReal - curImag * wImag;
           curImag = curReal * wImag + curImag * wReal;
           curReal = nextReal;
         }
@@ -243,13 +288,15 @@ class SoundAnalyzer {
     }
   }
 
-  /// فرکانس غالب
   double _findDominantFrequency(List<double> spectrum) {
     if (spectrum.isEmpty) return 0.0;
 
     double maxMagnitude = 0.0;
     int maxIndex = 0;
-    for (int i = 0; i < spectrum.length; i++) {
+    // نادیده گرفتن باین‌های خیلی پایین (DC و نویز بسیار پایین)
+    final startBin = math.max(1, (50 * config.fftSize / config.sampleRate).round());
+
+    for (int i = startBin; i < spectrum.length; i++) {
       if (spectrum[i] > maxMagnitude) {
         maxMagnitude = spectrum[i];
         maxIndex = i;
@@ -259,7 +306,6 @@ class SoundAnalyzer {
     return maxIndex * config.sampleRate / config.fftSize;
   }
 
-  /// مرکز طیف
   double _calculateSpectralCentroid(List<double> spectrum) {
     if (spectrum.isEmpty) return 0.0;
 
@@ -276,7 +322,6 @@ class SoundAnalyzer {
     return (weighted / total) * config.sampleRate / config.fftSize;
   }
 
-  /// نقطه پایان طیف (Spectral Rolloff)
   double _calculateSpectralRolloff(List<double> spectrum, double threshold) {
     if (spectrum.isEmpty) return 0.0;
 
@@ -284,7 +329,7 @@ class SoundAnalyzer {
     for (final x in spectrum) {
       total += x;
     }
-    
+
     if (total == 0) return 0.0;
 
     double accumulated = 0.0;
@@ -298,7 +343,6 @@ class SoundAnalyzer {
     return spectrum.length * config.sampleRate / config.fftSize;
   }
 
-  /// نرخ تغییر طیف (Spectral Flux)
   double _calculateSpectralFlux(List<double> samples) {
     if (samples.length < config.hopLength * 2) return 0.0;
 
@@ -313,7 +357,6 @@ class SoundAnalyzer {
       if (prevSpectrum.isNotEmpty) {
         double frameFlux = 0.0;
         for (int k = 0; k < currSpectrum.length; k++) {
-          // فقط تغییرات مثبت (افزایش انرژی) محاسبه می‌شود
           final diff = currSpectrum[k] - prevSpectrum[k];
           if (diff > 0) {
             frameFlux += diff * diff;
@@ -328,11 +371,10 @@ class SoundAnalyzer {
     return frameCount > 0 ? totalFlux / frameCount : 0.0;
   }
 
-  /// تخمین SNR (نسبت سیگنال به نویز)
   double _estimateSNR(List<double> samples) {
     if (samples.length < 2) return 0.0;
 
-    final noiseLength = math.max(1, (samples.length * 0.2).toInt());
+    final noiseLength = math.max(1, (samples.length * 0.15).toInt());
     final noiseSamples = samples.sublist(0, noiseLength);
     final signalSamples = samples.sublist(noiseLength);
 
@@ -348,8 +390,8 @@ class SoundAnalyzer {
     }
     signalEnergy /= signalSamples.length;
 
-    if (noiseEnergy == 0) return 50.0;
-    return 10 * math.log(signalEnergy / noiseEnergy) / math.log(10);
+    if (noiseEnergy <= 1e-12) return 50.0;
+    return 10 * math.log(signalEnergy / noiseEnergy) / math.ln10;
   }
 }
 

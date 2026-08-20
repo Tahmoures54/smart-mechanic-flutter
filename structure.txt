@@ -1,29 +1,38 @@
-flutter_app:
-|   pubspec.yaml
-|   structure.txt
-|   
-+---.github
-|   \---workflows
-|           build-apk.yml
-|           
-\---lib
-    |   constants.dart
-    |   main.dart
-    |   
-    +---models
-    |       car.dart
-    |       diagnostic.dart
-    |       
-    +---providers
-    |       auth_provider.dart
-    |       
-    +---screens
-    |       history_screen.dart
-    |       home_screen.dart
-    |       login_screen.dart
-    |       result_screen.dart
-    |       shop_screen.dart
-    |       
-    \---services
-            api_service.dart
-            
+smart-mechanic-flutter/
+├── .github/
+│   └── workflows/
+│       ├── build-apk.yml
+│       └── generate-keystore.yml
+├── lib/
+│   ├── constants.dart
+│   ├── main.dart
+│   ├── models/
+│   │   ├── audio_features.dart
+│   │   ├── car.dart
+│   │   └── diagnostic.dart
+│   ├── providers/
+│   │   ├── auth_provider.dart
+│   │   ├── locale_provider.dart
+│   │   └── theme_provider.dart
+│   ├── screens/
+│   │   ├── chat_screen.dart
+│   │   ├── history_screen.dart
+│   │   ├── home_screen.dart
+│   │   ├── login_screen.dart
+│   │   ├── record_screen.dart
+│   │   ├── result_screen.dart
+│   │   └── shop_screen.dart
+│   ├── services/
+│   │   ├── ai_diagnostic_service.dart
+│   │   ├── api_service.dart
+│   │   ├── audio_service.dart
+│   │   ├── localization_service.dart
+│   │   ├── map_service.dart
+│   │   └── sound_analyzer.dart
+│   └── widgets/
+│       └── car_selector_widget.dart
+├── analysis_options.yaml
+├── DISCLAIMER.md
+├── pubspec.yaml
+├── README.md
+└── structure.txt
