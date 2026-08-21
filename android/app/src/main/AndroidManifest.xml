@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.microsoft.com/apk/res/android">
     
-    <!-- دسترسی‌های برنامه: اینترنت، مکان‌یاب، ضبط صدا -->
+    <!-- دسترسی‌های سخت‌افزاری و نرم‌افزاری حیاتی پروژه -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -12,7 +12,7 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
-        <!-- تنظیمات مربوط به گوگل مپ -->
+        <!-- کلید نقشه گوگل مپ -->
         <meta-data android:name="com.google.android.geo.API_KEY"
             android:value="YOUR_GOOGLE_MAPS_API_KEY_HERE"/>
 
