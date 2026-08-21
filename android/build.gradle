@@ -6,13 +6,10 @@ buildscript {
     }
 }
 
-// ⚠️ این بلوک دقیقاً مشکل geolocator_android را به طور مستقیم حل می‌کند
-ext {
-    compileSdkVersion = 34
-    targetSdkVersion = 34
-    minSdkVersion = 24
-    buildToolsVersion = "34.0.0"
-}
+// ⚠️ این ۳ خط به صورت عددی (Integer) به geolocator مقدار می‌دهند تا خط ۲۹ کرش نکند
+rootProject.ext.compileSdkVersion = 34
+rootProject.ext.targetSdkVersion = 34
+rootProject.ext.minSdkVersion = 24
 
 allprojects {
     repositories {
