@@ -1,3 +1,7 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Smart Mechanic - Optimized .gitignore for Flutter CI/CD (GitHub Actions)
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Miscellaneous
 *.class
 *.log
@@ -37,14 +41,13 @@ app.*.symbols
 # Obfuscation
 app.*.map.json
 
-# Android
-**/android/**/gradle-wrapper.jar
+# Android (تغییرات اساسی برای حل مشکل بیلد گیت‌هاب)
 **/android/.gradle
 **/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
 **/android/local.properties
 **/android/**/GeneratedPluginRegistrant.java
+
+# کلیدها و فایل‌های امنیتی (باید در گیت‌هاب سکرت بمانند)
 **/android/key.properties
 *.jks
 *.keystore
