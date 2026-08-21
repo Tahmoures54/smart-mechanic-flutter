@@ -7,9 +7,6 @@ import '../constants.dart';
 import '../models/car.dart';
 import '../models/diagnostic.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── استثناء API ──
-// ─────────────────────────────────────────────────────────────────────────────
 class ApiException implements Exception {
   final int statusCode;
   final String message;
@@ -29,9 +26,6 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── نتیجه عملیات API ──
-// ─────────────────────────────────────────────────────────────────────────────
 class ApiResponse<T> {
   final T data;
   final int statusCode;
@@ -40,9 +34,6 @@ class ApiResponse<T> {
   const ApiResponse({required this.data, required this.statusCode, this.meta});
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── پارامترهای pagination ──
-// ─────────────────────────────────────────────────────────────────────────────
 class PaginationParams {
   final int page;
   final int limit;
@@ -52,12 +43,26 @@ class PaginationParams {
   Map<String, String> toQueryParams() => {
         'page': page.toString(),
         'limit': limit.toString(),
+        // بک‌اند از offset استفاده می‌کند
+        'offset': ((page - 1) * limit).toString(),
       };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── سرویس اصلی ──
-// ─────────────────────────────────────────────────────────────────────────────
+/// نتیجه عیب‌یابی از سرور (شامل diagnosticId برای feedback)
+class DiagnoseApiResult {
+  final String result;
+  final int? diagnosticId;
+  final int? remainingCredits;
+  final int? remainingFreeQuestions;
+
+  const DiagnoseApiResult({
+    required this.result,
+    this.diagnosticId,
+    this.remainingCredits,
+    this.remainingFreeQuestions,
+  });
+}
+
 class ApiService {
   final http.Client _httpClient;
 
@@ -82,9 +87,6 @@ class ApiService {
         _diagnoseTimeout = diagnoseTimeout,
         _uploadTimeout = uploadTimeout;
 
-  // ─────────────────────────────────────────
-  // ── هدرها ──
-  // ─────────────────────────────────────────
   Map<String, String> _getHeaders([String? token]) {
     return {
       'Content-Type': 'application/json',
@@ -100,9 +102,6 @@ class ApiService {
     };
   }
 
-  // ─────────────────────────────────────────
-  // ── parse پاسخ ──
-  // ─────────────────────────────────────────
   dynamic _parseBody(http.Response response) {
     if (response.body.isEmpty) return <String, dynamic>{};
     try {
@@ -128,14 +127,10 @@ class ApiService {
       throw ApiException(response.statusCode, msg.toString(), details: details);
     }
 
-    // ✅ اگر سرور لیست برگرداند، آن را در یک مپ می‌پیچیم
     if (data is List) return {'data': data};
     return data is Map<String, dynamic> ? data : <String, dynamic>{'data': data};
   }
 
-  // ─────────────────────────────────────────
-  // ── rate limiting ──
-  // ─────────────────────────────────────────
   Future<void> _checkRateLimit(String key) async {
     final last = _lastRequestTime[key];
     if (last != null) {
@@ -144,13 +139,9 @@ class ApiService {
         await Future.delayed(_minRequestInterval - elapsed);
       }
     }
-    // ✅ ثبت زمان دقیقاً قبل از ارسال درخواست
     _lastRequestTime[key] = DateTime.now();
   }
 
-  // ─────────────────────────────────────────
-  // ── ارسال امن با مدیریت خطا ──
-  // ─────────────────────────────────────────
   Future<http.Response> _safeCall(
     Future<http.Response> Function() call, {
     Duration? timeout,
@@ -184,38 +175,49 @@ class ApiService {
   void _logError(String type, String msg) => debugPrint('[API Error] $type: ${_truncate(msg)}');
   String _truncate(String s, {int max = 100}) => s.length > max ? '${s.substring(0, max)}...' : s;
 
-  // ─────────────────────────────────────────
-  // ── لیست خودروها (با cache) ──
-  // ─────────────────────────────────────────
+  // ── Cars: اول /api/cars سپس fallback به cars.json ──
   Future<List<Car>> getCars({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _carsCache != null &&
         _carsCacheTime != null &&
         DateTime.now().difference(_carsCacheTime!) < _carsCacheDuration) {
-      debugPrint('[API] لیست خودروها از cache برگشت داده شد.');
       return _carsCache!;
     }
 
-    // ✅ ساخت ایمن URL با Uri
-    final baseUri = Uri.parse(Constants.baseUrl);
-    final carsUri = baseUri.replace(path: '/cars.json', queryParameters: null);
-
-    final response = await _safeCall(
-      () => _httpClient.get(carsUri, headers: {'Accept': 'application/json'}),
-      rateLimitKey: 'getCars',
-    );
-
-    final body = _parseBody(response);
-    final List<dynamic> rawList = body is Map && body.containsKey('cars')
-        ? body['cars'] as List<dynamic>
-        : (body is List ? body : []);
-
-    final cars = rawList.map((j) => Car.fromJson(j as Map<String, dynamic>)).toList();
-
-    _carsCache = cars;
-    _carsCacheTime = DateTime.now();
-
-    return cars;
+    try {
+      final response = await _safeCall(
+        () => _httpClient.get(
+          Uri.parse(Constants.carsApi),
+          headers: {'Accept': 'application/json'},
+        ),
+        rateLimitKey: 'getCars',
+      );
+      final body = _parseBody(response);
+      final List<dynamic> rawList = body is Map && body['data'] is List
+          ? body['data'] as List
+          : (body is List ? body : []);
+      final cars = rawList.map((j) => Car.fromJson(j as Map<String, dynamic>)).toList();
+      _carsCache = cars;
+      _carsCacheTime = DateTime.now();
+      return cars;
+    } catch (_) {
+      // fallback static
+      final response = await _safeCall(
+        () => _httpClient.get(
+          Uri.parse(Constants.carsJson),
+          headers: {'Accept': 'application/json'},
+        ),
+        rateLimitKey: 'getCarsJson',
+      );
+      final body = _parseBody(response);
+      final List<dynamic> rawList = body is Map && body.containsKey('cars')
+          ? body['cars'] as List<dynamic>
+          : (body is List ? body : []);
+      final cars = rawList.map((j) => Car.fromJson(j as Map<String, dynamic>)).toList();
+      _carsCache = cars;
+      _carsCacheTime = DateTime.now();
+      return cars;
+    }
   }
 
   void clearCarsCache() {
@@ -223,9 +225,6 @@ class ApiService {
     _carsCacheTime = null;
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ احراز هویت و پروفایل ──
-  // ─────────────────────────────────────────
   Future<void> sendOtp(String phone) async {
     final response = await _safeCall(
       () => _httpClient.post(
@@ -278,10 +277,14 @@ class ApiService {
     _parseAndEnsure(response, defaultError: 'خطا در ثبت درخواست برداشت');
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ عیب‌یابی ──
-  // ─────────────────────────────────────────
-  Future<String> diagnose(String token, String carId, String description, {required String year, String? carName}) async {
+  /// عیب‌یابی — برمی‌گرداند result + diagnosticId
+  Future<DiagnoseApiResult> diagnose(
+    String token,
+    String carId,
+    String description, {
+    required String year,
+    String? carName,
+  }) async {
     final body = <String, dynamic>{
       'carId': carId,
       'year': year,
@@ -300,9 +303,22 @@ class ApiService {
     );
 
     final data = _parseAndEnsure(response, defaultError: 'خطا در عیب‌یابی');
-    final result = _extractResult(data);
-    if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه‌ای برنگرداند.');
-    return result;
+    final resultText = _extractResult(data);
+    if (resultText == null || resultText.isEmpty) {
+      throw const ApiException(500, 'سرور نتیجه‌ای برنگرداند.');
+    }
+
+    final diagId = data['diagnosticId'] is int
+        ? data['diagnosticId'] as int
+        : int.tryParse('${data['diagnosticId']}');
+
+    return DiagnoseApiResult(
+      result: resultText,
+      diagnosticId: diagId,
+      remainingCredits: data['remainingCredits'] is int ? data['remainingCredits'] as int : null,
+      remainingFreeQuestions:
+          data['remainingFreeQuestions'] is int ? data['remainingFreeQuestions'] as int : null,
+    );
   }
 
   String? _extractResult(Map<String, dynamic> data) {
@@ -313,37 +329,43 @@ class ApiService {
     return data['result']?.toString() ?? data['answer']?.toString() ?? data['text']?.toString();
   }
 
-  // ✅ پارامتر onProgress حذف شد چون در http پیش‌فرض پشتیبانی نمی‌شود
-  Future<String> uploadAudioAndDiagnose(
+  Future<DiagnoseApiResult> uploadAudioAndDiagnose(
     String token, {
     required String filePath,
     required String carId,
     required String year,
     String? carName,
+    String? description,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) throw const ApiException(0, 'فایل صوتی پیدا نشد.');
 
-    final fileSize = await file.length();
-    debugPrint('[API] آپلود فایل صوتی: ${fileSize ~/ 1024} KB');
-
-    final uri = Uri.parse('${Constants.diagnose}/audio');
+    final uri = Uri.parse(Constants.diagnoseAudio);
     final request = http.MultipartRequest('POST', uri)
       ..headers.addAll(_getMultipartHeaders(token))
       ..fields['carId'] = carId
       ..fields['year'] = year
       ..files.add(await http.MultipartFile.fromPath('audio', filePath, filename: 'engine_sound.m4a'));
 
-    if (carName != null && carName.trim().isNotEmpty) request.fields['carName'] = carName.trim();
+    if (carName != null && carName.trim().isNotEmpty) {
+      request.fields['carName'] = carName.trim();
+    }
+    if (description != null && description.trim().isNotEmpty) {
+      request.fields['description'] = description.trim();
+    }
 
     try {
       final streamedResponse = await request.send().timeout(_uploadTimeout);
       final response = await http.Response.fromStream(streamedResponse);
-
       final data = _parseAndEnsure(response, defaultError: 'خطا در آپلود و تحلیل صدا');
-      final result = _extractResult(data);
-      if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه تحلیل صدا را برنگرداند.');
-      return result;
+      final resultText = _extractResult(data);
+      if (resultText == null || resultText.isEmpty) {
+        throw const ApiException(500, 'سرور نتیجه تحلیل صدا را برنگرداند.');
+      }
+      final diagId = data['diagnosticId'] is int
+          ? data['diagnosticId'] as int
+          : int.tryParse('${data['diagnosticId']}');
+      return DiagnoseApiResult(result: resultText, diagnosticId: diagId);
     } on ApiException {
       rethrow;
     } on TimeoutException {
@@ -353,9 +375,6 @@ class ApiService {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ تاریخچه ──
-  // ─────────────────────────────────────────
   Future<List<Diagnostic>> getHistory(String token, {PaginationParams? pagination}) async {
     final params = {'history': 'true', ...?(pagination?.toQueryParams())};
     final uri = Uri.parse(Constants.diagnose).replace(queryParameters: params);
@@ -367,14 +386,11 @@ class ApiService {
 
     final data = _parseAndEnsure(response, defaultError: 'خطا در دریافت تاریخچه');
 
-    // ✅ پارس تمیزتر و بدون تداخل
     final List<dynamic> rawList;
     if (data['data'] is List) {
       rawList = data['data'] as List;
     } else if (data['history'] is List) {
       rawList = data['history'] as List;
-    } else if (data['items'] is List) {
-      rawList = data['items'] as List;
     } else {
       rawList = [];
     }
@@ -385,7 +401,7 @@ class ApiService {
   Future<void> deleteHistory(String token, String diagnosticId) async {
     if (diagnosticId.isEmpty) throw const ApiException(400, 'شناسه تاریخچه نامعتبر است.');
 
-    final uri = Uri.parse('${Constants.diagnose}/$diagnosticId');
+    final uri = Uri.parse(Constants.deleteDiagnose(diagnosticId));
     final response = await _safeCall(
       () => _httpClient.delete(uri, headers: _getHeaders(token)),
       rateLimitKey: 'deleteHistory',
@@ -393,9 +409,6 @@ class ApiService {
     _parseAndEnsure(response, defaultError: 'خطا در حذف تاریخچه');
   }
 
-  // ─────────────────────────────────────────
-  // ─ـ پرداخت ──
-  // ─────────────────────────────────────────
   Future<String> getPaymentUrl(String token, String productId) async {
     if (productId.isEmpty) throw const ApiException(400, 'شناسه محصول نامعتبر است.');
 
@@ -415,9 +428,71 @@ class ApiService {
     return url;
   }
 
+  /// امتیاز به نتیجه عیب‌یابی (۱–۵)
+  Future<void> submitFeedback(
+    String token, {
+    required int diagnosticId,
+    required int rating,
+    String? feedback,
+  }) async {
+    final response = await _safeCall(
+      () => _httpClient.post(
+        Uri.parse(Constants.feedback),
+        headers: _getHeaders(token),
+        body: jsonEncode({
+          'diagnosticId': diagnosticId,
+          'rating': rating,
+          if (feedback != null && feedback.trim().isNotEmpty) 'feedback': feedback.trim(),
+        }),
+      ),
+      rateLimitKey: 'feedback',
+    );
+    _parseAndEnsure(response, defaultError: 'خطا در ثبت نظر');
+  }
+
+  /// رویداد آنالیتیکس (خطا را می‌بلعد تا UX خراب نشود)
+  Future<void> trackEvent(
+    String eventName, {
+    String? token,
+    Map<String, dynamic>? properties,
+    String platform = 'android',
+  }) async {
+    if (!Constants.featureAnalytics) return;
+    try {
+      await _safeCall(
+        () => _httpClient.post(
+          Uri.parse(Constants.events),
+          headers: _getHeaders(token),
+          body: jsonEncode({
+            'eventName': eventName,
+            'platform': platform,
+            'appVersion': Constants.appVersion,
+            if (properties != null) 'properties': properties,
+          }),
+        ),
+        rateLimitKey: 'event_$eventName',
+        timeout: const Duration(seconds: 8),
+      );
+    } catch (e) {
+      debugPrint('[Analytics] soft-fail $eventName: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getProducts() async {
+    final response = await _safeCall(
+      () => _httpClient.get(
+        Uri.parse(Constants.products),
+        headers: {'Accept': 'application/json'},
+      ),
+      rateLimitKey: 'products',
+    );
+    final data = _parseAndEnsure(response);
+    final list = data['data'] is List ? data['data'] as List : [];
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
   void dispose() {
     _httpClient.close();
     _lastRequestTime.clear();
-    debugPrint('[API] ApiService بسته شد.');
   }
 }
