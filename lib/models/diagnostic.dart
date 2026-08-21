@@ -3,34 +3,29 @@ import 'audio_features.dart';
 
 /// مدل کامل عیب‌یابی
 class Diagnostic {
-  // ── شناسه‌ها ──
   final String id;
   final String carId;
-  final String? carName;    // نام خودرو در زمان عیب‌یابی
-  final String? carYear;   // سال خودرو در زمان عیب‌یابی
-  final Car? car;           // آبجکت کامل خودرو (اگر سرور populate کرده باشد)
+  final String? carName;
+  final String? carYear;
+  final Car? car;
 
-  // ── زمان‌ها ──
-  final DateTime createdAt;   // زمان ایجاد
-  final DateTime? updatedAt;  // آخرین آپدیت
+  final DateTime createdAt;
+  final DateTime? updatedAt;
 
-  // ── محتوا ──
-  final String? description;     // توضیح کاربر
-  final String? result;          // پاسخ AI
-  final AudioFeatures? audioFeatures; // ویژگی‌های صوتی
+  final String? description;
+  final String? result;
+  final AudioFeatures? audioFeatures;
 
-  // ── امتیازها ──
-  final double? confidenceScore; // اطمینان AI
-  final int? userRating;         // امتیاز کاربر (1-5)
+  final double? confidenceScore;
+  final int? userRating;
+  final String? userFeedback;
 
-  // ── وضعیت ──
   final DiagnosticStatus status;
-  final DiagnosticType type;      // متنی یا صوتی
-  final bool isGolden;            // آیا با اشتراک طلایی انجام شده
+  final DiagnosticType type;
+  final bool isGolden;
 
-  // ── اطلاعات اضافی ──
-  final String? errorMessage;     
-  final Map<String, dynamic>? metadata; 
+  final String? errorMessage;
+  final Map<String, dynamic>? metadata;
 
   const Diagnostic({
     required this.id,
@@ -45,6 +40,7 @@ class Diagnostic {
     this.audioFeatures,
     this.confidenceScore,
     this.userRating,
+    this.userFeedback,
     this.status = DiagnosticStatus.completed,
     this.type = DiagnosticType.text,
     this.isGolden = false,
@@ -52,25 +48,18 @@ class Diagnostic {
     this.metadata,
   });
 
-  // ─────────────────────────────────────────
-  // ── سازنده از JSON ──
-  // ─────────────────────────────────────────
   factory Diagnostic.fromJson(Map<String, dynamic> json) {
-    // ── پارس تاریخ‌ها (پشتیبانی از استرینگ و Unix Timestamp) ──
     final createdAt = _parseDate(json['createdAt'] ?? json['created_at'] ?? json['timestamp']) ?? DateTime.now();
     final updatedAt = _parseDate(json['updatedAt'] ?? json['updated_at']);
 
-    // ── پارس Car ──
     final Car? car = json['car'] is Map<String, dynamic>
         ? Car.fromJson(json['car'] as Map<String, dynamic>)
         : null;
 
-    // ── پارس AudioFeatures ──
     final AudioFeatures? audioFeatures = json['audioFeatures'] is Map<String, dynamic>
         ? AudioFeatures.fromJson(json['audioFeatures'] as Map<String, dynamic>)
         : null;
 
-    // ── پارس metadata (ایمن در برابر خطای نوع) ──
     final Map<String, dynamic>? metadata = json['metadata'] is Map
         ? Map<String, dynamic>.from(json['metadata'] as Map)
         : null;
@@ -78,7 +67,6 @@ class Diagnostic {
     return Diagnostic(
       id: _str(json['id']),
       carId: _str(json['carId'] ?? json['car_id']),
-      // ✅ استفاده از ?.toString() برای جلوگیری از کرش
       carName: (json['carName'] ?? json['car_name'])?.toString(),
       carYear: (json['carYear'] ?? json['car_year'])?.toString(),
       car: car,
@@ -88,7 +76,8 @@ class Diagnostic {
       result: json['result']?.toString(),
       audioFeatures: audioFeatures,
       confidenceScore: _parseDouble(json['confidenceScore'] ?? json['confidence_score']),
-      userRating: _parseInt(json['userRating'] ?? json['user_rating']),
+      userRating: _parseInt(json['userRating'] ?? json['user_rating'] ?? json['rating']),
+      userFeedback: (json['feedback'] ?? json['userFeedback'])?.toString(),
       status: DiagnosticStatus.fromString(json['status']?.toString()),
       type: DiagnosticType.fromString(json['type']?.toString(), hasAudio: audioFeatures != null),
       isGolden: _bool(json['isGolden'] ?? json['is_golden']),
@@ -97,9 +86,6 @@ class Diagnostic {
     );
   }
 
-  // ─────────────────────────────────────────
-  // ── تبدیل به JSON ──
-  // ─────────────────────────────────────────
   Map<String, dynamic> toJson() => {
         'id': id,
         'carId': carId,
@@ -113,6 +99,7 @@ class Diagnostic {
         if (audioFeatures != null) 'audioFeatures': audioFeatures!.toJson(),
         if (confidenceScore != null) 'confidenceScore': confidenceScore,
         if (userRating != null) 'userRating': userRating,
+        if (userFeedback != null) 'feedback': userFeedback,
         'status': status.name,
         'type': type.name,
         'isGolden': isGolden,
@@ -120,9 +107,6 @@ class Diagnostic {
         if (metadata != null) 'metadata': metadata,
       };
 
-  // ─────────────────────────────────────────
-  // ── copyWith ──
-  // ─────────────────────────────────────────
   Diagnostic copyWith({
     String? id,
     String? carId,
@@ -136,6 +120,7 @@ class Diagnostic {
     AudioFeatures? audioFeatures,
     double? confidenceScore,
     int? userRating,
+    String? userFeedback,
     DiagnosticStatus? status,
     DiagnosticType? type,
     bool? isGolden,
@@ -155,6 +140,7 @@ class Diagnostic {
       audioFeatures: audioFeatures ?? this.audioFeatures,
       confidenceScore: confidenceScore ?? this.confidenceScore,
       userRating: userRating ?? this.userRating,
+      userFeedback: userFeedback ?? this.userFeedback,
       status: status ?? this.status,
       type: type ?? this.type,
       isGolden: isGolden ?? this.isGolden,
@@ -162,10 +148,6 @@ class Diagnostic {
       metadata: metadata ?? this.metadata,
     );
   }
-
-  // ─────────────────────────────────────────
-  // ── Getters محاسباتی ──
-  // ─────────────────────────────────────────
 
   String get displayCarName {
     if (carName != null && carName!.isNotEmpty) return carName!;
@@ -183,7 +165,6 @@ class Diagnostic {
   String get summary {
     String? text = description;
     if (text == null || text.isEmpty) text = result;
-    
     if (text != null && text.isNotEmpty) {
       return text.length > 80 ? '${text.substring(0, 80)}...' : text;
     }
@@ -210,9 +191,6 @@ class Diagnostic {
     return '${(confidenceScore! * 100).toStringAsFixed(0)}٪';
   }
 
-  // ─────────────────────────────────────────
-  // ── مقایسه ──
-  // ─────────────────────────────────────────
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -225,12 +203,8 @@ class Diagnostic {
   @override
   String toString() => 'Diagnostic(id=$id, car=$displayCarName, status=${status.name}, type=${type.name})';
 
-  // ─────────────────────────────────────────
-  // ── توابع کمکی private ──
-  // ─────────────────────────────────────────
   static String _str(dynamic value) => value == null ? '' : value.toString().trim();
 
-  // ✅ پشتیبانی از Timestamp عددی (Unix) برای تاریخ‌ها
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
@@ -266,9 +240,6 @@ class Diagnostic {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── وضعیت عیب‌یابی ──
-// ─────────────────────────────────────────────────────────────────────────────
 enum DiagnosticStatus {
   pending,
   processing,
@@ -282,7 +253,6 @@ enum DiagnosticStatus {
         DiagnosticStatus.failed => 'ناموفق',
       };
 
-  // ✅ استفاده از حلقه for برای ایمنی و پرفورمنس بهتر
   static DiagnosticStatus fromString(String? value) {
     if (value == null) return DiagnosticStatus.completed;
     final lower = value.toLowerCase();
@@ -293,9 +263,6 @@ enum DiagnosticStatus {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── نوع عیب‌یابی ──
-// ─────────────────────────────────────────────────────────────────────────────
 enum DiagnosticType {
   text,
   audio;
