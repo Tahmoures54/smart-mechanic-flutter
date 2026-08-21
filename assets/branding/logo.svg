@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- گرادیانت‌های طلایی متالیک اصلی شما با کنتراست بهبود یافته -->
+    <linearGradient id="goldCore" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF3C4"/>
+      <stop offset="30%" stop-color="#FFD54F"/>
+      <stop offset="100%" stop-color="#FF8F00"/>
+    </linearGradient>
+    <linearGradient id="goldAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="100%" stop-color="#FFB300"/>
+    </linearGradient>
+    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- پس‌زمینه عمیق تیره -->
+  <circle cx="256" cy="256" r="240" fill="#0D0D12" stroke="#1A1A24" stroke-width="8"/>
+  
+  <!-- چرخ‌دنده مدرن تکنسین (متقارن و صنعتی) -->
+  <g transform="translate(256, 256)" stroke="url(#goldAccent)" stroke-width="6" fill="none" opacity="0.85">
+    <circle cx="0" cy="0" r="170" stroke-dasharray="25 15"/>
+    <circle cx="0" cy="0" r="145" stroke-dasharray="8 8" opacity="0.4"/>
+  </g>
+
+  <!-- آچار مکانیکی مدرن (ستون عمودی قدرت و عیب‌یابی) -->
+  <g transform="translate(256, 256) rotate(-45)">
+    <!-- بدنه آچار -->
+    <rect x="-16" y="-120" width="32" height="240" rx="16" fill="url(#goldCore)"/>
+    <!-- کله آچار تخت (بالا) -->
+    <path d="M -35 -110 C -35 -150, 35 -150, 35 -110 C 35 -95, 20 -85, 0 -85 C -20 -85, -35 -95, -35 -110 Z" fill="url(#goldCore)"/>
+    <path d="M -18 -135 L 18 -135 L 0 -105 Z" fill="#0D0D12"/> <!-- دهانه آچار -->
+    <!-- انتهای آچار رینگی (پایین) -->
+    <circle cx="0" cy="115" r="32" fill="url(#goldCore)"/>
+    <circle cx="0" cy="115" r="18" fill="#0D0D12"/>
+    <path d="M -6 115 L 6 115" stroke="url(#goldAccent)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- ماشین هوشمند (نمای جلو/سیلوئت مدرن متقارن روی آچار) -->
+  <g transform="translate(256, 240)">
+    <!-- سایه زیر ماشین برای ایجاد عمق -->
+    <ellipse cx="0" cy="45" rx="110" ry="20" fill="#050508" filter="url(#subtleGlow)"/>
+    
+    <!-- بدنه اصلی ماشین با خطوط آیرودینامیک لوکس -->
+    <path d="M -95 30 
+             C -105 30, -115 20, -115 5 
+             L -110 -20 
+             C -110 -35, -95 -45, -75 -45 
+             L -55 -45 
+             L -40 -70 
+             C -35 -78, -20 -80, 0 -80 
+             C 20 -80, 35 -78, 40 -70 
+             L 55 -45 
+             L 75 -45 
+             C 95 -45, 110 -35, 110 -20 
+             L 115 5 
+             C 115 20, 105 30, 95 30 Z" 
+          fill="url(#goldCore)" stroke="#0D0D12" stroke-width="4"/>
+          
+    <!-- شیشه جلو متقارن و تیره -->
+    <path d="M -42 -45 L -30 -68 C -25 -72, 25 -72, 30 -68 L 42 -45 Z" fill="#1A1A24"/>
+    
+    <!-- چراغ‌های LED مدرن و کشیده (حس ماشین‌های جدید و هوشمند) -->
+    <path d="M -90 -10 Q -70 -10, -60 -20 Q -75 -22, -90 -10 Z" fill="#FFFFFF" filter="url(#subtleGlow)"/>
+    <path d="M 90 -10 Q 70 -10, 60 -20 Q 75 -22, 90 -10 Z" fill="#FFFFFF" filter="url(#subtleGlow)"/>
+    
+    <!-- جلوپنجره هوشمند (طرح دیجیتالی) -->
+    <rect x="-40" y="-15" width="80" height="15" rx="6" fill="#1A1A24"/>
+    <line x1="-30" y1="-7" x2="30" y2="-7" stroke="url(#goldAccent)" stroke-width="2" stroke-dasharray="6 4"/>
+    
+    <!-- چرخ‌های متقارن جلو -->
+    <rect x="-102" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccent)" stroke-width="3"/>
+    <rect x="78" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccent)" stroke-width="3"/>
+  </g>
+</svg>

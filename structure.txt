@@ -1,0 +1,69 @@
+smart-mechanic-flutter-main:
+|   .gitignore
+|   analysis_options.yaml
+|   BRANDING.md
+|   DISCLAIMER.md
+|   LICENSE
+|   logo.png
+|   PRIVACY.md
+|   pubspec.yaml
+|   README.md
+|   RELEASE.md
+|   structure.txt
+|   
++---.github
+|   \---workflows
+|           build-apk.yml
+|           generate-keystore.yml
+|           
++---assets
+|   \---branding
+|           adaptive_icon.svg
+|           app_icon.svg
+|           app_icon_foreground.svg
+|           banner.svg
+|           logo.svg
+|           splash_mark.svg
+|           
++---lib
+|   |   constants.dart
+|   |   main.dart
+|   |   
+|   +---models
+|   |       audio_features.dart
+|   |       car.dart
+|   |       diagnostic.dart
+|   |       
+|   +---providers
+|   |       auth_provider.dart
+|   |       locale_provider.dart
+|   |       theme_provider.dart
+|   |       
+|   +---screens
+|   |       chat_screen.dart
+|   |       history_screen.dart
+|   |       home_screen.dart
+|   |       login_screen.dart
+|   |       notification_settings_screen.dart
+|   |       record_screen.dart
+|   |       result_screen.dart
+|   |       shop_screen.dart
+|   |       
+|   +---services
+|   |       ai_diagnostic_service.dart
+|   |       api_service.dart
+|   |       audio_service.dart
+|   |       localization_service.dart
+|   |       map_service.dart
+|   |       notification_service.dart
+|   |       sound_analyzer.dart
+|   |       
+|   +---theme
+|   |       brand.dart
+|   |       
+|   \---widgets
+|           car_selector_widget.dart
+|           
+\---scripts
+        export_icon_notes.txt
+        

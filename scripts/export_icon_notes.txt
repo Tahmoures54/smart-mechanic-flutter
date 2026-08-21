@@ -1,0 +1,10 @@
+برای تولید app_icon.png از SVG:
+
+1) آنلاین: https://svgtopng.com  →  آپلود assets/branding/app_icon.svg  →  1024px
+2) ذخیره در: assets/branding/app_icon.png
+3) دستور:
+   flutter pub get
+   dart run flutter_launcher_icons
+
+اگر ImageMagick دارید:
+  convert -background none -size 1024x1024 assets/branding/app_icon.svg assets/branding/app_icon.png
