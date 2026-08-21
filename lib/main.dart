@@ -49,6 +49,9 @@ void main() async {
   final localeProvider = await LocaleProvider.create();
   final themeProvider = await ThemeProvider.create();
 
+  // رشد: ثبت باز شدن اپ (بدون بلاک کردن UI)
+  services.api.trackEvent('app_open');
+
   runApp(
     MultiProvider(
       providers: [

@@ -5,16 +5,22 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/audio_features.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
+import '../widgets/rating_stars.dart';
 import 'shop_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   final String? resultText;
   final AudioFeatures? audioFeatures;
+  final int? diagnosticId;
+  final int? initialRating;
 
   const ResultScreen({
     super.key,
     this.resultText,
     this.audioFeatures,
+    this.diagnosticId,
+    this.initialRating,
   });
 
   @override
@@ -97,6 +103,11 @@ class _ResultScreenState extends State<ResultScreen>
       '$referralLine',
       subject: 'نتیجه عیب‌یابی خودرو',
     );
+
+    final token = auth.token;
+    if (token != null) {
+      context.read<ApiService>().trackEvent('referral_share', token: token);
+    }
   }
 
   void _copyResult(BuildContext context) {
@@ -123,6 +134,10 @@ class _ResultScreenState extends State<ResultScreen>
       'https://smart-mec.ir',
       subject: 'دعوت به مکانیک هوشمند',
     );
+    final token = auth.token;
+    if (token != null) {
+      context.read<ApiService>().trackEvent('referral_share', token: token);
+    }
   }
 
   _AudioLevel _interpretRms(double rms) {
@@ -190,6 +205,11 @@ class _ResultScreenState extends State<ResultScreen>
                       theme,
                     ),
                     _buildResultCard(theme),
+                    const SizedBox(height: 16),
+                    RatingStars(
+                      diagnosticId: widget.diagnosticId,
+                      initialRating: widget.initialRating,
+                    ),
                   ],
 
                   if (hasAudio) ...[
@@ -204,7 +224,6 @@ class _ResultScreenState extends State<ResultScreen>
 
                   if (!hasResult && !hasAudio) _buildEmptyState(theme),
 
-                  // لحظه طلایی معرفی — بعد از ارزش دریافتی
                   if (hasResult) ...[
                     const SizedBox(height: 20),
                     _buildPostSuccessReferral(theme, auth),
@@ -279,7 +298,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  /// لحن آرام — کاهش اضطراب (نه هشدار ترسناک)
   Widget _buildCalmDisclaimer(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -310,7 +328,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  /// Reciprocity + Identity بعد از دریافت ارزش
   Widget _buildPostSuccessReferral(ThemeData theme, AuthProvider auth) {
     final hasCode = auth.referralCode != null && auth.referralCode!.isNotEmpty;
 
@@ -370,7 +387,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  /// Loss aversion ملایم — نه فشار فروش
   Widget _buildSoftCreditNudge(ThemeData theme, AuthProvider auth) {
     final credits = auth.credits;
     final msg = credits <= 0

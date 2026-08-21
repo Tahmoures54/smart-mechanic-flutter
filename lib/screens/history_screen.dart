@@ -100,15 +100,27 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
-  // ── حذف یک آیتم ──
+  int? _parseDiagId(String id) => int.tryParse(id);
+
+  void _openResult(Diagnostic item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(
+          resultText: item.result,
+          diagnosticId: _parseDiagId(item.id),
+          initialRating: item.userRating,
+        ),
+      ),
+    );
+  }
+
   Future<void> _deleteItem(Diagnostic item, int filteredIndex) async {
     final auth = context.read<AuthProvider>();
     if (auth.token == null) return;
 
-    // ✅ پیدا کردن ایندکس اصلی در لیست اصلی برای بازگشت (Undo) دقیق
     final originalIndex = _history!.indexOf(item);
 
-    // حذف از هر دو لیست
     setState(() {
       _filteredHistory!.removeAt(filteredIndex);
       _history!.remove(item);
@@ -123,9 +135,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         action: SnackBarAction(
           label: 'بازگشت',
           onPressed: () {
-            // بازگرداندن آیتم به ایندکس اصلی در لیست اصلی
             _history!.insert(originalIndex, item);
-            // اعمال مجدد فیلتر جستجو برای بازگرداندن به لیست فیلترشده
             _onSearchChanged();
           },
         ),
@@ -141,10 +151,9 @@ class _HistoryScreenState extends State<HistoryScreen>
         await context.read<ApiService>().deleteHistory(auth.token!, item.id);
       } catch (_) {
         if (mounted) {
-          // بازگرداندن آیتم در صورت خطای سرور
           setState(() {
             _history!.insert(originalIndex, item);
-            _onSearchChanged(); // رفرش لیست فیلترشده
+            _onSearchChanged();
           });
           messenger.showSnackBar(
             SnackBar(
@@ -251,7 +260,6 @@ class _HistoryScreenState extends State<HistoryScreen>
       curve: Interval(intervalBegin, intervalEnd, curve: Curves.easeOut),
     );
 
-    // ✅ حذف AnimatedBuilder اضافه و استفاده مستقیم از Transition ها
     return FadeTransition(
       opacity: curve,
       child: SlideTransition(
@@ -287,7 +295,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildItemCard(Diagnostic item, int index, ThemeData theme) {
-    final isGolden = item.isGolden ?? false;
+    final isGolden = item.isGolden;
     final carLabel = item.carName ?? item.carId;
     final formattedDate = _formatDate(item.createdAt);
 
@@ -304,9 +312,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       color: theme.cardColor,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ResultScreen(resultText: item.result)));
-        },
+        onTap: () => _openResult(item),
         onLongPress: () => _showItemOptions(item, index),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -362,6 +368,19 @@ class _HistoryScreenState extends State<HistoryScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (item.userRating != null) ...[
+                          const SizedBox(width: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star_rounded, size: 14, color: Colors.amber.shade600),
+                              Text(
+                                '${item.userRating}',
+                                style: TextStyle(fontSize: 12, color: Colors.amber.shade700, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ],
                         if (isGolden) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -455,7 +474,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 title: const Text('مشاهده نتیجه'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => ResultScreen(resultText: item.result)));
+                  _openResult(item);
                 },
               ),
               ListTile(
@@ -578,7 +597,6 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 }
 
-// ── ویجت Shimmer برای لودینگ ──
 class _ShimmerCard extends StatefulWidget {
   final ThemeData theme;
   const _ShimmerCard({required this.theme});
@@ -610,7 +628,6 @@ class _ShimmerCardState extends State<_ShimmerCard> with SingleTickerProviderSta
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (_, __) {
-        // ✅ استفاده از Opacity برای پرفورمنس بهتر نسبت به Color.lerp
         return Opacity(
           opacity: 0.5 + (_ctrl.value * 0.5),
           child: Container(

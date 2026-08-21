@@ -3,14 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../models/audio_features.dart';
 import 'api_service.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── مدل کد OBD ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticCode {
-  final String code;           // مثال: P0300
-  final String description;    // توضیح کد
-  final OBDSeverity severity;  // شدت خطا
-  final String? system;        // سیستم مربوطه: موتور، گیربکس، ...
+  final String code;
+  final String description;
+  final OBDSeverity severity;
+  final String? system;
 
   const DiagnosticCode({
     required this.code,
@@ -64,20 +61,23 @@ enum OBDSeverity {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── نتیجه عیب‌یابی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticResult {
   final String text;
   final String prompt;
   final DateTime timestamp;
   final DiagnosticInputType type;
+  final int? diagnosticId;
+  final int? remainingCredits;
+  final int? remainingFreeQuestions;
 
   const DiagnosticResult({
     required this.text,
     required this.prompt,
     required this.timestamp,
     required this.type,
+    this.diagnosticId,
+    this.remainingCredits,
+    this.remainingFreeQuestions,
   });
 
   bool get isEmpty => text.trim().isEmpty;
@@ -97,9 +97,6 @@ enum DiagnosticInputType {
       };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── پارامترهای عیب‌یابی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticRequest {
   final String token;
   final String carId;
@@ -147,9 +144,6 @@ class DiagnosticRequest {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── سرویس اصلی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class AIDiagnosticService {
   final ApiService _apiService;
 
@@ -181,7 +175,13 @@ class AIDiagnosticService {
       return _cache[cacheKey]!;
     }
 
-    final responseText = await _sendWithRetry(
+    unawaited(_apiService.trackEvent(
+      'diagnose_start',
+      token: request.token,
+      properties: {'carId': request.carId, 'type': request.inputType.name},
+    ));
+
+    final apiResult = await _sendWithRetry(
       token: request.token,
       carId: request.carId,
       prompt: prompt,
@@ -190,11 +190,23 @@ class AIDiagnosticService {
     );
 
     final result = DiagnosticResult(
-      text: responseText,
+      text: apiResult.result,
       prompt: prompt,
       timestamp: DateTime.now(),
       type: request.inputType,
+      diagnosticId: apiResult.diagnosticId,
+      remainingCredits: apiResult.remainingCredits,
+      remainingFreeQuestions: apiResult.remainingFreeQuestions,
     );
+
+    unawaited(_apiService.trackEvent(
+      'diagnose_success',
+      token: request.token,
+      properties: {
+        'carId': request.carId,
+        'diagnosticId': apiResult.diagnosticId,
+      },
+    ));
 
     _saveToCache(cacheKey, result);
 
@@ -224,7 +236,7 @@ class AIDiagnosticService {
     return result.text;
   }
 
-  Future<String> _sendWithRetry({
+  Future<DiagnoseApiResult> _sendWithRetry({
     required String token,
     required String carId,
     required String prompt,
@@ -241,7 +253,7 @@ class AIDiagnosticService {
         final response = await _apiService
             .diagnose(token, carId, prompt, year: year, carName: carName)
             .timeout(
-              const Duration(seconds: 45),
+              const Duration(seconds: 55),
               onTimeout: () => throw DiagnosticException(
                 'زمان پاسخ سرور تمام شد. لطفاً دوباره تلاش کنید.',
               ),
@@ -256,6 +268,11 @@ class AIDiagnosticService {
         }
         lastError = e;
         debugPrint('[AIDiagnostic] خطای API (${e.statusCode}): ${e.message}');
+        unawaited(_apiService.trackEvent(
+          'diagnose_error',
+          token: token,
+          properties: {'status': e.statusCode, 'message': e.message},
+        ));
       } catch (e) {
         lastError = e;
         debugPrint('[AIDiagnostic] خطای غیرمنتظره: $e');
@@ -263,7 +280,6 @@ class AIDiagnosticService {
 
       attempt++;
       if (attempt <= _maxRetries) {
-        debugPrint('[AIDiagnostic] ${_retryDelay.inSeconds} ثانیه صبر...');
         await Future.delayed(_retryDelay);
       }
     }
@@ -271,85 +287,46 @@ class AIDiagnosticService {
     throw lastError ?? DiagnosticException('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
   }
 
-  /// ساخت پرامپت حرفه‌ای‌تر برای عیب‌یابی
   String _buildPrompt(DiagnosticRequest req) {
     final buf = StringBuffer();
 
-    buf.writeln('تو یک مکانیک خودرو با تجربه و متخصص عیب‌یابی هستی.');
-    buf.writeln('پاسخ را به زبان ساده، دقیق و قابل فهم برای راننده بنویس.');
-    buf.writeln('هرگز ادعا نکن که تشخیص ۱۰۰٪ قطعی است. همیشه احتمال خطا را ذکر کن.');
-    buf.writeln();
-
-    if (req.carName != null && req.carName!.trim().isNotEmpty) {
-      buf.writeln('🚗 خودرو: ${req.carName} (${req.year})');
-    } else {
-      buf.writeln('🚗 سال ساخت: ${req.year}');
-    }
-    buf.writeln();
-
+    // پرامپت سیستم روی سرور است؛ اینجا فقط شرح مشکل کاربر + داده صوتی
     if (req.userDescription != null && req.userDescription!.trim().isNotEmpty) {
-      buf.writeln('📋 شرح مشکل توسط راننده:');
       buf.writeln(req.userDescription!.trim());
       buf.writeln();
     }
 
     if (req.obdCodes != null && req.obdCodes!.isNotEmpty) {
-      buf.writeln('🔌 کدهای خطای OBD-II:');
+      buf.writeln('کدهای خطای OBD-II:');
       for (final c in req.obdCodes!) {
         final sevLabel = c.severity != OBDSeverity.unknown ? ' [${c.severity.label}]' : '';
-        final sysLabel = c.system != null ? ' (سیستم: ${c.system})' : '';
-        buf.writeln('  • ${c.code}$sevLabel$sysLabel: ${c.description}');
+        buf.writeln('• ${c.code}$sevLabel: ${c.description}');
       }
       buf.writeln();
     }
 
     if (req.audioFeatures != null) {
       final af = req.audioFeatures!;
-      buf.writeln('🎙️ نتایج آنالیز صوتی موتور (ضبط‌شده با میکروفون گوشی):');
-      buf.writeln('  • بلندی صدا (RMS): ${af.rms.toStringAsFixed(4)} (${_rmsDescription(af.rms)})');
-      buf.writeln('  • فرکانس غالب: ${af.dominantFrequency.toStringAsFixed(1)} Hz (${_freqDescription(af.dominantFrequency)})');
-      buf.writeln('  • مرکز طیف: ${af.spectralCentroid.toStringAsFixed(1)} Hz');
-      buf.writeln('  • نرخ عبور از صفر: ${af.zeroCrossingRate.toStringAsFixed(4)}');
+      buf.writeln('نتایج آنالیز صوتی موتور (ضبط با گوشی):');
+      buf.writeln('• بلندی صدا (RMS): ${af.rms.toStringAsFixed(4)}');
+      buf.writeln('• فرکانس غالب: ${af.dominantFrequency.toStringAsFixed(1)} Hz');
+      buf.writeln('• مرکز طیف: ${af.spectralCentroid.toStringAsFixed(1)} Hz');
+      buf.writeln('• نرخ عبور از صفر: ${af.zeroCrossingRate.toStringAsFixed(4)}');
       if (af.spectralRolloff > 0) {
-        buf.writeln('  • Spectral Rolloff: ${af.spectralRolloff.toStringAsFixed(1)} Hz');
+        buf.writeln('• Spectral Rolloff: ${af.spectralRolloff.toStringAsFixed(1)} Hz');
       }
-      if (af.snr != 0) {
-        buf.writeln('  • نسبت سیگنال به نویز تقریبی: ${af.snr.toStringAsFixed(1)} dB');
-      }
-      buf.writeln('  (توجه: این مقادیر تقریبی هستند و جایگزین دیاگ تخصصی نیستند)');
-      buf.writeln();
+      buf.writeln('(مقادیر تقریبی — جایگزین دیاگ تخصصی نیستند)');
     }
 
-    buf.writeln('─────────────────────────────');
-    buf.writeln('لطفاً دقیقاً در قالب زیر پاسخ بده:\n');
-    buf.writeln('۱. تشخیص احتمالی مشکل (با ذکر احتمال تقریبی)');
-    buf.writeln('۲. دلایل محتمل (حداکثر ۳ مورد اصلی)');
-    buf.writeln('۳. راهکار پیشنهادی گام‌به‌گام');
-    buf.writeln('۴. سطح فوریت: فوری / نیمه‌فوری / غیر فوری');
-    buf.writeln('۵. توصیه نهایی (آیا نیاز به مراجعه فوری به تعمیرگاه هست؟)');
-    buf.writeln();
-    buf.writeln('پاسخ را کوتاه، شفاف و کاربردی بنویس. از اصطلاحات خیلی تخصصی بدون توضیح خودداری کن.');
-
-    return buf.toString().trim();
-  }
-
-  String _rmsDescription(double rms) {
-    if (rms < 0.05) return 'خیلی آرام';
-    if (rms < 0.15) return 'نرمال';
-    if (rms < 0.30) return 'بلند';
-    return 'بسیار بلند / ناهنجار';
-  }
-
-  String _freqDescription(double freq) {
-    if (freq < 100) return 'ارتعاش پایین';
-    if (freq < 500) return 'دور آرام موتور';
-    if (freq < 2000) return 'دور معمول';
-    if (freq < 5000) return 'دور بالا';
-    return 'بسیار بالا / ناکوبی احتمالی';
+    final text = buf.toString().trim();
+    if (text.length < 10) {
+      return 'مشکل خودرو را بررسی کن. اطلاعات محدود است؛ راهنمایی کلی بده.';
+    }
+    return text;
   }
 
   String _buildCacheKey(DiagnosticRequest req, String prompt) {
-    return '${req.carId}_${req.year}_$prompt';
+    return '${req.carId}_${req.year}_${prompt.hashCode}';
   }
 
   void _saveToCache(String key, DiagnosticResult result) {
@@ -361,15 +338,11 @@ class AIDiagnosticService {
 
   void clearCache() {
     _cache.clear();
-    debugPrint('[AIDiagnostic] cache پاک شد.');
   }
 
   int get cacheSize => _cache.length;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── خطای اختصاصی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticException implements Exception {
   final String message;
   final Object? cause;
