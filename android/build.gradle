@@ -6,17 +6,18 @@ buildscript {
     }
 }
 
+// ⚠️ این بلوک دقیقاً مشکل geolocator_android را به طور مستقیم حل می‌کند
+ext {
+    compileSdkVersion = 34
+    targetSdkVersion = 34
+    minSdkVersion = 24
+    buildToolsVersion = "34.0.0"
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
-    }
-    // ⚠️ این بخش مشکل geolocator و تمامی پکیج‌های اندرویدی را به صورت ریشه‌ای حل می‌کند
-    project.ext {
-        set('compileSdkVersion', 34)
-        set('targetSdkVersion', 34)
-        set('minSdkVersion', 24)
-        set('buildToolsVersion', '34.0.0')
     }
 }
 
