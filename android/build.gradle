@@ -10,13 +10,13 @@ subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
-// حل مشکل هماهنگی SDK برای تمامی پکیج‌های اندرویدی پروژه
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {
-                compileSdkVersion 34
-                buildToolsVersion "34.0.0"
+                if (namespace == null) {
+                    namespace project.group
+                }
             }
         }
     }
