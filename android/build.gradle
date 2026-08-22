@@ -1,5 +1,14 @@
 buildscript {
-    ext.kotlin_version = '1.9.24'
+    ext {
+        kotlin_version = '1.9.24'
+        // تعریف یک شیء flutter برای پلاگین‌هایی که از آن استفاده می‌کنند
+        flutter = [
+            compileSdkVersion: 36,
+            minSdkVersion: 24,
+            targetSdkVersion: 36,
+            ndkVersion: "25.1.8937393" // در صورت نیاز
+        ]
+    }
     repositories {
         google()
         mavenCentral()
