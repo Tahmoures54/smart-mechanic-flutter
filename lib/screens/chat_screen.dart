@@ -247,12 +247,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // ─── اشتراک‌گذاری ─────────────────────────────────────────────────────────
   void _shareMessage(String text) {
-    SharePlus.instance.share(
-      ShareParams(
-        text:
-            '🔧 نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
-        subject: 'عیب‌یابی مکانیک هوشمند',
-      ),
+    // اصلاح‌شده: استفاده از متد استاندارد کلاس Share
+    Share.share(
+      '🔧 نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
+      subject: 'عیب‌یابی مکانیک هوشمند',
     );
   }
 
