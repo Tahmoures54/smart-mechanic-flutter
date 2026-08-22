@@ -274,15 +274,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final codeLine = (code != null && code.isNotEmpty)
         ? '\n🎁 با کد معرف من ثبت‌نام کن تا اعتبار هدیه بگیری: $code\n'
         : '\n';
-    SharePlus.instance.share(
-      ShareParams(
-        text:
-            '🚗 مکانیک هوشمند — عیب‌یابی ماشین با کمک AI\n'
-            'من استفاده کردم و واقعاً کمکم کرد.'
-            '$codeLine'
-            'لینک: https://smart-mec.ir',
-        subject: 'معرفی مکانیک هوشمند',
-      ),
+    
+    // اصلاح‌شده: استفاده از متد استاندارد کلاس Share
+    Share.share(
+      '🚗 مکانیک هوشمند — عیب‌یابی ماشین با کمک AI\n'
+      'من استفاده کردم و واقعاً کمکم کرد.'
+      '$codeLine'
+      'لینک: https://smart-mec.ir',
+      subject: 'معرفی مکانیک هوشمند',
     );
   }
 
