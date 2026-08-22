@@ -6,11 +6,6 @@ buildscript {
     }
 }
 
-// ⚠️ این ۳ خط به صورت عددی (Integer) به geolocator مقدار می‌دهند تا خط ۲۹ کرش نکند
-rootProject.ext.compileSdkVersion = 34
-rootProject.ext.targetSdkVersion = 34
-rootProject.ext.minSdkVersion = 24
-
 allprojects {
     repositories {
         google()
@@ -19,6 +14,7 @@ allprojects {
 }
 
 rootProject.buildDir = '../build'
+
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
