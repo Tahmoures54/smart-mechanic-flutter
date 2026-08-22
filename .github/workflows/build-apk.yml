@@ -51,9 +51,10 @@ jobs:
           sed -i -E 's/id "com.android.application" version ".*" apply false/id "com.android.application" version "8.5.0" apply false/' android/settings.gradle || true
           sed -i -E 's/gradle-[0-9\.]+-all\.zip/gradle-8.7-all.zip/' android/gradle/wrapper/gradle-wrapper.properties || true
 
-          sed -i -E 's/^.*compileSdk.*$/    compileSdk = 35/g' android/app/build.gradle || true
+          # تنظیم SDK روی 36 جهت سازگاری با پلاگین‌ها
+          sed -i -E 's/^.*compileSdk.*$/    compileSdk = 36/g' android/app/build.gradle || true
           sed -i -E 's/^.*minSdk.*$/    minSdk = 24/g' android/app/build.gradle || true
-          sed -i -E 's/^.*targetSdk.*$/    targetSdk = 35/g' android/app/build.gradle || true
+          sed -i -E 's/^.*targetSdk.*$/    targetSdk = 36/g' android/app/build.gradle || true
 
           sed -i -E 's/VERSION_1_8/VERSION_17/g' android/app/build.gradle || true
           sed -i -E "s/jvmTarget = '1.8'/jvmTarget = '17'/g" android/app/build.gradle || true
@@ -145,20 +146,22 @@ jobs:
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses || true
 
-      - name: Build APK
+      # بیلد بهینه‌شده با تفکیک پردازنده‌ها (--split-per-abi)
+      - name: Build Split APKs
         if: ${{ github.event.inputs.build_type != 'appbundle' }}
-        run: flutter build apk --release --obfuscate --split-debug-info=build/symbols
+        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
 
       - name: Build App Bundle
         if: ${{ github.event.inputs.build_type == 'appbundle' }}
         run: flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
 
-      - name: Upload APK
+      # آپلود تمام نسخه‌های سبک‌شده
+      - name: Upload APKs
         if: ${{ github.event.inputs.build_type != 'appbundle' }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: app-release-apks
+          path: build/app/outputs/flutter-apk/app-*-release.apk
           retention-days: 30
 
       - name: Upload App Bundle
