@@ -50,8 +50,8 @@ dependencies:
   url_launcher: ^6.3.0
 
 dependency_overrides:
-  # رفع ناسازگاری geolocator_android با AGP جدید
-  geolocator_android: ^4.6.4
+  # نسخه‌ی ۴.۶.۲ ناسازگار است؛ این نسخه‌ی قدیمی‌تر مشکل را حل می‌کند
+  geolocator_android: 4.5.0
 
 dev_dependencies:
   flutter_test:
