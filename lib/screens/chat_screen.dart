@@ -1,4 +1,3 @@
-import 'package:share_plus/share_plus.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
