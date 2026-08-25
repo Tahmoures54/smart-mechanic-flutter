@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="goldCoreSplash" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF3C4"/>
+      <stop offset="30%" stop-color="#FFD54F"/>
+      <stop offset="100%" stop-color="#FF8F00"/>
+    </linearGradient>
+    <linearGradient id="goldAccentSplash" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="100%" stop-color="#FFB300"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(256, 256)" stroke="url(#goldAccentSplash)" stroke-width="6" fill="none" opacity="0.6">
+    <circle cx="0" cy="0" r="170" stroke-dasharray="25 15"/>
+  </g>
+
+  <g transform="translate(256, 256) rotate(-45)">
+    <rect x="-16" y="-120" width="32" height="240" rx="16" fill="url(#goldCoreSplash)"/>
+    <path d="M -35 -110 C -35 -150, 35 -150, 35 -110 C 35 -95, 20 -85, 0 -85 C -20 -85, -35 -95, -35 -110 Z" fill="url(#goldCoreSplash)"/>
+    <path d="M -18 -135 L 18 -135 L 0 -105 Z" fill="#0D0D12"/>
+    <circle cx="0" cy="115" r="32" fill="url(#goldCoreSplash)"/>
+    <circle cx="0" cy="115" r="18" fill="#0D0D12"/>
+  </g>
+
+  <g transform="translate(256, 240)">
+    <path d="M -95 30 C -105 30, -115 20, -115 5 L -110 -20 C -110 -35, -95 -45, -75 -45 L -55 -45 L -40 -70 C -35 -78, -20 -80, 0 -80 C 20 -80, 35 -78, 40 -70 L 55 -45 L 75 -45 C 95 -45, 110 -35, 110 -20 L 115 5 C 115 20, 105 30, 95 30 Z" fill="url(#goldCoreSplash)" stroke="#0D0D12" stroke-width="4"/>
+    <path d="M -42 -45 L -30 -68 C -25 -72, 25 -72, 30 -68 L 42 -45 Z" fill="#1A1A24"/>
+    <circle cx="-75" cy="-15" r="7" fill="#FFFFFF"/>
+    <circle cx="75" cy="-15" r="7" fill="#FFFFFF"/>
+    <rect x="-102" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccentSplash)" stroke-width="3"/>
+    <rect x="78" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccentSplash)" stroke-width="3"/>
+  </g>
+</svg>

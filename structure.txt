@@ -1,0 +1,143 @@
+smart-mechanic:
+|   .gitignore
+|   analysis_options.yaml
+|   BRANDING.md
+|   BUILD_RELEASE.bat
+|   DISCLAIMER.md
+|   LICENSE
+|   PRIVACY.md
+|   pubspec.yaml
+|   README.md
+|   RELEASE.md
+|   structure.txt
+|   TROUBLESHOOTING_ANDROID.md
+|   
++---.github
+|   \---workflows
+|           build-apk.yml
+|           generate-keystore.yml
+|           
++---android
+|   |   build.gradle
+|   |   gradle.properties
+|   |   gradlew
+|   |   settings.gradle
+|   |   
+|   +---app
+|   |   |   build.gradle
+|   |   |   
+|   |   \---src
+|   |       \---main
+|   |           |   AndroidManifest.xml
+|   |           |   
+|   |           +---kotlin
+|   |           |   \---ir
+|   |           |       \---smartmec
+|   |           |           \---app
+|   |           |                   MainActivity.kt
+|   |           |                   
+|   |           \---res
+|   |               +---drawable
+|   |               |       ic_launcher_foreground.png
+|   |               |       launch_background.xml
+|   |               |       
+|   |               +---mipmap-anydpi-v26
+|   |               |       ic_launcher.xml
+|   |               |       ic_launcher_round.xml
+|   |               |       
+|   |               +---mipmap-hdpi
+|   |               |       ic_launcher.png
+|   |               |       ic_launcher_round.png
+|   |               |       
+|   |               +---mipmap-mdpi
+|   |               |       ic_launcher.png
+|   |               |       ic_launcher_round.png
+|   |               |       
+|   |               +---mipmap-xhdpi
+|   |               |       ic_launcher.png
+|   |               |       ic_launcher_round.png
+|   |               |       
+|   |               +---mipmap-xxhdpi
+|   |               |       ic_launcher.png
+|   |               |       ic_launcher_round.png
+|   |               |       
+|   |               +---mipmap-xxxhdpi
+|   |               |       ic_launcher.png
+|   |               |       ic_launcher_round.png
+|   |               |       
+|   |               +---values
+|   |               |       colors.xml
+|   |               |       styles.xml
+|   |               |       
+|   |               \---values-v31
+|   |                       styles.xml
+|   |                       
+|   \---gradle
+|       \---wrapper
+|               gradle-wrapper.properties
+|               
++---assets
+|   \---branding
+|           adaptive_icon.png
+|           adaptive_icon.svg
+|           app_icon.png
+|           app_icon.svg
+|           app_icon_foreground.png
+|           app_icon_foreground.svg
+|           banner.png
+|           banner.svg
+|           logo.png
+|           logo.svg
+|           splash_mark.png
+|           splash_mark.svg
+|           
++---lib
+|   |   constants.dart
+|   |   main.dart
+|   |   
+|   +---models
+|   |       audio_features.dart
+|   |       car.dart
+|   |       chat_message.dart
+|   |       diagnostic.dart
+|   |       shop_package.dart
+|   |       
+|   +---providers
+|   |       auth_provider.dart
+|   |       locale_provider.dart
+|   |       theme_provider.dart
+|   |       
+|   +---screens
+|   |       chat_screen.dart
+|   |       history_screen.dart
+|   |       home_screen.dart
+|   |       login_screen.dart
+|   |       notification_settings_screen.dart
+|   |       payment_webview.dart
+|   |       record_screen.dart
+|   |       result_screen.dart
+|   |       shop_screen.dart
+|   |       
+|   +---services
+|   |       ai_diagnostic_service.dart
+|   |       api_service.dart
+|   |       audio_service.dart
+|   |       localization_service.dart
+|   |       map_service.dart
+|   |       notification_service.dart
+|   |       sound_analyzer.dart
+|   |       
+|   +---theme
+|   |       app_theme.dart
+|   |       
+|   \---widgets
+|           car_selector_widget.dart
+|           shimmer_card.dart
+|           
++---scripts
+|       export_icon_notes.txt
+|       
+\---tool
+        apply_icons.py
+        icons_mdpi.json
+        

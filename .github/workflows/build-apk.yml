@@ -1,0 +1,139 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - appbundle
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Clean previous builds
+        run: flutter clean
+
+      - name: Ensure Gradle wrapper
+        run: |
+          mkdir -p android/gradle/wrapper
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            curl -fsSL -o android/gradle/wrapper/gradle-wrapper.jar \
+              "https://github.com/gradle/gradle/raw/v8.9.0/gradle/wrapper/gradle-wrapper.jar"
+          fi
+          chmod +x android/gradlew || true
+          test -f android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Generate launcher icons
+        run: |
+          rm -rf android/app/src/main/res/mipmap-*
+          dart run flutter_launcher_icons
+          echo "=== launcher resources ==="
+          find android/app/src/main/res -name 'ic_launcher*' | sort
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+
+      - name: Inject Google Maps API Key
+        env:
+          MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          if [ -z "$MAPS_KEY" ]; then
+            echo "GOOGLE_MAPS_API_KEY not set — skipping"
+            exit 0
+          fi
+          python3 -c '
+          import os, re
+          path = "android/app/src/main/AndroidManifest.xml"
+          key = os.environ["MAPS_KEY"]
+          text = open(path, encoding="utf-8").read()
+          pattern = r"(android:name=\"com\.google\.android\.geo\.API_KEY\"\s+android:value=\")[^\"]*(\")"
+          text2, n = re.subn(pattern, rf"\g<1>{key}\2", text)
+          if n == 0:
+              needle = "<application"
+              insert = f"<application\n        <meta-data android:name=\"com.google.android.geo.API_KEY\" android:value=\"{key}\" />"
+              text2 = text.replace(needle, insert, 1)
+          open(path, "w", encoding="utf-8").write(text2)
+          print("Maps API key injected")
+          '
+
+      - name: Setup release signing (optional)
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "No release keystore — using debug signing"
+            exit 0
+          fi
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          printf '%s\n' \
+            "storePassword=${RELEASE_KEYSTORE_PASSWORD}" \
+            "keyPassword=${RELEASE_KEY_PASSWORD}" \
+            "keyAlias=${RELEASE_KEY_ALIAS}" \
+            "storeFile=upload-keystore.jks" \
+            > android/key.properties
+          echo "Release signing configured"
+
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses >/dev/null 2>&1 || true
+
+      - name: Build APK (Universal)
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
+        run: flutter build apk --release
+
+      - name: Build App Bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'appbundle' }}
+        run: flutter build appbundle --release
+
+      - name: Upload APK
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload App Bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'appbundle' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30

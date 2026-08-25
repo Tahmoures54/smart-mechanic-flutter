@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="goldCore1024" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF3C4"/>
+      <stop offset="30%" stop-color="#FFD54F"/>
+      <stop offset="100%" stop-color="#FF8F00"/>
+    </linearGradient>
+    <linearGradient id="goldAccent1024" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE082"/>
+      <stop offset="100%" stop-color="#FFB300"/>
+    </linearGradient>
+    <filter id="glow1024" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- پس‌زمینه با گوشه‌های گرد نرم (Superellipse) مناسب اندروید و آی‌او‌اس -->
+  <rect width="1024" height="1024" rx="220" fill="#0D0D12"/>
+  
+  <!-- رینگ خارجی چرخ‌دنده‌ای بزرگ -->
+  <circle cx="512" cy="512" r="440" fill="none" stroke="#1A1A24" stroke-width="12"/>
+  <circle cx="512" cy="512" r="390" fill="none" stroke="url(#goldAccent1024)" stroke-width="10" stroke-dasharray="50 30" opacity="0.8"/>
+
+  <!-- گروه المان‌های مرکزی (دو برابر مقیاس لوگوی کوچک) -->
+  <g transform="translate(512, 512) scale(2) translate(-256, -256)">
+    <!-- آچار -->
+    <g transform="translate(256, 256) rotate(-45)">
+      <rect x="-16" y="-120" width="32" height="240" rx="16" fill="url(#goldCore1024)"/>
+      <path d="M -35 -110 C -35 -150, 35 -150, 35 -110 C 35 -95, 20 -85, 0 -85 C -20 -85, -35 -95, -35 -110 Z" fill="url(#goldCore1024)"/>
+      <path d="M -18 -135 L 18 -135 L 0 -105 Z" fill="#0D0D12"/>
+      <circle cx="0" cy="115" r="32" fill="url(#goldCore1024)"/>
+      <circle cx="0" cy="115" r="18" fill="#0D0D12"/>
+    </g>
+
+    <!-- ماشین -->
+    <g transform="translate(256, 240)">
+      <ellipse cx="0" cy="45" rx="110" ry="20" fill="#050508" opacity="0.8"/>
+      <path d="M -95 30 C -105 30, -115 20, -115 5 L -110 -20 C -110 -35, -95 -45, -75 -45 L -55 -45 L -40 -70 C -35 -78, -20 -80, 0 -80 C 20 -80, 35 -78, 40 -70 L 55 -45 L 75 -45 C 95 -45, 110 -35, 110 -20 L 115 5 C 115 20, 105 30, 95 30 Z" fill="url(#goldCore1024)" stroke="#0D0D12" stroke-width="4"/>
+      <path d="M -42 -45 L -30 -68 C -25 -72, 25 -72, 30 -68 L 42 -45 Z" fill="#1A1A24"/>
+      <path d="M -90 -10 Q -70 -10, -60 -20 Q -75 -22, -90 -10 Z" fill="#FFFFFF" filter="url(#glow1024)"/>
+      <path d="M 90 -10 Q 70 -10, 60 -20 Q 75 -22, 90 -10 Z" fill="#FFFFFF" filter="url(#glow1024)"/>
+      <rect x="-40" y="-15" width="80" height="15" rx="6" fill="#1A1A24"/>
+      <line x1="-30" y1="-7" x2="30" y2="-7" stroke="url(#goldAccent1024)" stroke-width="2" stroke-dasharray="6 4"/>
+      <rect x="-102" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccent1024)" stroke-width="3"/>
+      <rect x="78" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccent1024)" stroke-width="3"/>
+    </g>
+  </g>
+</svg>

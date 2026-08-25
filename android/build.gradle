@@ -1,0 +1,32 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+
+// Plugins (geolocator_android, etc.) still use `flutter.compileSdkVersion`.
+// Do NOT set this on :app — the Flutter Gradle Plugin owns that name there.
+gradle.beforeProject { project ->
+    if (project.name == "app" || project.name == "smart_mechanic") {
+        return
+    }
+    if (!project.ext.has("flutter")) {
+        project.ext.flutter = [
+            compileSdkVersion: 36,
+            minSdkVersion    : 24,
+            targetSdkVersion : 36,
+            ndkVersion       : "26.1.10909125",
+        ]
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
