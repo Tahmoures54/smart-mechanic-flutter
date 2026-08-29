@@ -24,7 +24,6 @@ class AuthProvider with ChangeNotifier {
   bool _isGolden = false;
   DateTime? _goldenExpiry;
 
-  /// سهمیه رایگان ماهانه (از سرور)
   int _remainingFree = 2;
   int _monthlyFreeLimit = 2;
   int _usedFree = 0;
@@ -48,7 +47,13 @@ class AuthProvider with ChangeNotifier {
   String? get userName => _userName;
   String? get phone => _phone;
 
-  int get credits => _credits;
+  /// اعتبار خریداری‌شده (واقعی)
+  int get paidCredits => _credits;
+
+  /// سازگار با UI قدیمی: اگر اعتبار پولی صفر باشد ولی رایگان مانده، همان را نشان بده
+  int get credits =>
+      _credits > 0 ? _credits : (_remainingFree > 0 ? _remainingFree : 0);
+
   bool get isGolden => _isGolden;
   DateTime? get goldenExpiry => _goldenExpiry;
 
@@ -79,14 +84,12 @@ class AuthProvider with ChangeNotifier {
     return 'کاربر';
   }
 
-  /// طلایی یا اعتبار پولی یا سهمیه رایگان ماهانه
   bool get canDiagnose =>
       isAuthenticated && (isGoldenActive || _credits > 0 || _remainingFree > 0);
 
   Future<void> checkAuthStatus() async {
     _isLoading = true;
     notifyListeners();
-
     try {
       _token = await _storage.read(key: 'jwt_token');
       if (_token != null) {
@@ -109,7 +112,6 @@ class AuthProvider with ChangeNotifier {
     try {
       if (!Hive.isBoxOpen('user_profile')) return;
       final box = Hive.box('user_profile');
-
       _userId = box.get('userId') as String?;
       _userName = box.get('userName') as String?;
       _phone = box.get('phone') as String?;
@@ -126,12 +128,10 @@ class AuthProvider with ChangeNotifier {
           box.get('referralPercentage', defaultValue: 10) as int? ?? 10;
       _minWithdrawal =
           box.get('minWithdrawal', defaultValue: 50000) as int? ?? 50000;
-
       final expiryStr = box.get('goldenExpiry') as String?;
       if (expiryStr != null) {
         _goldenExpiry = DateTime.tryParse(expiryStr);
       }
-
       if (_credits > 0 || _isGolden || _referralCode != null || _remainingFree > 0) {
         _isProfileLoaded = true;
         notifyListeners();
@@ -149,7 +149,6 @@ class AuthProvider with ChangeNotifier {
       } else {
         box = await Hive.openBox('user_profile');
       }
-
       await box.putAll({
         if (_userId != null) 'userId': _userId,
         if (_userName != null) 'userName': _userName,
@@ -173,18 +172,14 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> fetchProfile({bool force = false}) async {
     if (_token == null) return;
-
     if (!force && _isFetchingProfile) return;
     if (!force && _profileLastFetched != null) {
       final elapsed = DateTime.now().difference(_profileLastFetched!);
       if (elapsed < _profileCacheDuration) return;
     }
-
     _isFetchingProfile = true;
-
     try {
       final response = await apiService.getProfile(_token!);
-
       if (response['success'] == true && response['data'] != null) {
         _updateProfileFromData(response['data'] as Map<String, dynamic>);
         _profileLastFetched = DateTime.now();
@@ -219,12 +214,10 @@ class AuthProvider with ChangeNotifier {
     _referralPercentage =
         (data['referralPercentage'] as num?)?.toInt() ?? _referralPercentage;
     _minWithdrawal = (data['minWithdrawal'] as num?)?.toInt() ?? _minWithdrawal;
-
     _remainingFree = (data['remainingFree'] as num?)?.toInt() ?? _remainingFree;
     _monthlyFreeLimit =
         (data['monthlyFreeLimit'] as num?)?.toInt() ?? _monthlyFreeLimit;
     _usedFree = (data['usedFree'] as num?)?.toInt() ?? _usedFree;
-
     final expiryStr =
         data['goldenExpiry']?.toString() ?? data['golden_expiry']?.toString();
     if (expiryStr != null) {
@@ -239,22 +232,17 @@ class AuthProvider with ChangeNotifier {
   Future<void> login(String phone, String code, {String? referralCode}) async {
     final res =
         await apiService.verifyOtp(phone, code, referralCode: referralCode);
-
     if (res['success'] == true) {
       _token = res['token'] as String?;
-
       if (_token == null) {
         throw Exception('توکن دریافت نشد. لطفاً دوباره تلاش کنید.');
       }
-
       await _storage.write(key: 'jwt_token', value: _token!);
-
       final user = res['user'];
       if (user is Map<String, dynamic>) {
         _phone = phone;
         _updateProfileFromData(user);
       }
-
       await fetchProfile(force: true);
       notifyListeners();
     } else {
@@ -321,10 +309,8 @@ class AuthProvider with ChangeNotifier {
     _isProfileLoaded = false;
     _profileLastFetched = null;
     _isFetchingProfile = false;
-
     await _storage.delete(key: 'jwt_token');
     await _clearLocalCache();
-
     notifyListeners();
   }
 
