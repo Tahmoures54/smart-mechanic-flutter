@@ -11,9 +11,6 @@ import '../models/chat_message.dart';
 import 'shop_screen.dart';
 import 'login_screen.dart';
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ChatScreen
-// ══════════════════════════════════════════════════════════════════════════════
 class ChatScreen extends StatefulWidget {
   final String carName;
   final String carId;
@@ -47,7 +44,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-
     _dotAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -141,9 +137,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (text.isEmpty || _isTyping) return;
 
     final auth = context.read<AuthProvider>();
-
-    final isGolden = auth.isGolden;
-    if (!isGolden && auth.credits <= 0) {
+    if (!auth.canDiagnose) {
       _showNoCreditDialog();
       return;
     }
@@ -156,11 +150,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   void _retryLast() {
     if (_messages.isEmpty) return;
-
     if (_messages.last.isError) {
       setState(() => _messages.removeLast());
     }
-
     final lastUser = _messages.lastWhere(
       (m) => m.isUser,
       orElse: () => ChatMessage(
@@ -168,7 +160,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         role: MessageRole.user,
       ),
     );
-
     _fetchDiagnosis(lastUser.text);
   }
 
@@ -190,11 +181,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('متن کپی شد ✅'),
+        content: const Text('متن کپی شد'),
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.green.shade700,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(12),
         duration: const Duration(seconds: 2),
       ),
@@ -203,7 +193,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   void _shareMessage(String text) {
     Share.share(
-      '🔧 نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
+      'نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
       subject: 'عیب‌یابی مکانیک هوشمند',
     );
   }
@@ -214,28 +204,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: theme.dialogBackgroundColor,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded,
-                color: Colors.orange.shade600, size: 28),
-            const SizedBox(width: 8),
-            Text(
-              'اعتبار ناکافی',
-              style: TextStyle(color: theme.textTheme.titleLarge?.color),
-            ),
-          ],
-        ),
-        content: Text(
-          'برای ادامه گفتگو، نیاز به تهیه اعتبار دارید.',
-          style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('اعتبار کافی نیست'),
+        content: const Text(
+          'برای ادامه گفتگو، بسته اعتبار یا اشتراک طلایی بگیرید.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('انصراف'),
+            child: const Text('بعداً'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -252,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 MaterialPageRoute(builder: (_) => const ShopScreen()),
               );
             },
-            child: const Text('تهیه اعتبار'),
+            child: const Text('مشاهده بسته‌ها'),
           ),
         ],
       ),
@@ -263,8 +240,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = context.watch<AuthProvider>();
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
@@ -272,9 +251,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             CircleAvatar(
               backgroundColor: theme.colorScheme.secondary,
               radius: 18,
-              child: const Icon(
+              child: Icon(
                 Icons.support_agent_rounded,
-                color: Colors.black87,
+                color: theme.colorScheme.onSecondary,
                 size: 20,
               ),
             ),
@@ -285,16 +264,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 children: [
                   const Text(
                     'مکانیک هوشمند',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     '${widget.carName} · ${widget.year}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: Colors.white70,
+                      color: theme.hintColor,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -305,89 +281,78 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: auth.isGolden
-                  ? const Text(
-                      '⭐ طلایی',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.amber,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : _buildCreditBadge(auth),
-            ),
+            padding: const EdgeInsets.only(left: 8, right: 4),
+            child: Center(child: _buildCreditBadge(auth, theme)),
           ),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
-            _buildCarInfoBanner(theme),
             Expanded(child: _buildMessageList(theme)),
             if (_isTyping) _buildTypingBanner(theme),
-            _buildInputArea(theme, auth),
+            _buildInputArea(theme, auth, bottomInset),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCreditBadge(AuthProvider auth) {
-    final hasCredit = auth.credits > 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: hasCredit
-            ? Colors.green.withAlpha(51)
-            : Colors.red.withAlpha(51),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasCredit ? Colors.green : Colors.red,
-          width: 1,
+  Widget _buildCreditBadge(AuthProvider auth, ThemeData theme) {
+    if (auth.isGoldenActive) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.amber.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.amber.withOpacity(0.5)),
         ),
-      ),
-      child: Text(
-        '${auth.credits} اعتبار',
-        style: TextStyle(
-          fontSize: 12,
-          color: hasCredit ? Colors.green : Colors.red,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCarInfoBanner(ThemeData theme) {
-    final sentCount = _messages.where((m) => m.isUser).length;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.colorScheme.primary.withAlpha(18),
-      child: Row(
-        children: [
-          Icon(
-            Icons.directions_car_rounded,
-            size: 16,
-            color: theme.colorScheme.secondary,
+        child: const Text(
+          'طلایی',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.amber,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              '${widget.carName} · ${widget.year}',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.secondary,
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+
+    final ok = auth.canDiagnose;
+    final label = auth.paidCredits > 0
+        ? '${auth.paidCredits} اعتبار'
+        : (auth.remainingFree > 0
+            ? '${auth.remainingFree} رایگان'
+            : 'بدون اعتبار');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ShopScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: ok
+                ? Colors.green.withOpacity(0.12)
+                : Colors.red.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: ok ? Colors.green : Colors.redAccent,
             ),
           ),
-          Text(
-            '$sentCount پیام ارسالی',
-            style: TextStyle(fontSize: 11, color: theme.hintColor),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: ok ? Colors.green : Colors.redAccent,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -395,24 +360,26 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Widget _buildTypingBanner(ThemeData theme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: theme.colorScheme.secondary.withAlpha(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: theme.colorScheme.secondary.withOpacity(0.08),
       child: Row(
         children: [
           SizedBox(
-            width: 16,
-            height: 16,
+            width: 14,
+            height: 14,
             child: CircularProgressIndicator(
               strokeWidth: 2,
               color: theme.colorScheme.secondary,
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            'مکانیک هوشمند در حال تحلیل مشکل شماست...',
-            style: TextStyle(
-              fontSize: 11,
-              color: theme.colorScheme.secondary,
+          Expanded(
+            child: Text(
+              'در حال تحلیل مشکل شما...',
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.colorScheme.secondary,
+              ),
             ),
           ),
         ],
@@ -421,18 +388,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMessageList(ThemeData theme) {
-    return ListView.builder(
-      controller: _scrollCtrl,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      itemCount: _messages.length + (_isTyping ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == _messages.length && _isTyping) {
-          return _buildTypingIndicator(theme);
-        }
-        final msg = _messages[index];
-        final isLast = index == _messages.length - 1;
-        return _buildMessageItem(msg, isLast, theme);
-      },
+    return GestureDetector(
+      onTap: () => _focusNode.unfocus(),
+      child: ListView.builder(
+        controller: _scrollCtrl,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        itemCount: _messages.length + (_isTyping ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _messages.length && _isTyping) {
+            return _buildTypingIndicator(theme);
+          }
+          final msg = _messages[index];
+          final isLast = index == _messages.length - 1;
+          return _buildMessageItem(msg, isLast, theme);
+        },
+      ),
     );
   }
 
@@ -440,26 +411,24 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     return TweenAnimationBuilder<double>(
       key: ValueKey(msg.id),
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 280),
       curve: Curves.easeOut,
       builder: (_, value, child) => Opacity(
         opacity: value.clamp(0.0, 1.0),
         child: Transform.translate(
-          offset: Offset(0, 16 * (1 - value)),
+          offset: Offset(0, 12 * (1 - value)),
           child: child,
         ),
       ),
       child: GestureDetector(
         onLongPress: () => _showMessageOptions(msg),
         child: Align(
-          alignment:
-              msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.85,
+              maxWidth: MediaQuery.sizeOf(context).width * 0.88,
             ),
             decoration: BoxDecoration(
               color: _bubbleColor(msg, theme),
@@ -469,37 +438,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 bottomLeft: Radius.circular(msg.isUser ? 18 : 4),
                 bottomRight: Radius.circular(msg.isUser ? 4 : 18),
               ),
-              border: Border.all(
-                color: _bubbleBorder(msg, theme),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: _bubbleBorder(msg, theme)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildMessageContent(msg, theme),
                 const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    msg.timeLabel,
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: theme.hintColor.withAlpha(153),
-                    ),
+                Text(
+                  msg.timeLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.hintColor.withOpacity(0.7),
                   ),
                 ),
                 if (msg.isError && isLast) ...[
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
+                    height: 40,
                     child: OutlinedButton.icon(
                       onPressed: _retryLast,
                       icon: const Icon(Icons.refresh_rounded, size: 16),
@@ -507,10 +464,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.redAccent,
                         side: const BorderSide(color: Colors.redAccent),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -532,21 +485,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         msg.text,
         style: TextStyle(
           fontSize: 14,
-          height: 1.6,
-          color: theme.brightness == Brightness.dark
-              ? Colors.white
-              : theme.colorScheme.primary,
+          height: 1.55,
+          color: theme.textTheme.bodyLarge?.color,
         ),
         textDirection: TextDirection.rtl,
       );
     }
-
     if (msg.isError) {
       return SelectableText(
-        '⚠️ ${msg.text}',
+        msg.text,
         style: const TextStyle(
           fontSize: 13,
-          height: 1.6,
+          height: 1.55,
           color: Colors.redAccent,
         ),
         textDirection: TextDirection.rtl,
@@ -559,69 +509,34 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       styleSheet: MarkdownStyleSheet(
         p: TextStyle(
           fontSize: 14,
-          height: 1.7,
+          height: 1.65,
           color: theme.textTheme.bodyLarge?.color,
         ),
         h1: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.secondary,
-          height: 2,
-        ),
-        h2: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.secondary,
-          height: 2,
-        ),
-        h3: TextStyle(
-          fontSize: 15,
+          fontSize: 17,
           fontWeight: FontWeight.bold,
           color: theme.colorScheme.secondary,
           height: 1.8,
+        ),
+        h2: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.secondary,
+          height: 1.7,
+        ),
+        h3: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.secondary,
+          height: 1.6,
         ),
         listBullet: TextStyle(
           color: theme.colorScheme.secondary,
           fontSize: 14,
         ),
-        code: TextStyle(
-          backgroundColor: theme.dividerColor.withAlpha(76),
-          color: theme.colorScheme.error,
-          fontFamily: 'monospace',
-          fontSize: 13,
-        ),
-        codeblockDecoration: BoxDecoration(
-          color: theme.dividerColor.withAlpha(40),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: theme.dividerColor),
-        ),
-        blockquote: TextStyle(
-          color: theme.textTheme.bodyMedium?.color?.withAlpha(178),
-          fontSize: 13,
-          fontStyle: FontStyle.italic,
-        ),
-        blockquoteDecoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(
-              color: theme.colorScheme.secondary,
-              width: 4,
-            ),
-          ),
-        ),
         strong: TextStyle(
           fontWeight: FontWeight.bold,
           color: theme.textTheme.bodyLarge?.color,
-        ),
-        em: TextStyle(
-          fontStyle: FontStyle.italic,
-          color: theme.textTheme.bodyLarge?.color,
-        ),
-        tableHead: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.secondary,
-        ),
-        tableBody: TextStyle(
-          color: theme.textTheme.bodyMedium?.color,
         ),
       ),
     );
@@ -630,7 +545,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _showMessageOptions(ChatMessage msg) {
     if (!mounted) return;
     final theme = Theme.of(context);
-
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -650,42 +564,23 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Text(
-                msg.text.length > 80
-                    ? '${msg.text.substring(0, 80)}...'
-                    : msg.text,
-                style: TextStyle(
-                  color: theme.hintColor,
-                  fontSize: 12,
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const Divider(),
             ListTile(
-              leading: Icon(Icons.copy_rounded,
-                  color: theme.colorScheme.primary),
+              leading: Icon(Icons.copy_rounded, color: theme.colorScheme.secondary),
               title: const Text('کپی متن'),
               onTap: () {
                 Navigator.pop(ctx);
                 _copyMessage(msg.text);
               },
             ),
-            if (msg.isAssistant) ...[
-              const Divider(height: 1, indent: 16, endIndent: 16),
+            if (msg.isAssistant)
               ListTile(
-                leading: Icon(Icons.share_rounded,
-                    color: theme.colorScheme.primary),
+                leading: Icon(Icons.share_rounded, color: theme.colorScheme.secondary),
                 title: const Text('اشتراک‌گذاری'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _shareMessage(msg.text);
                 },
               ),
-            ],
             const SizedBox(height: 8),
           ],
         ),
@@ -694,18 +589,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Color _bubbleColor(ChatMessage msg, ThemeData theme) {
-    if (msg.isError) return Colors.red.withAlpha(30);
+    if (msg.isError) return Colors.red.withOpacity(0.12);
     if (msg.isUser) {
-      return theme.brightness == Brightness.dark
-          ? theme.colorScheme.primary.withAlpha(60)
-          : theme.colorScheme.primary.withAlpha(25);
+      return theme.colorScheme.primary.withOpacity(
+        theme.brightness == Brightness.dark ? 0.22 : 0.1,
+      );
     }
     return theme.cardColor;
   }
 
   Color _bubbleBorder(ChatMessage msg, ThemeData theme) {
-    if (msg.isError) return Colors.redAccent.withAlpha(100);
-    if (msg.isUser) return theme.colorScheme.primary.withAlpha(80);
+    if (msg.isError) return Colors.redAccent.withOpacity(0.35);
+    if (msg.isUser) return theme.colorScheme.primary.withOpacity(0.3);
     return theme.dividerColor;
   }
 
@@ -713,9 +608,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: const BorderRadius.only(
@@ -725,13 +619,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             bottomLeft: Radius.circular(4),
           ),
           border: Border.all(color: theme.dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -741,20 +628,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 animation: _dotAnimCtrl,
                 builder: (_, __) {
                   final delay = i / 3.0;
-                  final rawT =
-                      (_dotAnimCtrl.value - delay + 1.0) % 1.0;
+                  final rawT = (_dotAnimCtrl.value - delay + 1.0) % 1.0;
                   final scale = 0.5 + 0.5 * sin(rawT * pi);
                   final opacity = (0.4 + 0.6 * scale).clamp(0.0, 1.0);
-
                   return Transform.scale(
-                    scale: scale.clamp(0.3, 1.0),
+                    scale: scale.clamp(0.35, 1.0),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
                         color: theme.colorScheme.secondary
-                            .withAlpha((opacity * 255).toInt()),
+                            .withOpacity(opacity),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -762,13 +647,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 },
               );
             }),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Text(
               'در حال تحلیل...',
-              style: TextStyle(
-                color: theme.hintColor,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: theme.hintColor, fontSize: 12),
             ),
           ],
         ),
@@ -776,109 +658,100 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildInputArea(ThemeData theme, AuthProvider auth) {
-    final canSend = !_isTyping && (auth.isGolden || auth.credits > 0);
+  Widget _buildInputArea(ThemeData theme, AuthProvider auth, double bottomInset) {
+    final canSend = !_isTyping && auth.canDiagnose;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(13),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _inputCtrl,
-              focusNode: _focusNode,
-              enabled: !_isTyping,
-              maxLines: 4,
-              minLines: 1,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendMessage(),
-              style: TextStyle(
-                color: theme.textTheme.bodyLarge?.color,
-                fontSize: 14,
-              ),
-              decoration: InputDecoration(
-                hintText: _isTyping
-                    ? 'لطفاً صبر کنید...'
-                    : 'سوال دیگری دارید؟',
-                hintStyle:
-                    TextStyle(color: theme.hintColor, fontSize: 13),
-                filled: true,
-                fillColor: theme.cardColor,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset > 0 ? 4 : 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _inputCtrl,
+                focusNode: _focusNode,
+                enabled: !_isTyping,
+                maxLines: 4,
+                minLines: 1,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) {
+                  if (canSend) _sendMessage();
+                },
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontSize: 14,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: theme.dividerColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.secondary,
-                    width: 1.5,
+                decoration: InputDecoration(
+                  hintText: _isTyping
+                      ? 'لطفاً صبر کنید...'
+                      : 'سوال دیگری دارید؟',
+                  hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
+                  filled: true,
+                  fillColor: theme.cardColor,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
-                ),
-                disabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(
-                    color: theme.dividerColor.withAlpha(100),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.secondary,
+                      width: 1.5,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: canSend
-                  ? theme.colorScheme.primary
-                  : theme.disabledColor,
-              shape: BoxShape.circle,
-              boxShadow: canSend
-                  ? [
-                      BoxShadow(
-                        color:
-                            theme.colorScheme.primary.withAlpha(76),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: Material(
+                color: canSend
+                    ? theme.colorScheme.secondary
+                    : theme.disabledColor.withOpacity(0.35),
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: canSend ? _sendMessage : null,
+                  child: Center(
+                    child: _isTyping
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.onSecondary,
+                            ),
+                          )
+                        : Icon(
+                            Icons.send_rounded,
+                            color: canSend
+                                ? theme.colorScheme.onSecondary
+                                : theme.hintColor,
+                          ),
+                  ),
+                ),
+              ),
             ),
-            child: IconButton(
-              icon: _isTyping
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white.withAlpha(200),
-                      ),
-                    )
-                  : const Icon(Icons.send_rounded, color: Colors.white),
-              onPressed: canSend ? _sendMessage : null,
-              tooltip: canSend ? 'ارسال' : 'صبر کنید...',
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
