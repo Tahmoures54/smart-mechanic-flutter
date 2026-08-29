@@ -225,10 +225,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final auth = context.watch<AuthProvider>();
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.secondary;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
+        resizeToAvoidBottomInset: true,
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
           title: const Text(
@@ -273,16 +275,18 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              24 + (keyboard > 0 ? keyboard * 0.15 : 0),
+            ),
             children: [
               _StatusBanner(auth: auth),
               const SizedBox(height: 20),
 
-              // ── مرحله ۱ ──
-              _SectionLabel(
-                number: '۱',
-                title: 'خودرو را انتخاب کنید',
-              ),
+              _SectionLabel(number: '۱', title: 'خودرو را انتخاب کنید'),
               const SizedBox(height: 10),
               _CarCard(
                 isCustom: _isCustomCar,
@@ -305,7 +309,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 }),
               ),
 
-              // مشکلات شایع
               if (!_isCustomCar &&
                   _selectedCar != null &&
                   _selectedCar!.commonIssues
@@ -322,17 +325,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 22),
 
-              // ── مرحله ۲ ──
-              _SectionLabel(
-                number: '۲',
-                title: 'مشکل را بنویسید',
-              ),
+              _SectionLabel(number: '۲', title: 'مشکل را بنویسید'),
               const SizedBox(height: 10),
               TextField(
                 controller: _descController,
                 maxLines: 4,
                 maxLength: 300,
                 textInputAction: TextInputAction.done,
+                onEditingComplete: () =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
                 style: const TextStyle(height: 1.5),
                 decoration: InputDecoration(
                   hintText:
@@ -345,7 +346,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   filled: true,
                   fillColor: theme.cardColor,
                   contentPadding: const EdgeInsets.all(16),
-                  counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
+                  counterStyle:
+                      TextStyle(color: theme.hintColor, fontSize: 11),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -363,11 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 22),
 
-              // ── مرحله ۳ ──
-              _SectionLabel(
-                number: '۳',
-                title: 'ارسال برای عیب‌یابی',
-              ),
+              _SectionLabel(number: '۳', title: 'ارسال برای عیب‌یابی'),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -405,7 +403,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: secondary.withOpacity(0.5), width: 1.5),
+                    side: BorderSide(
+                      color: secondary.withOpacity(0.5),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -429,10 +430,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════
-// ویجت‌های کمکی صفحه اصلی
-// ═══════════════════════════════════════════════════════════
 
 class _SectionLabel extends StatelessWidget {
   final String number;
@@ -523,12 +520,16 @@ class _StatusBanner extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: secondary,
                 foregroundColor: theme.colorScheme.onSecondary,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('ورود', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text(
+                'ورود',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -710,8 +711,13 @@ class _CarCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
               ),
               child: Text(
-                isCustom ? '← بازگشت به لیست خودروها' : 'خودروی من در لیست نیست',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                isCustom
+                    ? '← بازگشت به لیست خودروها'
+                    : 'خودروی من در لیست نیست',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -747,7 +753,8 @@ class _CommonIssueChips extends StatelessWidget {
           runSpacing: 8,
           children: issues.take(6).map((issue) {
             return ActionChip(
-              label: Text(issue, style: TextStyle(fontSize: 12, color: secondary)),
+              label:
+                  Text(issue, style: TextStyle(fontSize: 12, color: secondary)),
               backgroundColor: secondary.withOpacity(0.1),
               side: BorderSide(color: secondary.withOpacity(0.25)),
               onPressed: () => onPick(issue),
