@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,14 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // بارگذاری متغیرهای محیطی از .env (قبل از هر استفاده از Constants)
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('[dotenv] فایل .env یافت نشد یا خطا در بارگذاری: $e');
+    debugPrint('[dotenv] از مقادیر پیش‌فرض constants استفاده می‌شود.');
+  }
 
   _setupErrorWidget();
   Constants.printInfo();

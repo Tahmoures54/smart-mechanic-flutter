@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ── محیط اجرا ──
@@ -35,28 +36,48 @@ class EnvironmentConfig {
     this.enableCrashReporting = true,
   });
 
-  // ── تعریف هر محیط ──
-  static const development = EnvironmentConfig(
-    environment: AppEnvironment.development,
-    // اگر لوکال هاست دارید میتوانید اینجا قرار دهید: 'http://10.0.2.2:3000/api'
-    baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
-    enableLogging: true,
-    enableCrashReporting: false,
-  );
+  /// مقدار پیش‌فرض اگر .env لود نشده باشد
+  static const String _defaultBaseUrl =
+      'https://smart-mec-backend-zeta.vercel.app/api';
 
-  static const staging = EnvironmentConfig(
-    environment: AppEnvironment.staging,
-    baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
-    enableLogging: true,
-    enableCrashReporting: true,
-  );
+  static String get _baseUrlFromEnv {
+    try {
+      final v = dotenv.env['API_BASE_URL']?.trim();
+      if (v != null && v.isNotEmpty) return v.replaceAll(RegExp(r'/+$'), '');
+    } catch (_) {}
+    return _defaultBaseUrl;
+  }
 
-  static const production = EnvironmentConfig(
-    environment: AppEnvironment.production,
-    baseUrl: 'https://smart-mec-backend-zeta.vercel.app/api',
-    enableLogging: false,
-    enableCrashReporting: true,
-  );
+  static bool get _loggingFromEnv {
+    try {
+      final v = dotenv.env['ENABLE_API_LOGGING']?.trim().toLowerCase();
+      if (v == 'true' || v == '1') return true;
+      if (v == 'false' || v == '0') return false;
+    } catch (_) {}
+    return kDebugMode;
+  }
+
+  // ── تعریف هر محیط (baseUrl از .env خوانده می‌شود) ──
+  static EnvironmentConfig get development => EnvironmentConfig(
+        environment: AppEnvironment.development,
+        baseUrl: _baseUrlFromEnv,
+        enableLogging: true,
+        enableCrashReporting: false,
+      );
+
+  static EnvironmentConfig get staging => EnvironmentConfig(
+        environment: AppEnvironment.staging,
+        baseUrl: _baseUrlFromEnv,
+        enableLogging: true,
+        enableCrashReporting: true,
+      );
+
+  static EnvironmentConfig get production => EnvironmentConfig(
+        environment: AppEnvironment.production,
+        baseUrl: _baseUrlFromEnv,
+        enableLogging: _loggingFromEnv,
+        enableCrashReporting: true,
+      );
 
   // ── انتخاب خودکار بر اساس build mode ──
   static EnvironmentConfig get current {
@@ -73,10 +94,16 @@ class Constants {
   Constants._();
 
   // ── محیط فعال ──
-  static final EnvironmentConfig env = EnvironmentConfig.current;
+  static EnvironmentConfig get env => EnvironmentConfig.current;
 
   // ── نسخه API ──
-  static const String _apiVersion = 'v1';
+  static String get _apiVersion {
+    try {
+      final v = dotenv.env['API_VERSION']?.trim();
+      if (v != null && v.isNotEmpty) return v;
+    } catch (_) {}
+    return 'v1';
+  }
 
   // ── آدرس پایه با version ──
   static String get baseUrl => env.baseUrl;
@@ -86,19 +113,18 @@ class Constants {
   // ─────────────────────────────────────────
   // ─ـ Endpoints: Account ──
   // ─────────────────────────────────────────
-  // ✅ استفاده از apiUrl به جای baseUrl برای هماهنگی با نسخه API
   static String get account => '$apiUrl/account';
-  static String get sendOtp => '$apiUrl/account';          // POST {action: send}
-  static String get verifyOtp => '$apiUrl/account';         // POST {action: verify}
-  static String get credits => '$apiUrl/account/credits';   // GET
-  static String get profile => '$apiUrl/account/credits';   // alias
+  static String get sendOtp => '$apiUrl/account'; // POST {action: send}
+  static String get verifyOtp => '$apiUrl/account'; // POST {action: verify}
+  static String get credits => '$apiUrl/account/credits'; // GET
+  static String get profile => '$apiUrl/account/credits'; // alias
   static String get withdraw => '$apiUrl/account/withdraw'; // POST
 
   // ─────────────────────────────────────────
   // ─ـ Endpoints: Diagnose ──
   // ─────────────────────────────────────────
   static String get diagnose => '$apiUrl/diagnose';
-  static String get diagnoseHistory => '$apiUrl/diagnose';  // GET ?history=true
+  static String get diagnoseHistory => '$apiUrl/diagnose'; // GET ?history=true
   static String get diagnoseAudio => '$apiUrl/diagnose/audio'; // POST multipart
   static String deleteDiagnose(String id) => '$apiUrl/diagnose/$id'; // DELETE
 
@@ -112,7 +138,6 @@ class Constants {
   // ─ـ Endpoints: Static ──
   // ─────────────────────────────────────────
   static String get carsJson {
-    // ✅ استفاده از Uri برای حذف ایمن مسیر /api (جلوگیری از باگ در دامنه‌هایی که کلمه api دارند)
     final uri = Uri.parse(baseUrl);
     return uri.replace(path: '/cars.json').toString();
   }
@@ -178,7 +203,7 @@ class Constants {
   static const bool featureGarageMap = true;
   static const bool featureReferral = true;
   static const bool featureWithdraw = true;
-  static const bool featureObdDiagnosis = false;  // هنوز آماده نیست
+  static const bool featureObdDiagnosis = false; // هنوز آماده نیست
 
   // ─────────────────────────────────────────
   // ─ـ Rate Limiting ──

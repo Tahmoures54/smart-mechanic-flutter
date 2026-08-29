@@ -25,6 +25,9 @@ dependencies:
   # Networking
   http: ^1.2.2
 
+  # Env config
+  flutter_dotenv: ^5.2.1
+
   # Audio & Speech
   flutter_sound: ^9.11.2
   speech_to_text: ^7.0.0
@@ -63,6 +66,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/branding/
+    - .env
 
 flutter_launcher_icons:
   android: true
