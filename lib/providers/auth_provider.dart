@@ -4,7 +4,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../services/api_service.dart';
 
 class AuthProvider with ChangeNotifier {
-  // ── وابستگی‌ها ──
   final FlutterSecureStorage _storage;
   final ApiService apiService;
 
@@ -13,36 +12,33 @@ class AuthProvider with ChangeNotifier {
     FlutterSecureStorage? storage,
   }) : _storage = storage ?? const FlutterSecureStorage();
 
-  // ── وضعیت احراز هویت ──
   String? _token;
   bool _isLoading = true;
   bool _isProfileLoaded = false;
 
-  // ── داده‌های کاربر ──
   String? _userId;
   String? _userName;
   String? _phone;
 
-  // ── اعتبار و اشتراک ──
   int _credits = 0;
   bool _isGolden = false;
   DateTime? _goldenExpiry;
 
-  // ── سیستم معرفی ──
+  /// سهمیه رایگان ماهانه (از سرور)
+  int _remainingFree = 2;
+  int _monthlyFreeLimit = 2;
+  int _usedFree = 0;
+
   String? _referralCode;
   int _earnings = 0;
   int _referredCount = 0;
   int _referralPercentage = 10;
   int _minWithdrawal = 50000;
 
-  // ── throttle برای fetchProfile ──
   DateTime? _profileLastFetched;
   static const _profileCacheDuration = Duration(seconds: 30);
   bool _isFetchingProfile = false;
 
-  // ─────────────────────────────────────────
-  // ── Getters ──
-  // ─────────────────────────────────────────
   bool get isAuthenticated => _token != null;
   bool get isLoading => _isLoading;
   bool get isProfileLoaded => _isProfileLoaded;
@@ -55,6 +51,10 @@ class AuthProvider with ChangeNotifier {
   int get credits => _credits;
   bool get isGolden => _isGolden;
   DateTime? get goldenExpiry => _goldenExpiry;
+
+  int get remainingFree => _remainingFree;
+  int get monthlyFreeLimit => _monthlyFreeLimit;
+  int get usedFree => _usedFree;
 
   String? get referralCode => _referralCode;
   int get earnings => _earnings;
@@ -79,11 +79,10 @@ class AuthProvider with ChangeNotifier {
     return 'کاربر';
   }
 
-  bool get canDiagnose => isAuthenticated && (isGoldenActive || _credits > 0);
+  /// طلایی یا اعتبار پولی یا سهمیه رایگان ماهانه
+  bool get canDiagnose =>
+      isAuthenticated && (isGoldenActive || _credits > 0 || _remainingFree > 0);
 
-  // ─────────────────────────────────────────
-  // ── بررسی وضعیت اولیه ──
-  // ─────────────────────────────────────────
   Future<void> checkAuthStatus() async {
     _isLoading = true;
     notifyListeners();
@@ -106,9 +105,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── بارگذاری cache محلی ──
-  // ─────────────────────────────────────────
   Future<void> _loadCachedProfile() async {
     try {
       if (!Hive.isBoxOpen('user_profile')) return;
@@ -119,18 +115,24 @@ class AuthProvider with ChangeNotifier {
       _phone = box.get('phone') as String?;
       _credits = box.get('credits', defaultValue: 0) as int? ?? 0;
       _isGolden = box.get('isGolden', defaultValue: false) as bool? ?? false;
+      _remainingFree = box.get('remainingFree', defaultValue: 2) as int? ?? 2;
+      _monthlyFreeLimit =
+          box.get('monthlyFreeLimit', defaultValue: 2) as int? ?? 2;
+      _usedFree = box.get('usedFree', defaultValue: 0) as int? ?? 0;
       _referralCode = box.get('referralCode') as String?;
       _earnings = box.get('earnings', defaultValue: 0) as int? ?? 0;
       _referredCount = box.get('referredCount', defaultValue: 0) as int? ?? 0;
-      _referralPercentage = box.get('referralPercentage', defaultValue: 10) as int? ?? 10;
-      _minWithdrawal = box.get('minWithdrawal', defaultValue: 50000) as int? ?? 50000;
+      _referralPercentage =
+          box.get('referralPercentage', defaultValue: 10) as int? ?? 10;
+      _minWithdrawal =
+          box.get('minWithdrawal', defaultValue: 50000) as int? ?? 50000;
 
       final expiryStr = box.get('goldenExpiry') as String?;
       if (expiryStr != null) {
         _goldenExpiry = DateTime.tryParse(expiryStr);
       }
 
-      if (_credits > 0 || _isGolden || _referralCode != null) {
+      if (_credits > 0 || _isGolden || _referralCode != null || _remainingFree > 0) {
         _isProfileLoaded = true;
         notifyListeners();
       }
@@ -139,9 +141,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── ذخیره در cache محلی ──
-  // ─────────────────────────────────────────
   Future<void> _saveCachedProfile() async {
     try {
       late final Box box;
@@ -157,6 +156,9 @@ class AuthProvider with ChangeNotifier {
         if (_phone != null) 'phone': _phone,
         'credits': _credits,
         'isGolden': _isGolden,
+        'remainingFree': _remainingFree,
+        'monthlyFreeLimit': _monthlyFreeLimit,
+        'usedFree': _usedFree,
         if (_referralCode != null) 'referralCode': _referralCode,
         'earnings': _earnings,
         'referredCount': _referredCount,
@@ -169,9 +171,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── دریافت پروفایل ──
-  // ─────────────────────────────────────────
   Future<void> fetchProfile({bool force = false}) async {
     if (_token == null) return;
 
@@ -206,36 +205,40 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── آپدیت فیلدها از response ──
-  // ─────────────────────────────────────────
   void _updateProfileFromData(Map<String, dynamic> data) {
     _userId = data['id']?.toString() ?? data['userId']?.toString() ?? _userId;
-    _userName = data['name']?.toString() ?? data['userName']?.toString() ?? data['username']?.toString();
+    _userName = data['name']?.toString() ??
+        data['userName']?.toString() ??
+        data['username']?.toString();
     _phone = data['phone']?.toString() ?? _phone;
     _credits = (data['credits'] as num?)?.toInt() ?? _credits;
     _isGolden = data['isGolden'] == true || data['is_golden'] == true;
     _referralCode = data['referralCode']?.toString() ?? _referralCode;
     _earnings = (data['earnings'] as num?)?.toInt() ?? _earnings;
     _referredCount = (data['referredCount'] as num?)?.toInt() ?? _referredCount;
-    _referralPercentage = (data['referralPercentage'] as num?)?.toInt() ?? _referralPercentage;
+    _referralPercentage =
+        (data['referralPercentage'] as num?)?.toInt() ?? _referralPercentage;
     _minWithdrawal = (data['minWithdrawal'] as num?)?.toInt() ?? _minWithdrawal;
 
-    final expiryStr = data['goldenExpiry']?.toString() ?? data['golden_expiry']?.toString();
+    _remainingFree = (data['remainingFree'] as num?)?.toInt() ?? _remainingFree;
+    _monthlyFreeLimit =
+        (data['monthlyFreeLimit'] as num?)?.toInt() ?? _monthlyFreeLimit;
+    _usedFree = (data['usedFree'] as num?)?.toInt() ?? _usedFree;
+
+    final expiryStr =
+        data['goldenExpiry']?.toString() ?? data['golden_expiry']?.toString();
     if (expiryStr != null) {
       _goldenExpiry = DateTime.tryParse(expiryStr);
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── ارسال OTP و ورود ──
-  // ─────────────────────────────────────────
   Future<void> sendOtp(String phone) async {
     await apiService.sendOtp(phone);
   }
 
   Future<void> login(String phone, String code, {String? referralCode}) async {
-    final res = await apiService.verifyOtp(phone, code, referralCode: referralCode);
+    final res =
+        await apiService.verifyOtp(phone, code, referralCode: referralCode);
 
     if (res['success'] == true) {
       _token = res['token'] as String?;
@@ -259,9 +262,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── آپدیت اعتبار محلی ──
-  // ─────────────────────────────────────────
   void updateCredits(int newCredits) {
     _credits = newCredits;
     notifyListeners();
@@ -277,9 +277,22 @@ class AuthProvider with ChangeNotifier {
   void consumeCredit() {
     if (_credits > 0) {
       _credits--;
-      notifyListeners();
-      _saveCachedProfile();
+    } else if (_remainingFree > 0) {
+      _remainingFree--;
+      _usedFree++;
     }
+    notifyListeners();
+    _saveCachedProfile();
+  }
+
+  void applyDiagnoseQuota({
+    int? remainingCredits,
+    int? remainingFreeQuestions,
+  }) {
+    if (remainingCredits != null) _credits = remainingCredits;
+    if (remainingFreeQuestions != null) _remainingFree = remainingFreeQuestions;
+    notifyListeners();
+    _saveCachedProfile();
   }
 
   void activateGolden({DateTime? expiry}) {
@@ -289,9 +302,6 @@ class AuthProvider with ChangeNotifier {
     _saveCachedProfile();
   }
 
-  // ─────────────────────────────────────────
-  // ── خروج ──
-  // ─────────────────────────────────────────
   Future<void> logout() async {
     _token = null;
     _userId = null;
@@ -300,6 +310,9 @@ class AuthProvider with ChangeNotifier {
     _credits = 0;
     _isGolden = false;
     _goldenExpiry = null;
+    _remainingFree = 2;
+    _monthlyFreeLimit = 2;
+    _usedFree = 0;
     _referralCode = null;
     _earnings = 0;
     _referredCount = 0;
@@ -321,10 +334,8 @@ class AuthProvider with ChangeNotifier {
       try {
         if (Hive.isBoxOpen(name)) {
           await Hive.box(name).clear();
-          // ✅ اصلاح شد: بستن باکس با متد close روی خود شیء
           await Hive.box(name).close();
         } else {
-          // اگر بسته بود، باز و پاک می‌کنیم تا داده‌های stale پاک شوند
           final box = await Hive.openBox(name);
           await box.clear();
           await box.close();
@@ -335,9 +346,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ─────────────────────────────────────────
-  // ── اطمینان از اعتبار token ──
-  // ─────────────────────────────────────────
   Future<bool> validateToken() async {
     if (_token == null) return false;
     try {
