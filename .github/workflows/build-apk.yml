@@ -42,11 +42,19 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Ensure .env for assets
+        run: |
+          if [ ! -f .env ]; then
+            cp .env.example .env || true
+            echo 'API_BASE_URL=https://smart-mec-backend-zeta.vercel.app/api' > .env
+            echo 'API_VERSION=v1' >> .env
+          fi
+
       - name: Flutter pub get
         run: flutter pub get
 
       - name: Clean previous builds
-        run: flutter clean
+        run: flutter clean && flutter pub get
 
       - name: Ensure Gradle wrapper
         run: |
@@ -62,7 +70,6 @@ jobs:
         run: |
           rm -rf android/app/src/main/res/mipmap-*
           dart run flutter_launcher_icons
-          echo "=== launcher resources ==="
           find android/app/src/main/res -name 'ic_launcher*' | sort
           test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
 
@@ -112,20 +119,23 @@ jobs:
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses >/dev/null 2>&1 || true
 
-      - name: Build APK (Universal)
+      - name: Build APK (split per ABI)
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
 
       - name: Build App Bundle
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'appbundle' }}
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
 
-      - name: Upload APK
+      - name: Upload APKs
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
           if-no-files-found: error
           retention-days: 30
 
