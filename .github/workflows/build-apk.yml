@@ -68,10 +68,28 @@ jobs:
 
       - name: Generate launcher icons
         run: |
-          rm -rf android/app/src/main/res/mipmap-*
+          # Do not wipe mipmap-* first. flutter_launcher_icons adaptive mode
+          # emits ic_launcher (+ anydpi XML) but not ic_launcher_round, and
+          # AndroidManifest still references @mipmap/ic_launcher_round.
           dart run flutter_launcher_icons
+          python3 - <<'PY'
+          from pathlib import Path
+          res = Path("android/app/src/main/res")
+          copied = 0
+          for folder in sorted(res.glob("mipmap-*")):
+              for name in ("ic_launcher.png", "ic_launcher.xml"):
+                  src = folder / name
+                  dst = folder / name.replace("ic_launcher", "ic_launcher_round", 1)
+                  if src.exists() and not dst.exists():
+                      dst.write_bytes(src.read_bytes())
+                      copied += 1
+                      print(f"copied {src} -> {dst}")
+          print(f"round-icon fallbacks created: {copied}")
+          PY
           find android/app/src/main/res -name 'ic_launcher*' | sort
           test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
       - name: Inject Google Maps API Key
         env:
