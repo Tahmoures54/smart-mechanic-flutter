@@ -159,7 +159,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: _isSearching
             ? TextField(

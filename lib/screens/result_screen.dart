@@ -126,7 +126,7 @@ class _ResultScreenState extends State<ResultScreen>
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('نتیجه عیب‌یابی'),
         centerTitle: true,

@@ -201,7 +201,7 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
       margin: EdgeInsets.only(top: topPad),
       padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: theme.canvasColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(

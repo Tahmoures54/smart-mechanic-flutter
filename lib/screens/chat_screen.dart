@@ -661,7 +661,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
+          color: theme.canvasColor,
           border: Border(top: BorderSide(color: theme.dividerColor)),
         ),
         child: Row(

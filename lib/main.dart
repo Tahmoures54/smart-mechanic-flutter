@@ -20,6 +20,7 @@ import 'screens/notification_settings_screen.dart';
 import 'theme/app_theme.dart';
 import 'theme/brand.dart';
 import 'widgets/brand_logo.dart';
+import 'widgets/mechanic_backdrop.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -177,7 +178,9 @@ class SmartMechanicApp extends StatelessWidget {
           statusBarColor: Colors.transparent,
           statusBarIconBrightness:
               brightness == Brightness.dark ? Brightness.light : Brightness.dark,
-          systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
+          systemNavigationBarColor: brightness == Brightness.dark
+              ? BrandColors.darkBackground
+              : BrandColors.lightBackground,
           systemNavigationBarIconBrightness:
               brightness == Brightness.dark ? Brightness.light : Brightness.dark,
         );
@@ -185,7 +188,13 @@ class SmartMechanicApp extends StatelessWidget {
           value: overlay,
           child: Directionality(
             textDirection: localeProvider.textDirection,
-            child: child ?? const SizedBox.shrink(),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const MechanicBackdrop(),
+                child ?? const SizedBox.shrink(),
+              ],
+            ),
           ),
         );
       },
@@ -248,7 +257,7 @@ class _SplashScreenState extends State<_SplashScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnim,

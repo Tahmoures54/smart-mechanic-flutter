@@ -21,23 +21,26 @@ class BrandAssets {
   static const String banner = 'assets/branding/banner.png';
 }
 
-/// پالت استخراج‌شده از لوگوی رسمی (چرخ‌دنده + قفل طلایی)
+/// پالت کارگاه مکانیکی — نارنجی ابزار، زنگ فلز، نور لامپ سقفی
 class BrandColors {
   BrandColors._();
 
-  static const Color gold = Color(0xFFE4BA56);
-  static const Color goldLight = Color(0xFFF5DFB0);
-  static const Color goldDark = Color(0xFFD6A330);
-  static const Color orange = Color(0xFFFF9800);
+  static const Color gold = Color(0xFFFFB300);
+  static const Color goldLight = Color(0xFFFFE082);
+  static const Color goldDark = Color(0xFFFF8F00);
+  static const Color orange = Color(0xFFFF7A1A);
+  static const Color orangeDeep = Color(0xFFE65100);
+  static const Color orangeLight = Color(0xFFFFCC80);
+  static const Color rust = Color(0xFFBF360C);
 
-  static const Color darkBackground = Color(0xFF0D0D12);
-  static const Color darkSurface = Color(0xFF1A1A24);
-  static const Color lightBackground = Color(0xFFF5F5FA);
+  static const Color darkBackground = Color(0xFF140C08);
+  static const Color darkSurface = Color(0xFF241610);
+  static const Color lightBackground = Color(0xFFFFF3E6);
 
   static const Color textOnDark = Colors.white;
-  static const Color textOnLight = Color(0xFF1C1E21);
-  static const Color textSecondaryOnDark = Color(0xFFB0B0C0);
-  static const Color textSecondaryOnLight = Color(0xFF5A6472);
+  static const Color textOnLight = Color(0xFF2A140A);
+  static const Color textSecondaryOnDark = Color(0xFFE0C8B0);
+  static const Color textSecondaryOnLight = Color(0xFF6D4C3D);
 
   static const Color success = Color(0xFF4CAF50);
   static const Color error = Color(0xFFE53935);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 
 import 'brand.dart';
 
@@ -35,8 +36,7 @@ class AppTheme {
     scaffold: BrandColors.darkBackground,
     surface: BrandColors.darkSurface,
     onSurface: BrandColors.textOnDark,
-    divider: const Color(0xFF2A2A36),
-    appBarBg: BrandColors.darkBackground,
+    divider: const Color(0xFF3D2A1C),
     inputFill: BrandColors.darkSurface,
   );
 
@@ -45,8 +45,7 @@ class AppTheme {
     scaffold: BrandColors.lightBackground,
     surface: Colors.white,
     onSurface: BrandColors.textOnLight,
-    divider: const Color(0xFFE0E0E0),
-    appBarBg: Colors.white,
+    divider: const Color(0xFFE8D5C4),
     inputFill: Colors.white,
   );
 
@@ -56,7 +55,6 @@ class AppTheme {
     required Color surface,
     required Color onSurface,
     required Color divider,
-    required Color appBarBg,
     required Color inputFill,
   }) {
     final isDark = brightness == Brightness.dark;
@@ -66,23 +64,26 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
-      scaffoldBackgroundColor: scaffold,
+      scaffoldBackgroundColor: Colors.transparent,
+      canvasColor: scaffold,
       colorScheme: isDark
           ? const ColorScheme.dark(
               primary: BrandColors.orange,
               onPrimary: Colors.black,
-              secondary: BrandColors.gold,
+              secondary: BrandColors.orange,
               onSecondary: Colors.black,
+              tertiary: BrandColors.gold,
               surface: BrandColors.darkSurface,
               onSurface: BrandColors.textOnDark,
               error: BrandColors.error,
               onError: Colors.white,
             )
           : const ColorScheme.light(
-              primary: BrandColors.orange,
+              primary: BrandColors.orangeDeep,
               onPrimary: Colors.white,
-              secondary: BrandColors.gold,
-              onSecondary: Colors.black,
+              secondary: BrandColors.orangeDeep,
+              onSecondary: Colors.white,
+              tertiary: BrandColors.gold,
               surface: Colors.white,
               onSurface: BrandColors.textOnLight,
               error: BrandColors.error,
@@ -95,10 +96,15 @@ class AppTheme {
         displayColor: onSurface,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: appBarBg,
+        backgroundColor: Colors.transparent,
         foregroundColor: onSurface,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       cardTheme: CardTheme(
         color: surface,
@@ -127,12 +133,12 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: radius,
-          borderSide: const BorderSide(color: BrandColors.gold, width: 2),
+          borderSide: const BorderSide(color: BrandColors.orange, width: 2),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: BrandColors.gold,
+          backgroundColor: BrandColors.orange,
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -142,7 +148,7 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: BrandColors.gold,
+          backgroundColor: BrandColors.orange,
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -152,7 +158,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: onSurface,
-          side: BorderSide(color: BrandColors.gold.withOpacity(0.5), width: 1.5),
+          side: BorderSide(color: BrandColors.orange.withOpacity(0.55), width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -163,7 +169,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: BrandColors.gold,
+        color: BrandColors.orange,
       ),
     );
   }

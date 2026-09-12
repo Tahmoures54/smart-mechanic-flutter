@@ -245,7 +245,7 @@ class _ShopScreenState extends State<ShopScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('اعتبار و اشتراک'),
         centerTitle: true,
@@ -478,7 +478,7 @@ class _ShopScreenState extends State<ShopScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
+              color: theme.canvasColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.dividerColor),
             ),
@@ -600,7 +600,7 @@ class _ShopScreenState extends State<ShopScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: theme.canvasColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: theme.dividerColor),
       ),

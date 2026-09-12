@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../legal/terms_of_use.dart';
 import '../theme/brand.dart';
 import '../widgets/brand_logo.dart';
 import 'home_screen.dart';
+import 'terms_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -231,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen>
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       appBar: _loginSuccess
           ? null
           : AppBar(
@@ -305,7 +307,7 @@ class _LoginScreenState extends State<LoginScreen>
         return Opacity(
           opacity: t,
           child: Container(
-            color: theme.scaffoldBackgroundColor.withOpacity(0.92 * t),
+            color: theme.canvasColor.withOpacity(0.92 * t),
             alignment: Alignment.center,
             child: Transform.scale(
               scale: 0.7 + (0.3 * t),
@@ -551,7 +553,9 @@ class _LoginScreenState extends State<LoginScreen>
           icon: Icons.send_rounded,
           onPressed: _sendOtp,
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 20),
+        const _LoginLegalNote(),
+        const SizedBox(height: 12),
         _buildInfoRow(
           theme,
           icon: Icons.lock_outline_rounded,
@@ -651,7 +655,9 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 16),
         _buildResendRow(theme),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
+        const _LoginLegalNote(),
+        const SizedBox(height: 12),
         _buildInfoRow(
           theme,
           icon: Icons.info_outline_rounded,
@@ -768,6 +774,80 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LoginLegalNote extends StatelessWidget {
+  const _LoginLegalNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final orange = theme.colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.cardColor.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: orange.withOpacity(0.28)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.handyman_rounded, color: orange, size: 22),
+          const SizedBox(height: 8),
+          Text(
+            TermsOfUse.analysisDisclaimer,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.55,
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text.rich(
+            TextSpan(
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.5,
+                color: theme.hintColor,
+              ),
+              children: [
+                const TextSpan(text: 'با ورود، '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TermsScreen(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'قوانین استفاده',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: orange,
+                        decoration: TextDecoration.underline,
+                        decorationColor: orange,
+                      ),
+                    ),
+                  ),
+                ),
+                const TextSpan(text: ' را می‌پذیرید.'),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

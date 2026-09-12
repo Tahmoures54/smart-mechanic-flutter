@@ -17,6 +17,7 @@ import 'history_screen.dart';
 import 'login_screen.dart';
 import 'record_screen.dart';
 import 'shop_screen.dart';
+import 'terms_screen.dart';
 
 /// صفحه اصلی — مسیر ساده: خودرو → شرح مشکل → ارسال
 class HomeScreen extends StatefulWidget {
@@ -281,12 +282,21 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const BrandAppBarTitle(),
           centerTitle: true,
           elevation: 0,
+          backgroundColor: Colors.transparent,
           actions: [
+            IconButton(
+              tooltip: 'قوانین استفاده',
+              icon: const Icon(Icons.gavel_rounded),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TermsScreen()),
+              ),
+            ),
             if (auth.isAuthenticated)
               IconButton(
                 tooltip: 'تاریخچه',
@@ -418,18 +428,9 @@ class _HomeScreenState extends State<HomeScreen> {
               _DiagnoseCtaButton(onPressed: _diagnose),
               const SizedBox(height: 12),
               _AudioCtaButton(onPressed: _recordAudio),
-              const SizedBox(height: 10),
-              Text(
-                'تحلیل فقط راهنماست و جای بازدید حضوری مکانیک را نمی‌گیرد.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.hintColor,
-                  height: 1.4,
-                ),
-              ),
-
-              const SizedBox(height: 28),
+              const SizedBox(height: 18),
+              const _MechanicAllyCard(),
+              const SizedBox(height: 22),
 
               // توضیحات و متقاعدسازی — بعد از مسیر عیب‌یابی
               const _WhyItWorksSection(),
@@ -579,6 +580,79 @@ class _AudioCtaButton extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// پیام به مکانیک‌ها — شریک، نه رقیب
+// ─────────────────────────────────────────────────────────────────────────────
+class _MechanicAllyCard extends StatelessWidget {
+  const _MechanicAllyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final orange = theme.colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            orange.withOpacity(0.32),
+            theme.cardColor.withOpacity(0.92),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: orange.withOpacity(0.45), width: 1.4),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: orange.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.handshake_rounded, color: orange, size: 28),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'مکانیک هستی؟',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'مکانیک هوشمند آمده تا به تو کمک کند — رقیبت نیست.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              fontWeight: FontWeight.w800,
+              color: orange,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'مشتری با شرح واضح و تشخیص اولیه می‌آید؛ '
+            'تعمیر و نظر نهایی کار توست. با هم ماشین را زودتر راه می‌اندازیم.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.55,
+              color: theme.colorScheme.onSurface.withOpacity(0.85),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // بخش متقاعدسازی — بعد از مراحل عیب‌یابی
 // کاهش اضطراب، حس کنترل، جلوگیری از ضرر، دعوت به پلن
 // ─────────────────────────────────────────────────────────────────────────────
@@ -597,13 +671,13 @@ class _WhyItWorksSection extends StatelessWidget {
         icon: Icons.verified_user_rounded,
         title: 'با چشم باز برو تعمیرگاه',
         subtitle:
-            'وقتی علت احتمالی را می‌دانی، راحت‌تر حرف می‌زنی و کمتر هزینه اضافه می‌پذیری.',
+            'وقتی علت احتمالی را می‌دانی، گفتگو با مکانیک شفاف‌تر می‌شود و کار زودتر جلو می‌رود.',
       ),
       (
         icon: Icons.savings_rounded,
-        title: 'یک قطعه اشتباه، گرون‌تر از اشتراک سالانه است',
+        title: 'جلوی تعویض قطعه اشتباه را بگیر',
         subtitle:
-            'اشتراک طلایی کمتر از یک تعویض روغن در ماه است؛ جلوی حدس و آزمایش را می‌گیرد.',
+            'یک حدس غلط گران تمام می‌شود. اشتراک طلایی کمتر از یک تعویض روغن در ماه است.',
       ),
       (
         icon: Icons.nightlight_round,
@@ -710,13 +784,13 @@ class _WhyItWorksSection extends StatelessWidget {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor.withOpacity(0.55),
+                  color: theme.canvasColor.withOpacity(0.55),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
                   golden
                       ? 'اشتراک طلایی‌ات فعاله. از عیب‌یابی نامحدود استفاده کن و اگر دوستت هم ماشین داره، معرفیش کن.'
-                      : 'راننده‌هایی که قبل از مراجعه عیب‌یابی می‌کنند، معمولاً کمتر پول الکی می‌دهند و با اعتماد بیشتری تصمیم می‌گیرند.',
+                      : 'راننده‌هایی که قبل از مراجعه عیب‌یابی می‌کنند، با اعتماد بیشتری کنار مکانیک می‌ایستند و کارشان سریع‌تر جلو می‌رود.',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.55,
@@ -1098,9 +1172,16 @@ class _StatusBanner extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: secondary.withOpacity(0.35)),
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              secondary.withOpacity(0.28),
+              theme.cardColor.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: secondary.withOpacity(0.45)),
         ),
         child: Row(
           children: [
@@ -1113,12 +1194,12 @@ class _StatusBanner extends StatelessWidget {
                   Text(
                     'سلام! آماده‌ای عیب‌یابی کنی؟',
                     style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'با ورود: تا ۲ عیب‌یابی رایگان در ماه',
+                    'ورود رایگان — تا ۲ عیب‌یابی هدیه در ماه',
                     style: TextStyle(fontSize: 12, color: theme.hintColor),
                   ),
                 ],
@@ -1278,7 +1359,7 @@ class _CarCard extends StatelessWidget {
                 hintText: 'مثال: تویوتا کمری',
                 prefixIcon: const Icon(Icons.edit_rounded, size: 20),
                 filled: true,
-                fillColor: theme.scaffoldBackgroundColor,
+                fillColor: theme.canvasColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
@@ -1308,7 +1389,7 @@ class _CarCard extends StatelessWidget {
               counterText: '',
               prefixIcon: const Icon(Icons.calendar_today_rounded, size: 18),
               filled: true,
-              fillColor: theme.scaffoldBackgroundColor,
+              fillColor: theme.canvasColor,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
