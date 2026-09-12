@@ -10,11 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Build type'
+        description: 'APK برای بازار / گوشی‌های امروزی، یا AAB برای گوگل‌پلی'
         required: true
-        default: 'apk'
+        default: 'both'
         type: choice
         options:
+          - both
           - apk
           - appbundle
 
@@ -139,28 +140,25 @@ jobs:
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses >/dev/null 2>&1 || true
 
-      - name: Build APK (split per ABI)
+      - name: Build single arm64 APK (modern phones / Cafe Bazaar)
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
-        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols
+        run: flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
 
-      - name: Build App Bundle
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'appbundle' }}
-        run: flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+      - name: Build Play Store App Bundle
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
+        run: flutter build appbundle --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
 
-      - name: Upload APKs
+      - name: Upload APK
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: |
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-x86_64-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload App Bundle
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'appbundle' }}
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab

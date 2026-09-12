@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/share_service.dart';
 import '../models/diagnostic.dart';
 import 'result_screen.dart';
 
@@ -388,7 +389,25 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              if (item.result != null && item.result!.trim().isNotEmpty)
+                IconButton(
+                  tooltip: 'اشتراک‌گذاری پاسخ',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    ShareService.shareDiagnosis(
+                      result: item.result!,
+                      carName: item.carName,
+                      year: item.carYear,
+                      referralCode: context.read<AuthProvider>().referralCode,
+                    );
+                  },
+                  icon: Icon(
+                    Icons.share_rounded,
+                    size: 20,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
               Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.hintColor.withOpacity(0.4)),
             ],
           ),
@@ -451,6 +470,20 @@ class _HistoryScreenState extends State<HistoryScreen>
                   Navigator.push(context, MaterialPageRoute(builder: (_) => ResultScreen(resultText: item.result)));
                 },
               ),
+              if (item.result != null && item.result!.trim().isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.share_rounded),
+                  title: const Text('اشتراک‌گذاری پاسخ'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ShareService.shareDiagnosis(
+                      result: item.result!,
+                      carName: item.carName,
+                      year: item.carYear,
+                      referralCode: context.read<AuthProvider>().referralCode,
+                    );
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
                 title: const Text('حذف', style: TextStyle(color: Colors.red)),

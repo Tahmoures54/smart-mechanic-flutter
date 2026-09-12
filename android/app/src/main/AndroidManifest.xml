@@ -40,8 +40,10 @@
             android:value="2" />
     </application>
 
-    <!-- باز شدن لینک‌ها در مرورگر -->
+    <!-- باز شدن لینک‌ها، اشتراک‌گذاری و واتساپ -->
     <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -49,6 +51,14 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />

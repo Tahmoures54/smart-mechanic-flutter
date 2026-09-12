@@ -31,7 +31,7 @@ flutter clean
 flutter pub get
 dart run flutter_launcher_icons
 flutter analyze
-flutter build apk --release --split-debug-info=build/symbols
+flutter build apk --release --target-platform android-arm64 --split-debug-info=build/symbols
 ```
 
 ## APK location

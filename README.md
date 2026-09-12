@@ -83,10 +83,14 @@ flutter run
 
 جزئیات: [RELEASE.md](RELEASE.md)
 
+بیلد یک APK برای گوشی‌های امروزی (arm64) و یک AAB برای گوگل‌پلی می‌سازد:
+
 ```bash
-flutter build apk --release --obfuscate --split-debug-info=build/symbols
-flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
+flutter build appbundle --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
 ```
+
+کلید امضای Play و بازار را یک‌بار با `scripts/generate_release_keystore.sh` یا workflow **Generate Play / Bazaar Upload Key** بسازید.
 
 ---
 

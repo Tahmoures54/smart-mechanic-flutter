@@ -33,13 +33,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
-flutter build apk --release --split-debug-info=build\symbols
+flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build\symbols
 if errorlevel 1 (
   echo ERROR: APK build failed.
   exit /b 1
 )
 
+flutter build appbundle --release --target-platform android-arm64 --obfuscate --split-debug-info=build\symbols
+if errorlevel 1 (
+  echo ERROR: App Bundle build failed.
+  exit /b 1
+)
+
 echo.
 echo SUCCESS
- echo APK: build\app\outputs\flutter-apk\app-release.apk
+echo APK (Cafe Bazaar / modern phones): build\app\outputs\flutter-apk\app-release.apk
+echo AAB (Google Play): build\app\outputs\bundle\release\app-release.aab
 exit /b 0

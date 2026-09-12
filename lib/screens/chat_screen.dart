@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/share_service.dart';
 import '../models/chat_message.dart';
 import '../widgets/brand_logo.dart';
 import 'shop_screen.dart';
@@ -193,9 +193,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _shareMessage(String text) {
-    Share.share(
-      'نتیجه عیب‌یابی ${widget.carName} (${widget.year}):\n\n$text',
-      subject: 'عیب‌یابی مکانیک هوشمند',
+    final auth = context.read<AuthProvider>();
+    ShareService.shareDiagnosis(
+      result: text,
+      carName: widget.carName,
+      year: widget.year,
+      referralCode: auth.referralCode,
     );
   }
 
@@ -423,6 +426,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     color: theme.hintColor.withOpacity(0.7),
                   ),
                 ),
+                if (msg.isAssistant) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _MessageShareChip(
+                        icon: Icons.ios_share_rounded,
+                        label: 'اشتراک‌گذاری پاسخ',
+                        onTap: () => _shareMessage(msg.text),
+                      ),
+                      _MessageShareChip(
+                        icon: Icons.copy_rounded,
+                        label: 'کپی',
+                        onTap: () => _copyMessage(msg.text),
+                      ),
+                    ],
+                  ),
+                ],
                 if (msg.isError && isLast) ...[
                   const SizedBox(height: 8),
                   SizedBox(
@@ -722,6 +744,50 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageShareChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MessageShareChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.secondary;
+    return Material(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

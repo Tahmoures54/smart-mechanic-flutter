@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../models/audio_features.dart';
 import '../providers/auth_provider.dart';
+import '../services/share_service.dart';
 import 'shop_screen.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -86,16 +86,9 @@ class _ResultScreenState extends State<ResultScreen>
   void _shareResult() {
     if (widget.resultText == null) return;
     final auth = context.read<AuthProvider>();
-    final code = auth.referralCode;
-    final referralLine = (code != null && code.isNotEmpty)
-        ? '\n\nبا کد معرف $code در مکانیک هوشمند ثبت‌نام کن و اعتبار هدیه بگیر.'
-        : '\n\nاپ مکانیک هوشمند — عیب‌یابی خودرو با کمک AI';
-
-    Share.share(
-      '🔧 نتیجه عیب‌یابی من با مکانیک هوشمند:\n\n'
-      '${widget.resultText!}'
-      '$referralLine',
-      subject: 'نتیجه عیب‌یابی خودرو',
+    ShareService.shareDiagnosis(
+      result: widget.resultText!,
+      referralCode: auth.referralCode,
     );
   }
 
@@ -107,22 +100,7 @@ class _ResultScreenState extends State<ResultScreen>
 
   void _shareReferral() {
     final auth = context.read<AuthProvider>();
-    final code = auth.referralCode;
-    if (code == null || code.isEmpty) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ShopScreen()),
-      );
-      return;
-    }
-    Share.share(
-      '🚗 مکانیک هوشمند — عیب‌یابی ماشین با AI\n\n'
-      'من همین الان ازش استفاده کردم و واقعاً کمکم کرد.\n'
-      'با کد معرف من ثبت‌نام کن تا اعتبار هدیه بگیری:\n'
-      '🎁 کد: $code\n\n'
-      'https://smart-mec.ir',
-      subject: 'دعوت به مکانیک هوشمند',
-    );
+    ShareService.shareApp(referralCode: auth.referralCode);
   }
 
   _AudioLevel _interpretRms(double rms) {

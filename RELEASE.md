@@ -1,20 +1,46 @@
 # 📦 راهنمای انتشار نهایی — مکانیک هوشمند
 
+## خروجی بیلد (یک APK برای گوشی‌های امروزی)
+
+بیلد دیگر سه APK جدا (armeabi-v7a / arm64 / x86) نمی‌سازد.
+
+| فایل | مخاطب |
+|------|--------|
+| `app-release.apk` | گوشی‌های امروزی ARM 64-bit + آپلود در **کافه‌بازار** |
+| `app-release.aab` | **Google Play** (Play App Signing) |
+
+حداقل اندروید: API 24. فقط معماری `arm64-v8a`.
+
+---
+
 ## پیش‌نیازها
 
-### ۱. Secrets در GitHub Repository
+### ۱. کلید انتشار Play و بازار (یک‌بار)
 
-در Settings → Secrets and variables → Actions این موارد را اضافه کنید:
+همین کلید را برای **هر دو فروشگاه** استفاده کنید. اگر گم شود، به‌روزرسانی اپ ممکن نیست.
 
-| Secret | توضیح |
+**روش پیشنهادی:** workflow **Generate Play / Bazaar Upload Key** را **فقط یک‌بار** از تب Actions اجرا کنید و artifact را دانلود کنید.
+
+یا محلی:
+
+```bash
+chmod +x scripts/generate_release_keystore.sh
+./scripts/generate_release_keystore.sh secrets
+```
+
+سپس در GitHub → Settings → Secrets and variables → Actions:
+
+| Secret | منبع |
 |--------|--------|
-| `RELEASE_KEYSTORE_BASE64` | کلید keystore به صورت base64 |
-| `RELEASE_KEYSTORE_PASSWORD` | رمز keystore |
-| `RELEASE_KEY_ALIAS` | نام alias (معمولاً `release`) |
-| `RELEASE_KEY_PASSWORD` | رمز کلید |
+| `RELEASE_KEYSTORE_BASE64` | محتویات `RELEASE_KEYSTORE.base64` |
+| `RELEASE_KEYSTORE_PASSWORD` | از `github-secrets.txt` |
+| `RELEASE_KEY_ALIAS` | معمولاً `upload` |
+| `RELEASE_KEY_PASSWORD` | از `github-secrets.txt` |
 | `GOOGLE_MAPS_API_KEY` | کلید Google Maps / Places |
 
-> برای تولید keystore یک‌بار workflow به نام **Generate Release Keystore** را اجرا کنید.
+فایل‌های `.jks` و رمز را در گیت نگذارید. یک نسخه آفلاین در جای امن نگه دارید.
+
+> اگر قبلاً کلیدی ساخته‌اید، کلید جدید نسازید؛ فروشگاه‌ها فقط همان کلید اول را می‌پذیرند.
 
 ### ۲. کلید Google Maps
 
@@ -44,16 +70,19 @@
 
 1. به تب **Actions** بروید
 2. workflow **Build Flutter APK** را انتخاب کنید
-3. **Run workflow** را بزنید
-4. پس از اتمام، فایل APK را از Artifacts دانلود کنید
+3. **Run workflow** → گزینه `both` (پیش‌فرض)
+4. آرتیفکت‌ها:
+   - `app-release-apk` → کافه‌بازار / نصب مستقیم
+   - `app-release-aab` → Google Play
 
-### بیلد محلی (اختیاری)
+روی pull request فقط APK ساخته می‌شود تا CI سریع‌تر باشد.
+
+### بیلد محلی
 
 ```bash
 flutter pub get
-flutter build apk --release --obfuscate --split-debug-info=build/symbols
-# یا App Bundle برای Play Store:
-flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+flutter build apk --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
+flutter build appbundle --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
 ```
 
 ---
@@ -62,7 +91,7 @@ flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
 
 - [ ] نسخه در `pubspec.yaml` و `Constants` یکسان است
 - [ ] `enableLogging` در production خاموش است
-- [ ] keystore واقعی (نه تست) استفاده شده
+- [ ] keystore واقعی (نه تست) در Secrets است
 - [ ] کلید Google Maps محدود به package name است
 - [ ] DISCLAIMER در اپ قابل مشاهده است
 - [ ] OTP واقعی تست شده
@@ -77,12 +106,18 @@ flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
 ## انتشار در فروشگاه‌ها
 
 ### Google Play
-1. ساخت `app-release.aab`
+1. ساخت / دانلود `app-release.aab`
 2. ساخت اپ در Google Play Console
 3. آپلود AAB + تصاویر + توضیحات + سیاست حریم خصوصی
 4. تکمیل پرسشنامه محتوا و رتبه‌بندی سنی
+5. در Play App Signing، کلید آپلود همین `upload` است
 
-### آپلود مستقیم (APK)
+### کافه‌بازار
+1. دانلود `app-release.apk` (arm64)
+2. آپلود در پنل بازار با **همان کلید امضا**
+3. نسخه و versionCode باید از نسخه قبلی بیشتر باشد
+
+### آپلود مستقیم
 فایل `app-release.apk` را می‌توانید مستقیم توزیع کنید (مثلاً سایت رسمی).
 
 ---

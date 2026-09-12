@@ -9,6 +9,7 @@ import '../constants.dart';
 import '../models/car.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/share_service.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/car_selector_widget.dart';
 import 'chat_screen.dart';
@@ -330,11 +331,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             children: [
               _StatusBanner(auth: auth),
+              const SizedBox(height: 18),
+              Text(
+                'عیب‌یابی در ۳ قدم — کمتر از ۲ دقیقه',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.hintColor,
+                  height: 1.4,
+                ),
+              ),
               const SizedBox(height: 16),
-
-              // ─── بخش مزایای اپ (روان‌شناسی: کاهش اضطراب، ایجاد اعتماد و احساس کنترل) ───
-              const _BenefitsSection(),
-              const SizedBox(height: 22),
 
               _SectionLabel(number: '۱', title: 'خودرو را انتخاب کنید'),
               const SizedBox(height: 10),
@@ -407,52 +415,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
               _SectionLabel(number: '۳', title: 'ارسال برای عیب‌یابی'),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: _diagnose,
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 22),
-                  label: const Text(
-                    'شروع عیب‌یابی هوشمند',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
+              _DiagnoseCtaButton(onPressed: _diagnose),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: _recordAudio,
-                  icon: Icon(Icons.mic_rounded, color: secondary),
-                  label: Text(
-                    'یا صدای موتور را ضبط کنید',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: secondary.withOpacity(0.5),
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
+              _AudioCtaButton(onPressed: _recordAudio),
               const SizedBox(height: 10),
               Text(
                 'تحلیل فقط راهنماست و جای بازدید حضوری مکانیک را نمی‌گیرد.',
@@ -466,7 +431,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 28),
 
-              // ─── درخواست حمایت (استارتاپ نوپا) ───
+              // توضیحات و متقاعدسازی — بعد از مسیر عیب‌یابی
+              const _WhyItWorksSection(),
+              const SizedBox(height: 18),
+
+              // درخواست حمایت (استارتاپ نوپا)
               const _SupportCard(),
             ],
           ),
@@ -477,121 +446,336 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// بخش مزایا — طراحی مدرن و روان‌شناختی
-// تمرکز روی: کاهش اضطراب، حس کنترل، سرعت، صرفه‌جویی و اعتماد
+// دکمه‌های اقدام — ارتفاع بیشتر و کنتراست واضح برای خوانایی
 // ─────────────────────────────────────────────────────────────────────────────
-class _BenefitsSection extends StatelessWidget {
-  const _BenefitsSection();
+class _DiagnoseCtaButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _DiagnoseCtaButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fg = theme.colorScheme.onSecondary;
+    return Material(
+      color: theme.colorScheme.secondary,
+      elevation: 3,
+      shadowColor: theme.colorScheme.secondary.withOpacity(0.45),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.send_rounded, color: fg, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ارسال به مکانیک هوشمند',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: fg,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'تحلیل فوری با هوش مصنوعی',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: fg.withOpacity(0.82),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.auto_awesome_rounded, color: fg, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AudioCtaButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _AudioCtaButton({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.secondary;
+    return Material(
+      color: theme.cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: secondary.withOpacity(0.55), width: 1.6),
+      ),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: secondary.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.mic_rounded, color: secondary, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ضبط صدای موتور',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'اگر نوشتن سخت است، صدا را بفرستید',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: theme.hintColor,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    final benefits = [
+// ─────────────────────────────────────────────────────────────────────────────
+// بخش متقاعدسازی — بعد از مراحل عیب‌یابی
+// کاهش اضطراب، حس کنترل، جلوگیری از ضرر، دعوت به پلن
+// ─────────────────────────────────────────────────────────────────────────────
+class _WhyItWorksSection extends StatelessWidget {
+  const _WhyItWorksSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.secondary;
+    final auth = context.watch<AuthProvider>();
+    final golden = auth.isAuthenticated && auth.isGoldenActive;
+
+    final points = const [
       (
-        icon: Icons.psychology_rounded,
-        title: 'تشخیص هوشمند با AI',
-        subtitle: 'در چند ثانیه علل احتمالی و راه‌حل عملی دریافت کنید',
-      ),
-      (
-        icon: Icons.mic_rounded,
-        title: 'تحلیل صدای موتور',
-        subtitle: 'با ضبط صدا، مشکل را دقیق‌تر شناسایی کنید',
-      ),
-      (
-        icon: Icons.location_on_rounded,
-        title: 'تعمیرگاه‌های نزدیک',
-        subtitle: 'بهترین گزینه‌ها را روی نقشه پیدا کنید',
+        icon: Icons.verified_user_rounded,
+        title: 'با چشم باز برو تعمیرگاه',
+        subtitle:
+            'وقتی علت احتمالی را می‌دانی، راحت‌تر حرف می‌زنی و کمتر هزینه اضافه می‌پذیری.',
       ),
       (
         icon: Icons.savings_rounded,
-        title: 'صرفه‌جویی در زمان و هزینه',
-        subtitle: 'قبل از مراجعه، اطلاعات دقیق داشته باشید',
+        title: 'یک قطعه اشتباه، گرون‌تر از اشتراک سالانه است',
+        subtitle:
+            'اشتراک طلایی کمتر از یک تعویض روغن در ماه است؛ جلوی حدس و آزمایش را می‌گیرد.',
+      ),
+      (
+        icon: Icons.nightlight_round,
+        title: 'نیمه‌شب و وسط جاده هم تنها نیستی',
+        subtitle:
+            'قبل از اینکه اضطراب بالا برود، در چند ثانیه تصویر روشنی از مشکل می‌گیری.',
       ),
     ];
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            const BrandLogo(size: 22),
-            const SizedBox(width: 8),
-            Text(
-              'چرا مکانیک هوشمند؟',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                secondary.withOpacity(0.16),
+                theme.cardColor,
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...benefits.map((b) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: secondary.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: secondary.withOpacity(0.28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const BrandLogo(size: 28, showGlow: true),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'چرا مکانیک هوشمند؟',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: secondary.withOpacity(0.06),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: secondary.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(b.icon, color: secondary, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            b.title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            b.subtitle,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.hintColor,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'بیشتر راننده‌ها با شنیدن صدای عجیب، مضطرب می‌شوند و چشم‌بسته می‌روند تعمیرگاه. '
+                'اینجا اول می‌فهمی ماجرا از چه قرار است — بعد تصمیم می‌گیری.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.65,
+                  color: theme.colorScheme.onSurface.withOpacity(0.82),
                 ),
               ),
-            )),
+              const SizedBox(height: 16),
+              ...points.map(
+                (p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: secondary.withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(p.icon, color: secondary, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13.5,
+                                height: 1.35,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              p.subtitle,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.5,
+                                color: theme.hintColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  golden
+                      ? 'اشتراک طلایی‌ات فعاله. از عیب‌یابی نامحدود استفاده کن و اگر دوستت هم ماشین داره، معرفیش کن.'
+                      : 'راننده‌هایی که قبل از مراجعه عیب‌یابی می‌کنند، معمولاً کمتر پول الکی می‌دهند و با اعتماد بیشتری تصمیم می‌گیرند.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.55,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface.withOpacity(0.88),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    if (golden) {
+                      ShareService.shareApp(
+                        referralCode: auth.referralCode,
+                      );
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ShopScreen()),
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: Text(
+                    golden ? 'معرفی به دوستان' : 'پلن مناسبت را انتخاب کن',
+                  ),
+                ),
+              ),
+              if (!golden) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'طلایی ۳۰ روزه: عیب‌یابی نامحدود — کمتر از هزینه یک حدس اشتباه در تعمیرگاه.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.45,
+                    color: theme.hintColor,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// کارت حمایت از استارتاپ
+// کارت حمایت از استارتاپ + شیت پیشنهادها
 // ─────────────────────────────────────────────────────────────────────────────
 class _SupportCard extends StatelessWidget {
   const _SupportCard();
@@ -629,32 +813,232 @@ class _SupportCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'به حمایت شما نیاز داریم تا بتوانیم این ابزار را بهتر و کامل‌تر کنیم. '
-            'با معرفی به دوستانتان و بازخوردهای ارزشمندتان، به رشد ما کمک کنید.',
+            'حمایت تو یعنی سرور پایدارتر، تشخیص دقیق‌تر، و این‌که این ابزار برای راننده‌های بیشتری زنده بماند. '
+            'حتی یک اشتراک‌گذاری ساده هم برای ما خیلی می‌ارزد.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
               color: theme.hintColor,
-              height: 1.5,
+              height: 1.55,
             ),
           ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.handshake_rounded, size: 16, color: secondary),
-              const SizedBox(width: 6),
-              Text(
-                'از همراهی‌تان سپاسگزاریم ❤️',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: secondary,
-                  fontSize: 13,
-                ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: () => _showSupportActions(context),
+              icon: const Icon(Icons.volunteer_activism_rounded),
+              label: const Text(
+                'چطور حمایت کنم؟',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
               ),
-            ],
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+void _showSupportActions(BuildContext context) {
+  final theme = Theme.of(context);
+  final auth = context.read<AuthProvider>();
+  final code = auth.referralCode;
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'چند راه ساده برای حمایت',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'هر کدام را که راحت‌تری انتخاب کن — همه به رشد این ابزار کمک می‌کند.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: theme.hintColor, height: 1.45),
+              ),
+              const SizedBox(height: 14),
+              _SupportActionTile(
+                icon: Icons.share_rounded,
+                title: 'معرفی به دوستان',
+                subtitle: 'برای کسی بفرست که ماشینش صدا می‌دهد',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ShareService.shareApp(referralCode: code);
+                },
+              ),
+              _SupportActionTile(
+                icon: Icons.chat_rounded,
+                title: 'وضعیت واتساپ',
+                subtitle: 'متن آماده را در استوری واتساپ بگذار',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final text = ShareService.whatsappStatus(referralCode: code);
+                  await ShareService.copy(text);
+                  await ShareService.shareToWhatsApp(text);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'متن کپی شد. می‌توانی آن را در وضعیت واتساپ هم بچسبانی.',
+                        ),
+                        backgroundColor: Colors.green.shade700,
+                      ),
+                    );
+                  }
+                },
+              ),
+              _SupportActionTile(
+                icon: Icons.badge_rounded,
+                title: 'پروفایل واتساپ',
+                subtitle: 'متن «درباره» را کپی کن و در پروفایل بچسبان',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await ShareService.copy(ShareService.whatsappAbout());
+                  if (!context.mounted) return;
+                  showDialog<void>(
+                    context: context,
+                    builder: (dialogCtx) => AlertDialog(
+                      title: const Text('متن پروفایل آماده است'),
+                      content: const Text(
+                        'متن معرفی کپی شد.\n\n'
+                        'واتساپ → تنظیمات → نمایه → درباره\n'
+                        'متن را بچسبان تا دوستانت مکانیک هوشمند را ببینند.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          child: const Text('باشه'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            Navigator.pop(dialogCtx);
+                            ShareService.shareToWhatsApp(
+                              ShareService.whatsappAbout(),
+                            );
+                          },
+                          child: const Text('باز کردن واتساپ'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              _SupportActionTile(
+                icon: Icons.workspace_premium_rounded,
+                title: 'خرید پلن',
+                subtitle: 'مستقیم‌ترین حمایت؛ عیب‌یابی نامحدود برای خودت',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ShopScreen()),
+                  );
+                },
+              ),
+              if (code != null && code.isNotEmpty)
+                _SupportActionTile(
+                  icon: Icons.card_giftcard_rounded,
+                  title: 'دعوت با کد معرف',
+                  subtitle: 'کد $code را برای دوستت بفرست؛ هر دو سود می‌برید',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ShareService.shareApp(referralCode: code);
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SupportActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SupportActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.secondary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: secondary.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: secondary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: theme.hintColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_left_rounded, color: theme.hintColor),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
