@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../models/chat_message.dart';
+import '../widgets/brand_logo.dart';
 import 'shop_screen.dart';
 import 'login_screen.dart';
 
@@ -246,38 +247,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: theme.colorScheme.secondary,
-              radius: 18,
-              child: Icon(
-                Icons.support_agent_rounded,
-                color: theme.colorScheme.onSecondary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'مکانیک هوشمند',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '${widget.carName} · ${widget.year}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.hintColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        title: BrandAppBarTitle(
+          subtitle: '${widget.carName} · ${widget.year}',
         ),
         actions: [
           Padding(

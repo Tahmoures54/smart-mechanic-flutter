@@ -1,41 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 432 432" width="432" height="432">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="goldCore432" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFF3C4"/>
-      <stop offset="30%" stop-color="#FFD54F"/>
-      <stop offset="100%" stop-color="#FF8F00"/>
-    </linearGradient>
-    <linearGradient id="goldAccent432" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFE082"/>
-      <stop offset="100%" stop-color="#FFB300"/>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5DFB0"/>
+      <stop offset="45%" stop-color="#E4BA56"/>
+      <stop offset="100%" stop-color="#D6A330"/>
     </linearGradient>
   </defs>
-
-  <!-- لایه پس‌زمینه با فضای امن اندروید -->
-  <rect width="432" height="432" fill="#0D0D12"/>
-
-  <!-- المان چرخ‌دنده هماهنگ با ابعاد کوچک -->
-  <circle cx="216" cy="216" r="160" fill="none" stroke="url(#goldAccent432)" stroke-width="5" stroke-dasharray="20 12" opacity="0.7"/>
-
-  <!-- آیکون مرکزی فشرده‌تر برای عدم برش در لانچرهای مختلف -->
-  <g transform="translate(216, 216) scale(0.72) translate(-256, -256)">
-    <!-- آچار عمود/مورب -->
-    <g transform="translate(256, 256) rotate(-45)">
-      <rect x="-16" y="-120" width="32" height="240" rx="16" fill="url(#goldCore432)"/>
-      <path d="M -35 -110 C -35 -150, 35 -150, 35 -110 C 35 -95, 20 -85, 0 -85 C -20 -85, -35 -95, -35 -110 Z" fill="url(#goldCore432)"/>
-      <path d="M -18 -135 L 18 -135 L 0 -105 Z" fill="#0D0D12"/>
-      <circle cx="0" cy="115" r="32" fill="url(#goldCore432)"/>
-      <circle cx="0" cy="115" r="18" fill="#0D0D12"/>
-    </g>
-
-    <!-- بدنه متقارن ماشین -->
-    <g transform="translate(256, 240)">
-      <path d="M -95 30 C -105 30, -115 20, -115 5 L -110 -20 C -110 -35, -95 -45, -75 -45 L -55 -45 L -40 -70 C -35 -78, -20 -80, 0 -80 C 20 -80, 35 -78, 40 -70 L 55 -45 L 75 -45 C 95 -45, 110 -35, 110 -20 L 115 5 C 115 20, 105 30, 95 30 Z" fill="url(#goldCore432)" stroke="#0D0D12" stroke-width="4"/>
-      <path d="M -42 -45 L -30 -68 C -25 -72, 25 -72, 30 -68 L 42 -45 Z" fill="#1A1A24"/>
-      <circle cx="-75" cy="-15" r="7" fill="#FFFFFF"/>
-      <circle cx="75" cy="-15" r="7" fill="#FFFFFF"/>
-      <rect x="-102" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccent432)" stroke-width="3"/>
-      <rect x="78" y="15" width="24" height="28" rx="8" fill="#1A1A24" stroke="url(#goldAccent432)" stroke-width="3"/>
-    </g>
+  <circle cx="256" cy="256" r="248" fill="#FAFBFB"/>
+  <circle cx="256" cy="256" r="222" fill="#121212"/>
+  <!-- Gear (simplified 8-tooth) -->
+  <g fill="#484747">
+    <path d="M256 56 l28 28 h40 l14 40 40 14 v40 l28 28 -28 28 v40 l-40 14 -14 40 h-40 l-28 28 -28-28 h-40 l-14-40 -40-14 v-40 l-28-28 28-28 v-40 l40-14 14-40 h40 z"/>
   </g>
+  <circle cx="256" cy="256" r="78" fill="#121212"/>
+  <circle cx="256" cy="256" r="92" fill="none" stroke="#484747" stroke-width="14"/>
+  <!-- Screwdriver -->
+  <g transform="translate(256,256) rotate(-48) translate(-256,-256)">
+    <rect x="240" y="70" width="32" height="90" rx="8" fill="url(#gold)"/>
+    <rect x="246" y="160" width="20" height="16" rx="3" fill="#303030"/>
+    <rect x="250" y="174" width="12" height="70" rx="3" fill="url(#gold)"/>
+  </g>
+  <!-- Wrench -->
+  <g transform="translate(256,256) rotate(48) translate(-256,-256)">
+    <rect x="244" y="150" width="24" height="110" rx="10" fill="url(#gold)"/>
+    <path d="M210 70 h36 v30 h20 v24 h-20 v20 h-36 v-24 h-18 v-26 h18 z" fill="url(#gold)"/>
+  </g>
+  <!-- Lock -->
+  <path d="M206 210 a50 48 0 0 1 100 0 v28 h-22 v-28 a28 28 0 0 0 -56 0 v28 h-22 z" fill="url(#gold)"/>
+  <rect x="186" y="228" width="140" height="130" rx="22" fill="url(#gold)"/>
+  <circle cx="256" cy="278" r="16" fill="#202020"/>
+  <path d="M248 278 l16 0 8 40 h-32 z" fill="#202020"/>
 </svg>

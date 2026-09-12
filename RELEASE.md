@@ -36,8 +36,8 @@
 ## مراحل انتشار
 
 ### نسخه فعلی
-- **Version name:** `1.0.0`
-- **Version code:** `1`
+- **Version name:** `1.2.0`
+- **Version code:** `3`
 - **Package:** `ir.smartmec.app`
 
 ### بیلد از طریق GitHub Actions

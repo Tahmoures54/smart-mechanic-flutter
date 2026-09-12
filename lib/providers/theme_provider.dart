@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,11 +53,10 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   void toggleTheme() {
-    // اگر سیستمی بود، دارک بشه، در غیر این صورت تاگل معمول
     if (isSystem) {
-      setTheme(ThemeMode.dark);
+      unawaited(setTheme(ThemeMode.dark));
     } else {
-      setTheme(isDark ? ThemeMode.light : ThemeMode.dark);
+      unawaited(setTheme(isDark ? ThemeMode.light : ThemeMode.dark));
     }
   }
 

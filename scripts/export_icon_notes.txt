@@ -1,10 +1,16 @@
-برای تولید app_icon.png از SVG:
+تولید دارایی‌های برند از لوگوی ریشه (`logo.png`):
 
-1) آنلاین: https://svgtopng.com  →  آپلود assets/branding/app_icon.svg  →  1024px
-2) ذخیره در: assets/branding/app_icon.png
-3) دستور:
-   flutter pub get
-   dart run flutter_launcher_icons
+```bash
+python3 tool/generate_branding.py
+```
 
-اگر ImageMagick دارید:
-  convert -background none -size 1024x1024 assets/branding/app_icon.svg assets/branding/app_icon.png
+سپس (اگر Flutter SDK نصب است):
+
+```bash
+flutter pub get
+dart run flutter_launcher_icons
+dart run flutter_native_splash:create
+```
+
+منبع هویت: چرخ‌دنده + قفل طلایی + پیچ‌گوشتی و آچار.
+خروجی در `assets/branding/` و `android/app/src/main/res/mipmap-*`.

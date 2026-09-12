@@ -40,6 +40,7 @@ smart-mechanic:
 |   |               +---drawable
 |   |               |       ic_launcher_foreground.png
 |   |               |       launch_background.xml
+|   |               |       splash_logo.png
 |   |               |       
 |   |               +---mipmap-anydpi-v26
 |   |               |       ic_launcher.xml
@@ -129,8 +130,10 @@ smart-mechanic:
 |   |       
 |   +---theme
 |   |       app_theme.dart
+|   |       brand.dart
 |   |       
 |   \---widgets
+|           brand_logo.dart
 |           car_selector_widget.dart
 |           shimmer_card.dart
 |           
@@ -139,5 +142,6 @@ smart-mechanic:
 |       
 \---tool
         apply_icons.py
+        generate_branding.py
         icons_mdpi.json
         

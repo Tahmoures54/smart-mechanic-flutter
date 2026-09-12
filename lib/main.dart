@@ -18,6 +18,8 @@ import 'services/sound_analyzer.dart';
 import 'screens/home_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'theme/app_theme.dart';
+import 'theme/brand.dart';
+import 'widgets/brand_logo.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,17 +84,23 @@ void _setupErrorWidget() {
   ErrorWidget.builder = (details) {
     debugPrint('[ErrorBoundary] ${details.exception}');
     return Material(
-      color: const Color(0xFF0D0D12),
+      color: BrandColors.darkBackground,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.warning_amber_rounded, size: 64, color: Colors.orange.shade400),
-              const SizedBox(height: 16),
-              const Text('مشکلی پیش آمد',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              const BrandLogo(size: 88),
+              const SizedBox(height: 20),
+              const Text(
+                'مشکلی پیش آمد',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(height: 8),
               const Text(
                 'لطفاً اپلیکیشن را مجدداً باز کنید.',
@@ -164,9 +172,21 @@ class SmartMechanicApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeProvider.themeMode,
       builder: (context, child) {
-        return Directionality(
-          textDirection: localeProvider.textDirection,
-          child: child ?? const SizedBox.shrink(),
+        final brightness = Theme.of(context).brightness;
+        final overlay = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness:
+              brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+          systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
+          systemNavigationBarIconBrightness:
+              brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+        );
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlay,
+          child: Directionality(
+            textDirection: localeProvider.textDirection,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       home: const _AppEntryPoint(),
@@ -237,29 +257,26 @@ class _SplashScreenState extends State<_SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: theme.colorScheme.secondary.withOpacity(0.12),
-                  ),
-                  child: Icon(
-                    Icons.directions_car_filled_rounded,
-                    size: 72,
-                    color: theme.colorScheme.secondary,
-                  ),
-                ),
+                const BrandLogo(size: 120, showGlow: true),
                 const SizedBox(height: 20),
                 Text(
-                  Constants.appName,
+                  Brand.nameFa,
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.secondary,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  Brand.tagline,
+                  style: TextStyle(fontSize: 13, color: theme.hintColor),
+                ),
                 const SizedBox(height: 8),
-                Text('در حال بارگذاری...', style: TextStyle(fontSize: 13, color: theme.hintColor)),
+                Text(
+                  'در حال بارگذاری...',
+                  style: TextStyle(fontSize: 13, color: theme.hintColor),
+                ),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: 120,

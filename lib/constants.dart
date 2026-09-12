@@ -138,6 +138,8 @@ class Constants {
 
   // App Info
   static const String appName = 'مکانیک هوشمند';
+  static const String appNameEn = 'Smart Mechanic';
+  static const String appTagline = 'عیب‌یابی هوشمند خودرو';
   static const String appVersion = '1.2.0';
   static const int appBuildNumber = 3;
   static const String packageName = 'ir.smartmec.app';

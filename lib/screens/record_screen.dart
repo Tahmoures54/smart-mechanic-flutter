@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
+import '../constants.dart';
 import 'chat_screen.dart';
 
 class RecordScreen extends StatefulWidget {
@@ -30,8 +31,8 @@ class _RecordScreenState extends State<RecordScreen>
   Timer? _timer;
   late AnimationController _animController;
 
-  static const int _maxRecordingDuration = 15;
-  static const int _minRecordingDuration = 3;
+  static const int _maxRecordingDuration = Constants.maxRecordingSeconds;
+  static const int _minRecordingDuration = Constants.minRecordingSeconds;
 
   @override
   void initState() {

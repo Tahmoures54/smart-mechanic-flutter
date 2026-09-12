@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../theme/brand.dart';
+import '../widgets/brand_logo.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -359,26 +361,24 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildHeader(ThemeData theme) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: theme.colorScheme.secondary.withOpacity(0.12),
-          ),
-          child: Icon(
-            Icons.directions_car_filled_rounded,
-            size: 56,
-            color: theme.colorScheme.secondary,
-          ),
-        ),
+        const BrandLogo(size: 108, showGlow: true),
         const SizedBox(height: 16),
         Text(
-          'مکانیک هوشمند',
+          Brand.nameFa,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: theme.colorScheme.secondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          Brand.tagline,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            color: theme.hintColor,
           ),
         ),
         const SizedBox(height: 8),

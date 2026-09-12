@@ -2,15 +2,17 @@
 
 <div align="center">
 
+<img src="assets/branding/banner.png" alt="مکانیک هوشمند — Smart Mechanic" width="720"/>
+
 [![Flutter](https://img.shields.io/badge/Flutter-3.24+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Android](https://img.shields.io/badge/Android-API_24+-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge)](RELEASE.md)
+[![Version](https://img.shields.io/badge/Version-1.2.0-blue?style=for-the-badge)](RELEASE.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 **عیب‌یابی هوشمند خودرو با کمک هوش مصنوعی، تحلیل صدا و نقشه تعمیرگاه‌های نزدیک**
 
-[راهنمای انتشار](RELEASE.md) · [حریم خصوصی](PRIVACY.md) · [سلب مسئولیت](DISCLAIMER.md)
+[راهنمای انتشار](RELEASE.md) · [برندینگ](BRANDING.md) · [حریم خصوصی](PRIVACY.md) · [سلب مسئولیت](DISCLAIMER.md)
 
 </div>
 
@@ -31,7 +33,7 @@
 |-------|--------|
 | 🧠 عیب‌یابی با AI | تشخیص مشکل، علل احتمالی و راه‌حل از طریق گفتگو |
 | 🎤 تحلیل صدای موتور | استخراج RMS، فرکانس غالب، طیف فرکانسی |
-| 📍 تعمیرگاه نزدیک | Google Places + نقشه |
+| 📍 تعمیرگاه نزدیک | نقشه تعمیرگاه‌ها از دیتابیس خود اپ |
 | 🔐 ورود OTP | احراز هویت با شماره موبایل |
 | 💳 اعتبار و اشتراک | بسته‌های اعتباری + اشتراک طلایی |
 | 👥 سیستم معرفی | کد معرف، پاداش و برداشت |
@@ -47,22 +49,14 @@ lib/
 ├── constants.dart
 ├── main.dart
 ├── models/
-│   ├── car.dart
-│   ├── diagnostic.dart
-│   ├── audio_features.dart
-│   ├── chat_message.dart      # استخراج‌شده از chat_screen
-│   └── shop_package.dart      # استخراج‌شده از shop_screen
 ├── providers/                 # Auth, Theme, Locale
 ├── screens/
-│   ├── home_screen.dart       # + CarSelectorWidget مشترک
-│   ├── chat_screen.dart
-│   ├── shop_screen.dart
-│   ├── payment_webview.dart   # استخراج‌شده از shop
-│   └── ...
 ├── services/
 ├── theme/
-│   └── app_theme.dart         # تم و رنگ‌های متمرکز
+│   ├── app_theme.dart
+│   └── brand.dart             # هویت، رنگ، مسیر لوگو
 └── widgets/
+    ├── brand_logo.dart
     └── car_selector_widget.dart
 ```
 
@@ -78,6 +72,7 @@ lib/
 git clone https://github.com/Tahmoures54/smart-mechanic-flutter.git
 cd smart-mechanic-flutter
 flutter pub get
+python3 tool/generate_branding.py   # اگر آیکون‌ها را از نو می‌سازید
 dart run flutter_launcher_icons
 flutter run
 ```

@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:collection/collection.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../constants.dart';
 import '../models/car.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/car_selector_widget.dart';
 import 'chat_screen.dart';
 import 'history_screen.dart';
@@ -33,15 +37,24 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isRefreshing = false;
   bool _hasCarLoadError = false;
   bool _isCustomCar = false;
+  SharedPreferences? _prefs;
+  String? _pendingCarId;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCars());
+    _yearController.addListener(_saveDraft);
+    _customCarController.addListener(_saveDraft);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _restoreDraft();
+      await _loadCars();
+    });
   }
 
   @override
   void dispose() {
+    _yearController.removeListener(_saveDraft);
+    _customCarController.removeListener(_saveDraft);
     _descController.dispose();
     _customCarController.dispose();
     _yearController.dispose();
@@ -65,12 +78,13 @@ class _HomeScreenState extends State<HomeScreen> {
       cars.sort((a, b) => a.fullName.compareTo(b.fullName));
       setState(() {
         _cars = cars;
-        // فقط اگر قبلاً انتخاب شده بود، سعی می‌کنیم همان را نگه داریم — هیچ پیش‌فرضی نداریم
         if (_selectedCar != null) {
           final found = cars.where((c) => c.id == _selectedCar!.id);
           _selectedCar = found.isNotEmpty ? found.first : null;
+        } else if (_pendingCarId != null && !_isCustomCar) {
+          final found = cars.where((c) => c.id == _pendingCarId);
+          _selectedCar = found.isNotEmpty ? found.first : null;
         }
-        // دیگر به صورت خودکار اولین خودرو را انتخاب نمی‌کنیم
       });
     } catch (_) {
       if (mounted) {
@@ -84,6 +98,41 @@ class _HomeScreenState extends State<HomeScreen> {
           _isRefreshing = false;
         });
       }
+    }
+  }
+
+  Future<void> _restoreDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    _prefs = prefs;
+    final year = prefs.getString(Constants.keyLastYear) ?? '';
+    final custom = prefs.getString(Constants.keyLastCustomCar) ?? '';
+    final carId = prefs.getString(Constants.keyLastCarId);
+    setState(() {
+      if (year.isNotEmpty) _yearController.text = year;
+      if (carId == 'custom' && custom.length >= 2) {
+        _isCustomCar = true;
+        _customCarController.text = custom;
+      } else {
+        _pendingCarId = carId;
+      }
+    });
+  }
+
+  void _saveDraft() {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    unawaited(prefs.setString(Constants.keyLastYear, _yearController.text.trim()));
+    if (_isCustomCar) {
+      unawaited(prefs.setString(Constants.keyLastCarId, 'custom'));
+      unawaited(
+        prefs.setString(
+          Constants.keyLastCustomCar,
+          _customCarController.text.trim(),
+        ),
+      );
+    } else if (_selectedCar != null) {
+      unawaited(prefs.setString(Constants.keyLastCarId, _selectedCar!.id));
     }
   }
 
@@ -233,10 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
         resizeToAvoidBottomInset: true,
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
-          title: const Text(
-            'مکانیک هوشمند',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+          title: const BrandAppBarTitle(),
           centerTitle: true,
           elevation: 0,
           actions: [
@@ -301,16 +347,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 customController: _customCarController,
                 yearController: _yearController,
                 onRetry: () => _loadCars(),
-                onCarSelected: (c) => setState(() => _selectedCar = c),
+                onCarSelected: (c) => setState(() {
+                  _selectedCar = c;
+                  _saveDraft();
+                }),
                 onToggleCustom: () => setState(() {
                   _isCustomCar = !_isCustomCar;
+                  _selectedCar = null;
                   if (!_isCustomCar) {
-                    // وقتی برمی‌گردیم به لیست، هیچ پیش‌فرضی انتخاب نمی‌شود
-                    _selectedCar = null;
                     _customCarController.clear();
-                  } else {
-                    _selectedCar = null;
                   }
+                  _saveDraft();
                 }),
               ),
 
@@ -469,7 +516,7 @@ class _BenefitsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.auto_awesome, size: 18, color: secondary),
+            const BrandLogo(size: 22),
             const SizedBox(width: 8),
             Text(
               'چرا مکانیک هوشمند؟',

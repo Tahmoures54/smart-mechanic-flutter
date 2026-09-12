@@ -9,54 +9,52 @@
 | کوتاه | Smart Mec |
 | شعار | عیب‌یابی هوشمند خودرو |
 | پکیج | `ir.smartmec.app` |
-| حس برند | قابل‌اعتماد · مدرن · فنیِ دوستانه |
+| حس برند | قابل‌اعتماد · فنی · قفلِ اطمینان + ابزار مکانیک |
+
+منبع لوگو: `logo.png` در ریشهٔ مخزن (نشان دایره‌ای: چرخ‌دنده، قفل طلایی، پیچ‌گوشتی و آچار).
+
+کد: `lib/theme/brand.dart` و ویجت `lib/widgets/brand_logo.dart`.
 
 ## پالت رنگ
 
 | نقش | رنگ | هگز |
 |-----|------|-----|
-| کهربایی اصلی | Amber | `#FFC107` |
+| طلایی برند | Gold | `#E4BA56` |
+| طلایی روشن | Gold Light | `#F5DFB0` |
+| طلایی تیره | Gold Dark | `#D6A330` |
 | نارنجی CTA | Orange | `#FF9800` |
-| هایلایت | Amber Light | `#FFD54F` |
 | پس‌زمینه دارک | Dark BG | `#0D0D12` |
 | سطح | Dark Surface | `#1A1A24` |
 | روشن | Light BG | `#F5F5FA` |
 
-کد منبع: `lib/theme/brand.dart`
-
 ## آیکون و لوگو
 
-فایل‌های منبع در `assets/branding/`:
+فایل‌های تولیدشده در `assets/branding/` (از روی لوگوی ریشه):
 
 | فایل | کاربرد |
 |------|--------|
-| `app_icon.svg` / `.png` | آیکون اپ (۱۰۲۴×۱۰۲۴) |
-| `app_icon_foreground.png` | لایهٔ پیش‌زمینهٔ Adaptive |
-| `logo.png` / `.svg` | لوگو افقی |
-| `splash_mark.png` | علامت اسپلش |
-| `banner.png` | بنر |
+| `logo.png` | لوگو دایره‌ای داخل اپ (اسپلش، ورود، AppBar) |
+| `logo_source.png` | کپی راستر اصلی ۱۲۸px |
+| `app_icon.png` | آیکون لانچر ۱۰۲۴×۱۰۲۴ |
+| `app_icon_foreground.png` | لایهٔ Adaptive (محدودهٔ امن) |
+| `splash_mark.png` | علامت اسپلش با پس‌زمینه شفاف |
+| `banner.png` | بنر گیت‌هاب / فروشگاه |
+| `play_store_icon.png` | آیکون ۵۱۲px پلی‌استور |
 
-### مفهوم بصری آیکون
-- پس‌زمینه دارک گرد
-- حلقه کهربایی
-- آچار هندسی + موج صدا (تحلیل موتور) + نقطه AI
+### مفهوم بصری
+- حلقه سفید روی پس‌زمینه زغالی
+- چرخ‌دنده هشت‌دندانه (فنی بودن)
+- قفل طلایی (اعتماد و امنیت داده)
+- پیچ‌گوشتی و آچار (عیب‌یابی مکانیکی)
 
-### تولید آیکون لانچر (الزامی بعد از کلون)
-
-منبع‌ها آماده است (`app_icon.png` و `app_icon_foreground.png`).
-فولدرهای `mipmap` در اندروید باید ساخته شوند:
+### تولید مجدد دارایی‌ها
 
 ```bash
+python3 tool/generate_branding.py
 flutter pub get
 dart run flutter_launcher_icons
-# اختیاری — اسپلش:
+# اختیاری — اسپلش نیتیو:
 dart run flutter_native_splash:create
-```
-
-یا بدون Flutter SDK:
-
-```bash
-python3 tool/apply_icons.py   # نیاز به tool/icons_*.json
 ```
 
 تنظیمات در `pubspec.yaml` → `flutter_launcher_icons`:
@@ -64,4 +62,4 @@ python3 tool/apply_icons.py   # نیاز به tool/icons_*.json
 - `adaptive_icon_background`: `#0D0D12`
 - `adaptive_icon_foreground`: `assets/branding/app_icon_foreground.png`
 
-AndroidManifest: `android:icon` + `android:roundIcon` روی `@mipmap/ic_launcher(_round)`.
+AndroidManifest: `android:icon` = `@mipmap/ic_launcher` و `android:roundIcon` = `@mipmap/ic_launcher_round`.
