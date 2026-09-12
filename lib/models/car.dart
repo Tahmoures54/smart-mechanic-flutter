@@ -24,6 +24,9 @@ class Car {
   final bool isElectric;        
   final bool isActive;          
 
+  /// نام‌های جایگزین برای جستجو (مثلاً ال۹۰، L90)
+  final List<String> aliases;
+
   // ── مشکلات و تاریخچه ──
   final List<String> commonIssues;
   final List<CarHistoryEntry> history;
@@ -47,6 +50,7 @@ class Car {
     this.isPopular = false,
     this.isElectric = false,
     this.isActive = true,
+    this.aliases = const [],
     this.commonIssues = const [],
     this.history = const [],
     this.productionStartYear,
@@ -73,6 +77,7 @@ class Car {
       isPopular: _bool(json['isPopular'] ?? json['is_popular']),
       isElectric: _bool(json['isElectric'] ?? json['is_electric']),
       isActive: _bool(json['isActive'] ?? json['is_active'], defaultValue: true),
+      aliases: _parseStringList(json['aliases']),
       commonIssues: _parseStringList(json['commonIssues']),
       history: _parseHistory(json['history']),
       productionStartYear: _parseInt(json['productionStartYear']),
@@ -99,6 +104,7 @@ class Car {
         'isPopular': isPopular,
         'isElectric': isElectric,
         'isActive': isActive,
+        if (aliases.isNotEmpty) 'aliases': aliases,
         'commonIssues': commonIssues,
         'history': history.map((h) => h.toJson()).toList(),
         if (productionStartYear != null)
@@ -124,6 +130,7 @@ class Car {
     bool? isPopular,
     bool? isElectric,
     bool? isActive,
+    List<String>? aliases,
     List<String>? commonIssues,
     List<CarHistoryEntry>? history,
     int? productionStartYear,
@@ -144,6 +151,7 @@ class Car {
       isPopular: isPopular ?? this.isPopular,
       isElectric: isElectric ?? this.isElectric,
       isActive: isActive ?? this.isActive,
+      aliases: aliases ?? this.aliases,
       commonIssues: commonIssues ?? this.commonIssues,
       history: history ?? this.history,
       productionStartYear: productionStartYear ?? this.productionStartYear,
@@ -174,12 +182,70 @@ class Car {
   /// توضیح کوتاه برای زیرعنوان
   String get description {
     final parts = <String>[];
+    if (category != null) parts.add(category!.label);
     if (engine.isNotEmpty) parts.add(engine);
-    // ✅ استفاده از لیبل فارسی Enum
     if (fuelType != null) parts.add(fuelType!.label);
     if (transmission != null) parts.add(transmission!.label);
     if (isElectric) parts.add('⚡ برقی');
     return parts.join(' · ');
+  }
+
+  /// متن یکپارچه برای جستجو (شامل نام‌های جایگزین و ارقام فارسی)
+  String get searchBlob {
+    final parts = <String>[
+      fullName,
+      brand,
+      model,
+      engine,
+      year,
+      ...aliases,
+      if (fuelType != null) fuelType!.label,
+      if (transmission != null) transmission!.label,
+      if (category != null) ...[category!.label, ...category!.searchAliases],
+      if (region != null) region!,
+      if (countryOfOrigin != null) countryOfOrigin!,
+    ];
+    return parts.join(' ');
+  }
+
+  bool matchesQuery(String query) {
+    final q = normalizeSearch(query.trim());
+    if (q.isEmpty) return true;
+    return normalizeSearch(searchBlob).contains(q);
+  }
+
+  /// یکسان‌سازی ارقام فارسی/عربی و حروف عربی برای جستجو
+  static String normalizeSearch(String input) {
+    var s = input.toLowerCase();
+    const map = <String, String>{
+      '۰': '0',
+      '۱': '1',
+      '۲': '2',
+      '۳': '3',
+      '۴': '4',
+      '۵': '5',
+      '۶': '6',
+      '۷': '7',
+      '۸': '8',
+      '۹': '9',
+      '٠': '0',
+      '١': '1',
+      '٢': '2',
+      '٣': '3',
+      '٤': '4',
+      '٥': '5',
+      '٦': '6',
+      '٧': '7',
+      '٨': '8',
+      '٩': '9',
+      'ي': 'ی',
+      'ى': 'ی',
+      'ك': 'ک',
+    };
+    map.forEach((from, to) {
+      s = s.replaceAll(from, to);
+    });
+    return s.replaceAll('\u200c', '');
   }
 
   /// آیا در حال تولید است
@@ -311,6 +377,14 @@ enum CarCategory {
   coupe,
   convertible,
   wagon,
+  motorcycle,
+  scooter,
+  atv,
+  truck,
+  bus,
+  minibus,
+  tractor,
+  heavy,
   other;
 
   String get label => switch (this) {
@@ -322,17 +396,92 @@ enum CarCategory {
         CarCategory.coupe => 'کوپه',
         CarCategory.convertible => 'کابریولت',
         CarCategory.wagon => 'واگن',
+        CarCategory.motorcycle => 'موتورسیکلت',
+        CarCategory.scooter => 'اسکوتر',
+        CarCategory.atv => 'چهارچرخ',
+        CarCategory.truck => 'کامیون',
+        CarCategory.bus => 'اتوبوس',
+        CarCategory.minibus => 'مینی‌بوس',
+        CarCategory.tractor => 'تراکتور',
+        CarCategory.heavy => 'ماشین‌آلات سنگین',
         CarCategory.other => 'سایر',
+      };
+
+  /// نام‌های متداول برای جستجو
+  List<String> get searchAliases => switch (this) {
+        CarCategory.motorcycle => const ['موتور', 'موتور سیکلت', 'bike', 'moto'],
+        CarCategory.scooter => const ['اسکوتر', 'موتور برقی'],
+        CarCategory.atv => const ['ATV', 'کواد', 'چهار چرخ'],
+        CarCategory.truck => const ['کامیون', 'خاور', 'تریلی', 'کشنده'],
+        CarCategory.bus => const ['اتوبوس'],
+        CarCategory.minibus => const ['مینی بوس', 'مینیبوس'],
+        CarCategory.tractor => const ['تراکتور', 'کشاورزی'],
+        CarCategory.heavy => const [
+            'ماشین آلات',
+            'بیل مکانیکی',
+            'لودر',
+            'گریدر',
+            'غلطک',
+            'جرثقیل',
+            'راه‌سازی',
+          ],
+        CarCategory.pickup => const ['پیکاپ', 'وانت'],
+        CarCategory.suv => const ['شاسی بلند', 'کراس‌اوور', 'کراس اوور'],
+        _ => const [],
       };
 
   /// پارس از رشته JSON (ایمن و بدون Exception)
   static CarCategory? fromString(String? value) {
     if (value == null || value.isEmpty) return null;
-    final lower = value.toLowerCase();
+    final lower = value.toLowerCase().trim();
     for (final cat in CarCategory.values) {
       if (cat.name == lower) return cat;
     }
-    return CarCategory.other;
+    const aliases = <String, CarCategory>{
+      'سدان': CarCategory.sedan,
+      'sedan': CarCategory.sedan,
+      'شاسی‌بلند': CarCategory.suv,
+      'شاسی بلند': CarCategory.suv,
+      'suv': CarCategory.suv,
+      'crossover': CarCategory.suv,
+      'هاچ‌بک': CarCategory.hatchback,
+      'هاچبک': CarCategory.hatchback,
+      'hatchback': CarCategory.hatchback,
+      'وانت': CarCategory.pickup,
+      'پیکاپ': CarCategory.pickup,
+      'pickup': CarCategory.pickup,
+      'ون': CarCategory.van,
+      'van': CarCategory.van,
+      'کوپه': CarCategory.coupe,
+      'coupe': CarCategory.coupe,
+      'کابریولت': CarCategory.convertible,
+      'convertible': CarCategory.convertible,
+      'واگن': CarCategory.wagon,
+      'wagon': CarCategory.wagon,
+      'موتورسیکلت': CarCategory.motorcycle,
+      'موتور': CarCategory.motorcycle,
+      'motorcycle': CarCategory.motorcycle,
+      'bike': CarCategory.motorcycle,
+      'اسکوتر': CarCategory.scooter,
+      'scooter': CarCategory.scooter,
+      'چهارچرخ': CarCategory.atv,
+      'atv': CarCategory.atv,
+      'quad': CarCategory.atv,
+      'کامیون': CarCategory.truck,
+      'truck': CarCategory.truck,
+      'اتوبوس': CarCategory.bus,
+      'bus': CarCategory.bus,
+      'مینی‌بوس': CarCategory.minibus,
+      'مینی بوس': CarCategory.minibus,
+      'minibus': CarCategory.minibus,
+      'تراکتور': CarCategory.tractor,
+      'tractor': CarCategory.tractor,
+      'ماشین‌آلات سنگین': CarCategory.heavy,
+      'ماشین آلات سنگین': CarCategory.heavy,
+      'heavy': CarCategory.heavy,
+      'construction': CarCategory.heavy,
+    };
+    return aliases[lower] ?? CarCategory.other;
   }
 }
 
@@ -358,11 +507,29 @@ enum FuelType {
 
   static FuelType? fromString(String? value) {
     if (value == null || value.isEmpty) return null;
-    final lower = value.toLowerCase();
+    final lower = value.toLowerCase().trim();
     for (final type in FuelType.values) {
       if (type.name == lower) return type;
     }
-    return null; // اگر نوع سوخت نامشخص بود، null برمی‌گردد
+    const aliases = <String, FuelType>{
+      'petrol': FuelType.gasoline,
+      'بنزین': FuelType.gasoline,
+      'بنزینی': FuelType.gasoline,
+      'گازوئیل': FuelType.diesel,
+      'دیزلی': FuelType.diesel,
+      'diesel': FuelType.diesel,
+      'دوگانه': FuelType.cng,
+      'گازسوز': FuelType.cng,
+      'گاز سوز': FuelType.cng,
+      'cng': FuelType.cng,
+      'برقی': FuelType.electric,
+      'ev': FuelType.electric,
+      'هیبرید': FuelType.hybrid,
+      'هیبریدی': FuelType.hybrid,
+      'phev': FuelType.hybrid,
+      'گاز مایع': FuelType.lpg,
+    };
+    return aliases[lower];
   }
 }
 
@@ -384,10 +551,19 @@ enum TransmissionType {
 
   static TransmissionType? fromString(String? value) {
     if (value == null || value.isEmpty) return null;
-    final lower = value.toLowerCase();
+    final lower = value.toLowerCase().trim();
     for (final type in TransmissionType.values) {
       if (type.name == lower) return type;
     }
-    return null;
+    const aliases = <String, TransmissionType>{
+      'دستی': TransmissionType.manual,
+      'مانوال': TransmissionType.manual,
+      'manual': TransmissionType.manual,
+      'اتومات': TransmissionType.automatic,
+      'اتوماتیک': TransmissionType.automatic,
+      'automatic': TransmissionType.automatic,
+      'اتوماتیک cvt': TransmissionType.cvt,
+    };
+    return aliases[lower];
   }
 }

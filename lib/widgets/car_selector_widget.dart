@@ -2,6 +2,62 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/car.dart';
 
+enum _CatalogFilter {
+  all,
+  popular,
+  iran,
+  suv,
+  pickup,
+  motorcycle,
+  truck,
+  bus,
+  tractor,
+  heavy,
+}
+
+extension on _CatalogFilter {
+  String get label => switch (this) {
+        _CatalogFilter.all => 'همه',
+        _CatalogFilter.popular => 'محبوب',
+        _CatalogFilter.iran => 'بازار ایران',
+        _CatalogFilter.suv => 'شاسی‌بلند',
+        _CatalogFilter.pickup => 'وانت',
+        _CatalogFilter.motorcycle => 'موتورسیکلت',
+        _CatalogFilter.truck => 'کامیون',
+        _CatalogFilter.bus => 'اتوبوس',
+        _CatalogFilter.tractor => 'تراکتور',
+        _CatalogFilter.heavy => 'ماشین‌آلات سنگین',
+      };
+
+  IconData get icon => switch (this) {
+        _CatalogFilter.all => Icons.apps_rounded,
+        _CatalogFilter.popular => Icons.star_rounded,
+        _CatalogFilter.iran => Icons.flag_rounded,
+        _CatalogFilter.suv => Icons.directions_car_filled_rounded,
+        _CatalogFilter.pickup => Icons.local_shipping_outlined,
+        _CatalogFilter.motorcycle => Icons.two_wheeler_rounded,
+        _CatalogFilter.truck => Icons.local_shipping_rounded,
+        _CatalogFilter.bus => Icons.directions_bus_rounded,
+        _CatalogFilter.tractor => Icons.agriculture_rounded,
+        _CatalogFilter.heavy => Icons.precision_manufacturing_rounded,
+      };
+}
+
+IconData _vehicleIconFor(CarCategory? category) {
+  return switch (category) {
+    CarCategory.motorcycle || CarCategory.scooter => Icons.two_wheeler_rounded,
+    CarCategory.atv => Icons.sports_motorsports_rounded,
+    CarCategory.truck => Icons.local_shipping_rounded,
+    CarCategory.bus || CarCategory.minibus => Icons.directions_bus_rounded,
+    CarCategory.tractor => Icons.agriculture_rounded,
+    CarCategory.heavy => Icons.precision_manufacturing_rounded,
+    CarCategory.pickup => Icons.local_shipping_outlined,
+    CarCategory.van => Icons.airport_shuttle_rounded,
+    CarCategory.suv => Icons.directions_car_filled_rounded,
+    _ => Icons.directions_car_rounded,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ── ویجت اصلی ──
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +130,7 @@ class CarSelectorWidget extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.directions_car_rounded,
+                  _vehicleIconFor(selectedCar?.category),
                   color: isSelected ? theme.colorScheme.secondary : theme.hintColor,
                   size: 20,
                 ),
@@ -85,7 +141,7 @@ class CarSelectorWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      selectedCar?.fullName ?? 'انتخاب یا جستجوی خودرو...',
+                      selectedCar?.fullName ?? 'انتخاب خودرو، موتور یا ماشین‌آلات...',
                       style: TextStyle(
                         color: isSelected ? theme.textTheme.bodyLarge?.color : theme.hintColor,
                         fontSize: 14,
@@ -134,6 +190,7 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
 
   List<Car> _filtered = [];
   String _query = '';
+  _CatalogFilter _filter = _CatalogFilter.all;
 
   @override
   void initState() {
@@ -162,23 +219,50 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
   }
 
   void _applyFilter(String query) {
-    final q = query.trim().toLowerCase();
+    final q = query.trim();
     setState(() {
       _query = query;
-      if (q.isEmpty) {
-        _filtered = widget.cars;
-      } else {
-        _filtered = widget.cars.where((car) {
-          return car.fullName.toLowerCase().contains(q) ||
-              car.brand.toLowerCase().contains(q) ||
-              car.model.toLowerCase().contains(q) ||
-              car.engine.toLowerCase().contains(q) ||
-              // ✅ اصلاح باگ کرش: استفاده از label برای Enum
-              (car.fuelType?.label.toLowerCase().contains(q) ?? false) ||
-              (car.transmission?.label.toLowerCase().contains(q) ?? false);
-        }).toList();
-      }
+      _filtered = widget.cars.where((car) {
+        if (!_matchesFilter(car)) return false;
+        return q.isEmpty || car.matchesQuery(q);
+      }).toList();
     });
+  }
+
+  bool _matchesFilter(Car car) {
+    return switch (_filter) {
+      _CatalogFilter.all => true,
+      _CatalogFilter.popular => car.isPopular,
+      _CatalogFilter.iran => car.region == 'ایران' && !_isCommercial(car.category),
+      _CatalogFilter.suv => car.category == CarCategory.suv,
+      _CatalogFilter.pickup => car.category == CarCategory.pickup,
+      _CatalogFilter.motorcycle =>
+        car.category == CarCategory.motorcycle ||
+            car.category == CarCategory.scooter ||
+            car.category == CarCategory.atv,
+      _CatalogFilter.truck => car.category == CarCategory.truck,
+      _CatalogFilter.bus =>
+        car.category == CarCategory.bus || car.category == CarCategory.minibus,
+      _CatalogFilter.tractor => car.category == CarCategory.tractor,
+      _CatalogFilter.heavy => car.category == CarCategory.heavy,
+    };
+  }
+
+  bool _isCommercial(CarCategory? category) {
+    return category == CarCategory.motorcycle ||
+        category == CarCategory.scooter ||
+        category == CarCategory.atv ||
+        category == CarCategory.truck ||
+        category == CarCategory.bus ||
+        category == CarCategory.minibus ||
+        category == CarCategory.tractor ||
+        category == CarCategory.heavy;
+  }
+
+  void _setFilter(_CatalogFilter filter) {
+    if (_filter == filter) return;
+    _filter = filter;
+    _applyFilter(_searchCtrl.text);
   }
 
   void _clearSearch() {
@@ -209,6 +293,7 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
           _buildHandle(theme),
           _buildHeader(theme),
           _buildSearchField(theme),
+          _buildFilterChips(theme),
           const Divider(height: 1),
           Expanded(child: _buildList(theme)),
         ],
@@ -228,9 +313,9 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
       padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
       child: Row(
         children: [
-          Icon(Icons.directions_car_rounded, color: theme.colorScheme.secondary, size: 22),
+          Icon(Icons.two_wheeler_rounded, color: theme.colorScheme.secondary, size: 22),
           const SizedBox(width: 8),
-          Text('انتخاب خودرو', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text('انتخاب وسیله نقلیه', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           const Spacer(),
           if (_query.isNotEmpty)
             Container(
@@ -258,7 +343,7 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         autofocus: true,
         style: TextStyle(color: theme.textTheme.bodyLarge?.color),
         decoration: InputDecoration(
-          hintText: 'جستجو (پراید، دنا، پژو ۲۰۶، ...)',
+          hintText: 'جستجو (پراید، دنا، هوندا ۱۲۵، تراکتور ۲۸۵، ...)',
           hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
           prefixIcon: Icon(Icons.search_rounded, color: theme.hintColor),
           suffixIcon: _query.isNotEmpty
@@ -278,21 +363,54 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     );
   }
 
+  Widget _buildFilterChips(ThemeData theme) {
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        scrollDirection: Axis.horizontal,
+        itemCount: _CatalogFilter.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = _CatalogFilter.values[index];
+          final selected = _filter == filter;
+          return FilterChip(
+            visualDensity: VisualDensity.compact,
+            selected: selected,
+            showCheckmark: false,
+            avatar: Icon(
+              filter.icon,
+              size: 16,
+              color: selected ? theme.colorScheme.onSecondary : theme.hintColor,
+            ),
+            label: Text(filter.label, style: const TextStyle(fontSize: 12)),
+            selectedColor: theme.colorScheme.secondary,
+            labelStyle: TextStyle(
+              color: selected ? theme.colorScheme.onSecondary : theme.textTheme.bodyMedium?.color,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            ),
+            onSelected: (_) => _setFilter(filter),
+          );
+        },
+      ),
+    );
+  }
+
   // ✅ استفاده از ListView.builder برای پرفورمنس بهتر
   Widget _buildList(ThemeData theme) {
     if (_filtered.isEmpty) return _buildNoResult(theme);
 
-    final popular = _popularCars;
-    final regular = _regularCars;
-
-    // ساخت یک لیست ترکیبی از هدرها و آیتم‌ها برای builder
     final items = <dynamic>[];
-    if (popular.isNotEmpty && _query.isEmpty) {
-      items.add('⭐ محبوب‌ترین‌ها');
-      items.addAll(popular);
-      items.add('divider');
-      items.add('همه خودروها');
-      items.addAll(regular);
+    if (_query.trim().isEmpty && _filter == _CatalogFilter.all) {
+      final popular = _popularCars;
+      if (popular.isNotEmpty) {
+        items.add('⭐ محبوب‌ترین‌ها');
+        items.addAll(popular);
+        items.add('divider');
+      }
+      items.addAll(_brandGroupedItems(_regularCars));
+    } else if (_query.trim().isEmpty) {
+      items.addAll(_brandGroupedItems(_filtered));
     } else {
       items.addAll(_filtered);
     }
@@ -311,6 +429,20 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         return const SizedBox.shrink();
       },
     );
+  }
+
+  List<dynamic> _brandGroupedItems(List<Car> cars) {
+    final grouped = <String, List<Car>>{};
+    for (final car in cars) {
+      grouped.putIfAbsent(car.brand, () => <Car>[]).add(car);
+    }
+    final brands = grouped.keys.toList()..sort();
+    final items = <dynamic>[];
+    for (final brand in brands) {
+      items.add(brand);
+      items.addAll(grouped[brand]!);
+    }
+    return items;
   }
 
   Widget _buildSectionHeader(String title, ThemeData theme) {
@@ -346,7 +478,7 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.directions_car_rounded,
+                  _vehicleIconFor(car.category),
                   color: isSelected ? theme.colorScheme.secondary : theme.hintColor,
                   size: 18,
                 ),
@@ -401,10 +533,18 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
       );
     }
 
-    final lower = text.toLowerCase();
-    final idx = lower.indexOf(query);
-    if (idx < 0) {
-      return Text(text, style: TextStyle(fontSize: 14, color: theme.textTheme.bodyLarge?.color));
+    final nQuery = Car.normalizeSearch(query);
+    final nText = Car.normalizeSearch(text);
+    final idx = nText.indexOf(nQuery);
+    if (idx < 0 || nText.length != text.length) {
+      return Text(
+        text,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? theme.colorScheme.secondary : theme.textTheme.bodyLarge?.color,
+        ),
+      );
     }
 
     return RichText(
@@ -436,13 +576,13 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
             Icon(Icons.search_off_rounded, size: 56, color: theme.hintColor.withOpacity(0.3)),
             const SizedBox(height: 12),
             Text(
-              'خودرویی با نام "$_query" یافت نشد.',
+              'وسیله‌ای با نام "$_query" یافت نشد.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.hintColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
             Text(
-              'نام برند یا مدل را به شکل دیگری امتحان کنید.',
+              'برند، مدل، موتورسیکلت یا ماشین‌آلات را با نام دیگری جستجو کنید.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.hintColor.withOpacity(0.6), fontSize: 12),
             ),
@@ -514,7 +654,7 @@ class _ErrorBox extends StatelessWidget {
         children: [
           const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 20),
           const SizedBox(width: 10),
-          const Expanded(child: Text('خطا در بارگذاری خودروها', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
+          const Expanded(child: Text('خطا در بارگذاری لیست وسایل نقلیه', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
           TextButton.icon(
             icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('تلاش مجدد'),
@@ -545,7 +685,7 @@ class _EmptyBox extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'لیست خودروها خالی است. صفحه را بکشید تا دوباره بارگذاری شود.',
+              'لیست وسایل نقلیه خالی است. صفحه را بکشید تا دوباره بارگذاری شود.',
               style: TextStyle(color: theme.hintColor, fontSize: 12),
             ),
           ),

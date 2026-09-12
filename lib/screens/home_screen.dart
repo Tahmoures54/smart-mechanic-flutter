@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (mounted) {
         setState(() => _hasCarLoadError = true);
-        _snack('لیست خودروها لود نشد. اینترنت را چک کنید.');
+        _snack('لیست وسایل نقلیه لود نشد. فایل داخلی یا اینترنت را چک کنید.');
       }
     } finally {
       if (mounted) {
@@ -354,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              _SectionLabel(number: '۱', title: 'خودرو را انتخاب کنید'),
+              _SectionLabel(number: '۱', title: 'وسیله نقلیه را انتخاب کنید'),
               const SizedBox(height: 10),
               _CarCard(
                 isCustom: _isCustomCar,
@@ -1356,7 +1356,7 @@ class _CarCard extends StatelessWidget {
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
                 labelText: 'نام و مدل خودرو',
-                hintText: 'مثال: تویوتا کمری',
+                hintText: 'مثال: تویوتا کمری یا هوندا ۱۲۵',
                 prefixIcon: const Icon(Icons.edit_rounded, size: 20),
                 filled: true,
                 fillColor: theme.canvasColor,
@@ -1406,8 +1406,8 @@ class _CarCard extends StatelessWidget {
               ),
               child: Text(
                 isCustom
-                    ? '← بازگشت به لیست خودروها'
-                    : 'خودروی من در لیست نیست',
+                    ? '← بازگشت به لیست وسایل نقلیه'
+                    : 'وسیله من در لیست نیست',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

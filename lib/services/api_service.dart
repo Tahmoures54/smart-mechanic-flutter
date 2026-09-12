@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import '../constants.dart';
 import '../models/car.dart';
@@ -185,8 +186,10 @@ class ApiService {
   String _truncate(String s, {int max = 100}) => s.length > max ? '${s.substring(0, max)}...' : s;
 
   // ─────────────────────────────────────────
-  // ── لیست خودروها (با cache) ──
+  // ── لیست خودروها (کاتالوگ داخلی + سرور) ──
   // ─────────────────────────────────────────
+  static const _bundledCarsAsset = 'assets/data/cars.json';
+
   Future<List<Car>> getCars({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _carsCache != null &&
@@ -196,26 +199,82 @@ class ApiService {
       return _carsCache!;
     }
 
-    // ✅ ساخت ایمن URL با Uri
+    final local = await _loadBundledCars();
+    var remote = <Car>[];
+    try {
+      remote = await _fetchRemoteCars();
+    } catch (e) {
+      debugPrint('[API] دریافت cars.json سرور ناموفق بود: $e');
+      if (local.isEmpty) rethrow;
+    }
+
+    final cars = _mergeCars(local, remote);
+    if (cars.isEmpty) {
+      throw const ApiException(404, 'لیست خودروها خالی است');
+    }
+
+    _carsCache = cars;
+    _carsCacheTime = DateTime.now();
+    debugPrint('[API] ${cars.length} وسیله نقلیه آماده شد (داخلی: ${local.length}، سرور: ${remote.length}).');
+    return cars;
+  }
+
+  Future<List<Car>> _loadBundledCars() async {
+    try {
+      final raw = await rootBundle.loadString(_bundledCarsAsset);
+      return _parseCarsJson(json.decode(raw));
+    } catch (e) {
+      debugPrint('[API] خواندن کاتالوگ داخلی ناموفق بود: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Car>> _fetchRemoteCars() async {
     final baseUri = Uri.parse(Constants.baseUrl);
     final carsUri = baseUri.replace(path: '/cars.json', queryParameters: null);
-
     final response = await _safeCall(
       () => _httpClient.get(carsUri, headers: {'Accept': 'application/json'}),
       rateLimitKey: 'getCars',
     );
+    return _parseCarsJson(_parseBody(response));
+  }
 
-    final body = _parseBody(response);
-    final List<dynamic> rawList = body is Map && body.containsKey('cars')
-        ? body['cars'] as List<dynamic>
-        : (body is List ? body : []);
+  List<Car> _parseCarsJson(dynamic body) {
+    final List<dynamic> rawList;
+    if (body is List<dynamic>) {
+      rawList = body;
+    } else if (body is Map && body['cars'] is List<dynamic>) {
+      rawList = body['cars'] as List<dynamic>;
+    } else {
+      rawList = const [];
+    }
+    return rawList
+        .whereType<Map>()
+        .map((j) => Car.fromJson(Map<String, dynamic>.from(j)))
+        .toList();
+  }
 
-    final cars = rawList.map((j) => Car.fromJson(j as Map<String, dynamic>)).toList();
+  List<Car> _mergeCars(List<Car> local, List<Car> remote) {
+    final byId = <String>{};
+    final byKey = <String>{};
+    final out = <Car>[];
 
-    _carsCache = cars;
-    _carsCacheTime = DateTime.now();
+    void add(Car car) {
+      if (car.id.isEmpty) return;
+      final key = '${car.brand.trim().toLowerCase()}|${car.model.trim().toLowerCase()}|${car.engine.trim().toLowerCase()}';
+      if (byId.contains(car.id) || byKey.contains(key)) return;
+      byId.add(car.id);
+      byKey.add(key);
+      out.add(car);
+    }
 
-    return cars;
+    for (final car in local) {
+      add(car);
+    }
+    for (final car in remote) {
+      add(car);
+    }
+    return out;
   }
 
   void clearCarsCache() {
