@@ -1,17 +1,6 @@
 part of 'home_screen.dart';
 
-// Widgets extracted — see repository history for full UI helpers.
-// Temporary minimal stubs so the app compiles; replace with full widgets from previous home_screen.
-
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-
-import '../providers/auth_provider.dart';
-import '../services/share_service.dart';
-import '../widgets/car_selector_widget.dart';
-import '../models/car.dart';
-import 'shop_screen.dart';
+// Private UI pieces for HomeScreen (must stay a `part of` — no own imports).
 
 class _DiagnoseCtaButton extends StatelessWidget {
   final VoidCallback onPressed;
@@ -24,6 +13,7 @@ class _DiagnoseCtaButton extends StatelessWidget {
     return Material(
       color: theme.colorScheme.secondary,
       elevation: 3,
+      shadowColor: theme.colorScheme.secondary.withOpacity(0.45),
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onPressed,
@@ -32,14 +22,42 @@ class _DiagnoseCtaButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
-              Icon(Icons.send_rounded, color: fg, size: 24),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.send_rounded, color: fg, size: 24),
+              ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  'ارسال به مکانیک هوشمند',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: fg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ارسال به مکانیک هوشمند',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: fg,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'تحلیل فوری با هوش مصنوعی',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: fg.withOpacity(0.82),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              Icon(Icons.auto_awesome_rounded, color: fg, size: 22),
             ],
           ),
         ),
@@ -69,12 +87,34 @@ class _AudioCtaButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(Icons.mic_rounded, color: secondary, size: 24),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: secondary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.mic_rounded, color: secondary, size: 24),
+              ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  'ضبط صدای موتور',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: secondary),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ضبط صدای موتور',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'تحلیل صدا برای تشخیص دقیق‌تر',
+                      style: TextStyle(fontSize: 12, color: theme.hintColor),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -98,7 +138,14 @@ class _SectionLabel extends StatelessWidget {
         CircleAvatar(
           radius: 14,
           backgroundColor: theme.colorScheme.secondary,
-          child: Text(number, style: TextStyle(color: theme.colorScheme.onSecondary, fontSize: 13, fontWeight: FontWeight.bold)),
+          child: Text(
+            number,
+            style: TextStyle(
+              color: theme.colorScheme.onSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
         const SizedBox(width: 10),
         Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -116,23 +163,23 @@ class _StatusBanner extends StatelessWidget {
     final theme = Theme.of(context);
     if (!auth.isAuthenticated) {
       return Card(
-        child: ListTile(
-          leading: const Icon(Icons.person_outline),
-          title: const Text('وارد نشده‌اید'),
-          subtitle: const Text('برای عیب‌یابی با شماره موبایل وارد شوید'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: const ListTile(
+          leading: Icon(Icons.person_outline),
+          title: Text('وارد نشده‌اید'),
+          subtitle: Text('برای عیب‌یابی با شماره موبایل وارد شوید'),
         ),
       );
     }
-    final credits = auth.credits;
-    final free = auth.remainingFree;
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
-        leading: Icon(auth.isGolden ? Icons.workspace_premium : Icons.account_circle),
-        title: Text(auth.phone ?? 'کاربر'),
+        leading: Icon(auth.isGoldenActive ? Icons.workspace_premium : Icons.account_circle),
+        title: Text(auth.displayName),
         subtitle: Text(
-          auth.isGolden
+          auth.isGoldenActive
               ? 'اشتراک طلایی فعال'
-              : 'اعتبار: $credits · رایگان ماهانه: ${free ?? 0}',
+              : 'اعتبار: ${auth.credits} · رایگان ماهانه: ${auth.remainingFree}',
         ),
       ),
     );
@@ -166,7 +213,6 @@ class _CarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -174,32 +220,39 @@ class _CarCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (isLoading)
-              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-            else if (hasError)
-              TextButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('تلاش مجدد'))
-            else if (!isCustom)
+            if (!isCustom)
               CarSelectorWidget(
                 cars: cars,
                 selectedCar: selectedCar,
-                onSelected: onCarSelected,
-              ),
-            if (isCustom)
+                isLoading: isLoading,
+                hasError: hasError,
+                onRetry: onRetry,
+                onCarSelected: onCarSelected,
+              )
+            else
               TextField(
                 controller: customController,
-                decoration: const InputDecoration(labelText: 'نام خودرو', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'نام خودرو',
+                  border: OutlineInputBorder(),
+                ),
               ),
             const SizedBox(height: 12),
             TextField(
               controller: yearController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(labelText: 'سال ساخت', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'سال ساخت',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: onToggleCustom,
-              child: Text(isCustom ? 'انتخاب از لیست خودروها' : 'خودروی من در لیست نیست'),
+              child: Text(
+                isCustom ? 'انتخاب از لیست خودروها' : 'خودروی من در لیست نیست',
+              ),
             ),
           ],
         ),
@@ -214,6 +267,7 @@ class _MechanicAllyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Text(
@@ -230,9 +284,9 @@ class _WhyItWorksSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text('چرا مکانیک هوشمند؟', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         SizedBox(height: 8),
         Text('• تشخیص اولیه با هوش مصنوعی بر اساس شرح مشکل یا صدای موتور'),
@@ -249,11 +303,14 @@ class _SupportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
         leading: const Icon(Icons.favorite_outline),
         title: const Text('حمایت از توسعه'),
         subtitle: const Text('با معرفی به دوستان، به رشد این ابزار کمک کنید'),
-        onTap: () => ShareService.shareApp(),
+        onTap: () {
+          ShareService.shareApp();
+        },
       ),
     );
   }
