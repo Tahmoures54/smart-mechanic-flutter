@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Generate Smart Mechanic branding assets from the official mark.
 
-Source of truth: /logo.png (circular badge: gear + padlock + wrench + screwdriver).
-This script redraws a crisp vector-faithful version for launcher, splash, and in-app use.
+Orange workshop palette — gear + lock + tools on warm dark chrome.
 """
 from __future__ import annotations
 
@@ -19,19 +18,20 @@ FONT_CANDIDATES = [
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
 ]
 
-# Palette sampled from logo.png
-WHITE = (250, 251, 251, 255)
-BG = (18, 18, 18, 255)
-BG_DEEP = (13, 13, 18, 255)  # #0D0D12 app chrome
-GEAR = (72, 71, 71, 255)
-GEAR_DARK = (36, 36, 36, 255)
-HOLE = (22, 22, 22, 255)
-GOLD_HI = (245, 223, 176, 255)
-GOLD_MID = (228, 186, 86, 255)
-GOLD_LO = (214, 163, 48, 255)
-GOLD_EDGE = (196, 140, 32, 255)
-KEYHOLE = (32, 32, 32, 255)
-SHADOW = (0, 0, 0, 90)
+# Palette — mechanical workshop orange (BrandColors)
+WHITE = (255, 248, 240, 255)           # warm off-white ring
+BG = (36, 20, 12, 255)                 # #24140C dark warm disc
+BG_DEEP = (20, 12, 8, 255)             # #140C08 launcher / chrome
+GEAR = (90, 58, 40, 255)               # bronze-metal gear
+GEAR_DARK = (48, 28, 16, 255)
+HOLE = (28, 16, 10, 255)
+# Tool + lock: vivid workshop orange (not pale yellow)
+GOLD_HI = (255, 204, 128, 255)         # #FFCC80
+GOLD_MID = (255, 122, 26, 255)         # #FF7A1A primary orange
+GOLD_LO = (230, 81, 0, 255)            # #E65100 deep orange
+GOLD_EDGE = (191, 54, 12, 255)         # #BF360C rust edge
+KEYHOLE = (40, 18, 8, 255)
+SHADOW = (0, 0, 0, 100)
 
 
 def _lerp(a, b, t):
@@ -101,8 +101,6 @@ def paste_layer(base, layer):
 
 
 def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
-    """Draw the circular brand mark at `size` x `size`."""
-    # Super-sample
     s = max(size * 2, 512)
     scale = s / 1024.0
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0) if transparent_outside else BG_DEEP)
@@ -119,7 +117,6 @@ def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
     r_gear_inner = sc(178)
     r_hole_ring = sc(268)
 
-    # Soft drop shadow under the badge
     shadow = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
     sd.ellipse(
@@ -129,13 +126,11 @@ def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
     shadow = shadow.filter(ImageFilter.GaussianBlur(radius=sc(18)))
     paste_layer(img, shadow)
 
-    # White ring + dark disc
     d.ellipse([cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer], fill=WHITE)
     d.ellipse(
         [cx - r_ring_inner, cy - r_ring_inner, cx + r_ring_inner, cy + r_ring_inner],
         fill=BG,
     )
-    # Inner hairline
     d.ellipse(
         [
             cx - r_ring_inner + sc(6),
@@ -143,18 +138,16 @@ def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
             cx + r_ring_inner - sc(6),
             cy + r_ring_inner - sc(6),
         ],
-        outline=(40, 40, 40, 255),
+        outline=(60, 36, 20, 255),
         width=max(1, int(sc(4))),
     )
 
-    # Gear
     pts = gear_points(cx, cy, 8, r_gear_tip, r_gear_root)
     rounded_poly(d, pts, GEAR)
     d.ellipse(
         [cx - r_gear_inner, cy - r_gear_inner, cx + r_gear_inner, cy + r_gear_inner],
         fill=BG,
     )
-    # Inner holes between teeth
     for i in range(8):
         ang = -90 + 22.5 + i * 45
         hx, hy = polar(cx, cy, r_hole_ring, ang)
@@ -167,7 +160,6 @@ def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
         ]
         hole = rotate_pts(hole, ang + 90, hx, hy)
         rounded_poly(d, hole, HOLE)
-    # Gear inner rim
     d.ellipse(
         [
             cx - r_gear_inner - sc(14),
@@ -179,7 +171,6 @@ def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
         width=max(2, int(sc(14))),
     )
 
-    # Tools + lock on a dedicated layer so gold stays crisp
     tools = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     td = ImageDraw.Draw(tools)
     _draw_screwdriver(td, cx, cy, sc)
@@ -192,21 +183,12 @@ def draw_mark(size: int, *, transparent_outside: bool = True) -> Image.Image:
     return out
 
 
-def _gold_rect(draw, box, t0=0.0, t1=1.0):
-    x0, y0, x1, y1 = box
-    h = max(1, int(y1 - y0))
-    for i in range(h):
-        t = t0 + (t1 - t0) * (i / h)
-        draw.line([(x0, y0 + i), (x1, y0 + i)], fill=gold_at(t))
-
-
 def _xform(pts, cx, cy, sc, angle, origin_y):
     shifted = [(cx + x, cy + origin_y + y) for x, y in pts]
     return rotate_pts(shifted, angle, cx, cy)
 
 
 def _draw_screwdriver(draw: ImageDraw.ImageDraw, cx, cy, sc):
-    # Handle sits upper-left; shaft runs into the lock.
     angle = -50
     origin_y = sc(-250)
 
@@ -232,7 +214,7 @@ def _draw_screwdriver(draw: ImageDraw.ImageDraw, cx, cy, sc):
     rounded_poly(
         draw,
         L([(-sc(20), sc(148)), (sc(20), sc(148)), (sc(20), sc(172)), (-sc(20), sc(172))]),
-        (42, 42, 42, 255),
+        (58, 32, 16, 255),
     )
     rounded_poly(
         draw,
@@ -253,7 +235,6 @@ def _draw_wrench(draw: ImageDraw.ImageDraw, cx, cy, sc, canvas: Image.Image):
     def L(pts):
         return _xform(pts, cx, cy, sc, angle, origin_y)
 
-    # Handle + neck
     rounded_poly(
         draw,
         L([(-sc(20), sc(155)), (sc(20), sc(155)), (sc(20), sc(340)), (-sc(20), sc(340))]),
@@ -265,7 +246,6 @@ def _draw_wrench(draw: ImageDraw.ImageDraw, cx, cy, sc, canvas: Image.Image):
         GOLD_MID,
     )
 
-    # Open-end head
     outer = [
         (-sc(88), sc(4)),
         (-sc(22), sc(4)),
@@ -282,7 +262,6 @@ def _draw_wrench(draw: ImageDraw.ImageDraw, cx, cy, sc, canvas: Image.Image):
     ]
     rounded_poly(draw, L(outer), GOLD_HI)
 
-    # Punch a transparent opening in the jaws
     opening = [
         (-sc(48), sc(14)),
         (sc(48), sc(14)),
@@ -393,35 +372,31 @@ def write_svg(path: Path):
         """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#F5DFB0"/>
-      <stop offset="45%" stop-color="#E4BA56"/>
-      <stop offset="100%" stop-color="#D6A330"/>
+      <stop offset="0%" stop-color="#FFCC80"/>
+      <stop offset="45%" stop-color="#FF7A1A"/>
+      <stop offset="100%" stop-color="#E65100"/>
     </linearGradient>
   </defs>
-  <circle cx="256" cy="256" r="248" fill="#FAFBFB"/>
-  <circle cx="256" cy="256" r="222" fill="#121212"/>
-  <!-- Gear (simplified 8-tooth) -->
-  <g fill="#484747">
+  <circle cx="256" cy="256" r="248" fill="#FFF8F0"/>
+  <circle cx="256" cy="256" r="222" fill="#24140C"/>
+  <g fill="#5A3A28">
     <path d="M256 56 l28 28 h40 l14 40 40 14 v40 l28 28 -28 28 v40 l-40 14 -14 40 h-40 l-28 28 -28-28 h-40 l-14-40 -40-14 v-40 l-28-28 28-28 v-40 l40-14 14-40 h40 z"/>
   </g>
-  <circle cx="256" cy="256" r="78" fill="#121212"/>
-  <circle cx="256" cy="256" r="92" fill="none" stroke="#484747" stroke-width="14"/>
-  <!-- Screwdriver -->
+  <circle cx="256" cy="256" r="78" fill="#24140C"/>
+  <circle cx="256" cy="256" r="92" fill="none" stroke="#5A3A28" stroke-width="14"/>
   <g transform="translate(256,256) rotate(-48) translate(-256,-256)">
     <rect x="240" y="70" width="32" height="90" rx="8" fill="url(#gold)"/>
-    <rect x="246" y="160" width="20" height="16" rx="3" fill="#303030"/>
+    <rect x="246" y="160" width="20" height="16" rx="3" fill="#3A2010"/>
     <rect x="250" y="174" width="12" height="70" rx="3" fill="url(#gold)"/>
   </g>
-  <!-- Wrench -->
   <g transform="translate(256,256) rotate(48) translate(-256,-256)">
     <rect x="244" y="150" width="24" height="110" rx="10" fill="url(#gold)"/>
     <path d="M210 70 h36 v30 h20 v24 h-20 v20 h-36 v-24 h-18 v-26 h18 z" fill="url(#gold)"/>
   </g>
-  <!-- Lock -->
   <path d="M206 210 a50 48 0 0 1 100 0 v28 h-22 v-28 a28 28 0 0 0 -56 0 v28 h-22 z" fill="url(#gold)"/>
   <rect x="186" y="228" width="140" height="130" rx="22" fill="url(#gold)"/>
-  <circle cx="256" cy="278" r="16" fill="#202020"/>
-  <path d="M248 278 l16 0 8 40 h-32 z" fill="#202020"/>
+  <circle cx="256" cy="278" r="16" fill="#281208"/>
+  <path d="M248 278 l16 0 8 40 h-32 z" fill="#281208"/>
 </svg>
 """,
         encoding="utf-8",
@@ -451,7 +426,7 @@ def make_banner(mark: Image.Image) -> Image.Image:
     x = 540
     d.text((x, 160), "Smart Mechanic", font=font_en, fill=GOLD_MID)
     d.text((x, 280), "مکانیک هوشمند", font=font_fa, fill=WHITE)
-    d.text((x, 390), "عیب‌یابی هوشمند خودرو", font=font_tag, fill=(176, 176, 188, 255))
+    d.text((x, 390), "عیب‌یابی هوشمند خودرو", font=font_tag, fill=(224, 180, 140, 255))
     return img
 
 
@@ -500,7 +475,6 @@ def write_adaptive_xml():
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
 
-    # Preserve the original raster
     src = ROOT / "logo.png"
     if src.exists():
         save_png(Image.open(src).convert("RGBA"), OUT / "logo_source.png")
@@ -508,15 +482,11 @@ def main():
     mark_1024 = draw_mark(1024)
     mark_512 = draw_mark(512)
 
-    # In-app circular logo (transparent outside)
     save_png(mark_512, OUT / "logo.png")
 
-    # Play / launcher: dark square with the badge
     app_icon = composite_on(BG_DEEP, mark_1024, fill_ratio=0.94)
-    # Flatten to RGB with dark fill (no alpha — Play Store / launcher)
     save_png(app_icon, OUT / "app_icon.png", rgb=True)
 
-    # Adaptive foreground: badge in the 66% safe zone
     fg = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
     inner = mark_1024.resize((680, 680), Image.Resampling.LANCZOS)
     fg.alpha_composite(inner, ((1024 - 680) // 2, (1024 - 680) // 2))
@@ -544,13 +514,12 @@ def main():
     write_svg(OUT / "banner.svg")
 
     round_icon = circle_crop(app_icon)
-    # round png still needs opaque corners for some launchers → composite on dark
     round_rgb = Image.new("RGBA", (1024, 1024), BG_DEEP)
     round_rgb.alpha_composite(round_icon)
     write_android_icons(app_icon, fg, round_rgb)
     write_adaptive_xml()
 
-    print("Branding assets generated.")
+    print("Branding assets generated (orange mechanical).")
 
 
 if __name__ == "__main__":
