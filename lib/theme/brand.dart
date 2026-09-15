@@ -1,14 +1,28 @@
 import 'package:flutter/material.dart';
 
-/// هویت بصری مکانیک هوشمند — منبع: `logo.png` ریشهٔ پروژه
+/// هویت بصری مکانیک هوشمند — هم‌تراز با سایت smart-mec.ir
 class Brand {
   Brand._();
 
   static const String nameFa = 'مکانیک هوشمند';
   static const String nameEn = 'Smart Mechanic';
   static const String shortName = 'Smart Mec';
-  static const String tagline = 'عیب‌یابی هوشمند خودرو';
-  static const String taglineEn = 'AI car diagnostics you can trust';
+  static const String tagline = 'بزرگترین بانک اطلاعات فنی خودرویی کشور';
+  static const String subtitle = 'تشخیص هوشمند، بدون گمراهی تعمیرگاه';
+  static const String taglineEn = 'Iran’s technical car knowledge base';
+
+  /// دامنه رسمی وب و API
+  static const String websiteUrl = 'https://smart-mec.ir';
+  static const String privacyUrl = 'https://smart-mec.ir/privacy';
+  static const String termsUrl = 'https://smart-mec.ir/terms';
+
+  /// نماد اعتماد الکترونیکی (اینماد) — همان کد سایت
+  static const String enamadSealId = '7731207';
+  static const String enamadSealCode = 'Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
+  static const String enamadProfileUrl =
+      'https://trustseal.enamad.ir/?id=$enamadSealId&Code=$enamadSealCode';
+  static const String enamadLogoUrl =
+      'https://trustseal.enamad.ir/logo.aspx?id=$enamadSealId&Code=$enamadSealCode';
 }
 
 /// مسیر دارایی‌های برند
