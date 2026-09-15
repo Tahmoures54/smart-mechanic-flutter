@@ -30,8 +30,8 @@ class EnvironmentConfig {
     this.enableCrashReporting = true,
   });
 
-  static const String _defaultBaseUrl =
-      'https://smart-mec-backend-zeta.vercel.app/api';
+  /// دامنه رسمی سایت / API (هم‌تراز با smart-mec-backend)
+  static const String _defaultBaseUrl = 'https://smart-mec.ir/api';
 
   static String get _baseUrlFromEnv {
     try {
@@ -112,18 +112,25 @@ class Constants {
   static String get purchase => '$apiUrl/purchase';
   static String get verifyPurchase => '$apiUrl/purchase/verify';
 
-  // Garages (دیتابیس خود اپ — جایگزین Google Places)
-  /// GET ?lat=&lng=&radius=&limit=&featured=&openNow=&q=&specialties=
+  // Garages
   static String get garagesNearby => '$apiUrl/garages/nearby';
   static String garageDetails(String id) => '$apiUrl/garages/$id';
   static String get garages => '$apiUrl/garages';
 
-  // Static
+  // Static (روی همان origin سایت، نه زیر /api)
   static String get carsJson {
     final uri = Uri.parse(baseUrl);
-    return uri.replace(path: '/cars.json').toString();
+    // baseUrl مثل https://smart-mec.ir/api → cars در ریشه سایت
+    final origin = uri.replace(path: '', query: null).toString().replaceAll(RegExp(r'/+$'), '');
+    return '$origin/cars.json';
   }
+
   static String get health => '$apiUrl/health';
+
+  // Site / Enamad
+  static const String websiteUrl = 'https://smart-mec.ir';
+  static const String enamadProfileUrl =
+      'https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
 
   // Timeouts
   static const Duration defaultTimeout = Duration(seconds: 20);
@@ -139,7 +146,7 @@ class Constants {
   // App Info
   static const String appName = 'مکانیک هوشمند';
   static const String appNameEn = 'Smart Mechanic';
-  static const String appTagline = 'عیب‌یابی هوشمند خودرو';
+  static const String appTagline = 'بزرگترین بانک اطلاعات فنی خودرویی کشور';
   static const String appVersion = '1.2.0';
   static const int appBuildNumber = 3;
   static const String packageName = 'ir.smartmec.app';

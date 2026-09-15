@@ -45,13 +45,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Ensure .env for assets
+      - name: Ensure .env for assets (production API)
         run: |
-          if [ ! -f .env ]; then
-            cp .env.example .env || true
-            echo 'API_BASE_URL=https://smart-mec-backend-zeta.vercel.app/api' > .env
-            echo 'API_VERSION=v1' >> .env
-          fi
+          cat > .env << 'EOF'
+          API_BASE_URL=https://smart-mec.ir/api
+          API_VERSION=v1
+          EOF
+          echo "API_BASE_URL set to production smart-mec.ir"
+          cat .env
 
       - name: Flutter pub get
         run: flutter pub get
@@ -71,9 +72,6 @@ jobs:
 
       - name: Generate launcher icons
         run: |
-          # Do not wipe mipmap-* first. flutter_launcher_icons adaptive mode
-          # emits ic_launcher (+ anydpi XML) but not ic_launcher_round, and
-          # AndroidManifest still references @mipmap/ic_launcher_round.
           dart run flutter_launcher_icons
           python3 - <<'PY'
           from pathlib import Path
