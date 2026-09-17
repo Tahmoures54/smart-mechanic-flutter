@@ -24,13 +24,15 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
-            if (request.url.startsWith('smartmec://success')) {
+            final url = request.url;
+            if (url.startsWith('smartmec://success')) {
               if (!_isProcessed) {
                 _isProcessed = true;
                 _handlePaymentResult(isSuccess: true);
               }
               return NavigationDecision.prevent;
-            } else if (request.url.startsWith('smartmec://failed')) {
+            }
+            if (url.startsWith('smartmec://failed')) {
               if (!_isProcessed) {
                 _isProcessed = true;
                 _handlePaymentResult(isSuccess: false);
@@ -38,6 +40,17 @@ class _PaymentWebViewState extends State<PaymentWebView> {
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
+          },
+          onPageFinished: (String url) {
+            // اگر صفحه verify با موفقیت لود شد و deep link خودکار نشد
+            if (_isProcessed) return;
+            if (url.contains('smartmec://success')) {
+              _isProcessed = true;
+              _handlePaymentResult(isSuccess: true);
+            } else if (url.contains('smartmec://failed')) {
+              _isProcessed = true;
+              _handlePaymentResult(isSuccess: false);
+            }
           },
         ),
       )
@@ -70,8 +83,8 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       await context.read<AuthProvider>().fetchProfile(force: true);
       if (!mounted) return;
 
-      Navigator.pop(context);
-      Navigator.pop(context);
+      Navigator.pop(context); // dialog
+      Navigator.pop(context); // webview
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -110,6 +123,7 @@ class _PaymentWebViewState extends State<PaymentWebView> {
           title: const Text('درگاه پرداخت امن'),
           leading: IconButton(
             icon: const Icon(Icons.close),
+            onClick: () => Navigator.of(context).pop(),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
