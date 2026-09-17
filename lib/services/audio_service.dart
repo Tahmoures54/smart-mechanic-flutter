@@ -10,14 +10,14 @@ import 'package:permission_handler/permission_handler.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 class RecordingConfig {
   final Codec codec;
-  final int bitRate;        // bps
-  final int sampleRate;     // Hz
-  final int numChannels;    // 1=mono, 2=stereo
+  final int bitRate; // bps (برای کدک‌های فشرده؛ برای PCM نادیده گرفته می‌شود)
+  final int sampleRate; // Hz
+  final int numChannels; // 1=mono, 2=stereo
   final Duration maxDuration;
   final Duration minDuration;
 
   const RecordingConfig({
-    this.codec = Codec.aacADTS,
+    this.codec = Codec.pcm16WAV,
     this.bitRate = 128000,
     this.sampleRate = 44100,
     this.numChannels = 1,
@@ -25,25 +25,40 @@ class RecordingConfig {
     this.minDuration = const Duration(seconds: 2),
   });
 
-  /// پیش‌فرض برای آنالیز موتور (کیفیت بالا)
+  /// پیش‌فرض برای آنالیز موتور — PCM16 WAV تا SoundAnalyzer نمونه‌های واقعی بگیرد
   static const engineAnalysis = RecordingConfig(
-    codec: Codec.aacADTS,
-    bitRate: 192000,
+    codec: Codec.pcm16WAV,
+    bitRate: 1411200, // 44100 * 16 * 1 (تقریبی)
     sampleRate: 44100,
     numChannels: 1,
     maxDuration: Duration(seconds: 30),
     minDuration: Duration(seconds: 3),
   );
 
-  /// پیش‌فرض برای ضبط عمومی (حجم کمتر)
+  /// پیش‌فرض برای ضبط عمومی (حجم کمتر با sampleRate پایین‌تر)
   static const general = RecordingConfig(
-    codec: Codec.aacADTS,
-    bitRate: 96000,
+    codec: Codec.pcm16WAV,
+    bitRate: 352800,
     sampleRate: 22050,
     numChannels: 1,
     maxDuration: Duration(minutes: 5),
     minDuration: Duration(seconds: 1),
   );
+
+  String get fileExtension {
+    switch (codec) {
+      case Codec.pcm16WAV:
+      case Codec.pcmFloat32WAV:
+        return 'wav';
+      case Codec.pcm16:
+        return 'pcm';
+      case Codec.aacADTS:
+      case Codec.aacMP4:
+        return 'aac';
+      default:
+        return 'wav';
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,12 +99,12 @@ class RecordingInfo {
 // ── وضعیت ضبط ──
 // ─────────────────────────────────────────────────────────────────────────────
 enum RecordingState {
-  idle,       // آماده
-  recording,  // در حال ضبط
-  paused,     // متوقف موقت
+  idle, // آماده
+  recording, // در حال ضبط
+  paused, // متوقف موقت
   processing, // در حال پردازش
-  done,       // تمام‌شده
-  error;      // خطا
+  done, // تمام‌شده
+  error; // خطا
 
   bool get isActive => this == recording || this == paused;
   bool get canStart => this == idle || this == done || this == error;
@@ -270,12 +285,10 @@ class AudioService implements IAudioService {
       }
     }
 
-    // ✅ بررسی فضای دیسک حذف شد (در فلاتر استاندارد دارای باگ است و برای فایل‌های کوچک اضافی است)
-
     try {
-      // ── ساخت مسیر فایل ──
       final ts = DateTime.now().millisecondsSinceEpoch;
-      _filePath = '${_tempDir!.path}/engine_$ts.aac';
+      final ext = _config.fileExtension;
+      _filePath = '${_tempDir!.path}/engine_$ts.$ext';
       _startTime = DateTime.now();
       _pausedDuration = Duration.zero;
 
@@ -291,7 +304,7 @@ class AudioService implements IAudioService {
       _startDurationTimer();
       _startMaxDurationTimer();
 
-      debugPrint('[AudioService] ضبط شروع شد: $_filePath');
+      debugPrint('[AudioService] ضبط شروع شد: $_filePath (codec=${_config.codec})');
     } catch (e) {
       _filePath = null;
       _startTime = null;
@@ -348,7 +361,6 @@ class AudioService implements IAudioService {
         config: _config,
       );
 
-      // ── بررسی حداقل مدت ──
       if (!info.isValid) {
         await _deleteFile(path);
         _changeState(RecordingState.idle);
@@ -398,7 +410,6 @@ class AudioService implements IAudioService {
     try {
       await _nativeRecorder.resumeRecorder();
 
-      // ── محاسبه مدت pause ──
       if (_pauseTime != null) {
         _pausedDuration += DateTime.now().difference(_pauseTime!);
         _pauseTime = null;
@@ -541,12 +552,11 @@ class AudioService implements IAudioService {
       debugPrint('[AudioService] خطا در بستن recorder: $e');
     }
 
-    // ✅ باگ بحرانی اصلاح شد: اگر کاربر فایل را گرفته و در حالت Done است، 
-    // نباید فایل را در dispose حذف کنیم. فقط در حالت Cancel حذف می‌شود.
+    // اگر کاربر فایل را گرفته و در حالت Done است، فایل را حذف نکن.
     if (_state == RecordingState.recording || _state == RecordingState.paused) {
       await _deleteCurrentFile();
     }
-    
+
     _resetState();
 
     await Future.wait([
