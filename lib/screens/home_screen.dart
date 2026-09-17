@@ -13,6 +13,7 @@ import '../services/share_service.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/car_selector_widget.dart';
 import '../widgets/enamad_badge.dart';
+import '../widgets/home_promo_carousel.dart';
 import 'chat_screen.dart';
 import 'history_screen.dart';
 import 'login_screen.dart';
@@ -344,6 +345,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             children: [
               _StatusBanner(auth: auth),
+              const SizedBox(height: 12),
+              HomePromoCarousel(
+                onDiagnose: _diagnose,
+                onAudio: _recordAudio,
+                onShop: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShopScreen()),
+                ),
+              ),
               const SizedBox(height: 18),
               Text(
                 'عیب‌یابی در ۳ قدم — کمتر از ۲ دقیقه',
