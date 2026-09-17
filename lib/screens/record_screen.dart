@@ -31,6 +31,9 @@ class _RecordScreenState extends State<RecordScreen>
   Timer? _timer;
   late AnimationController _animController;
 
+  /// نگهداری مرجع سرویس تا در dispose به context وابسته نباشیم.
+  AudioService? _audioService;
+
   static const int _maxRecordingDuration = Constants.maxRecordingSeconds;
   static const int _minRecordingDuration = Constants.minRecordingSeconds;
 
@@ -44,15 +47,28 @@ class _RecordScreenState extends State<RecordScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // فقط یک‌بار بگیر؛ بعد از dispose دیگر context معتبر نیست.
+    _audioService ??= context.read<AudioService>();
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _animController.dispose();
+
+    // بدون context.read — فقط از مرجع ذخیره‌شده استفاده کن
     if (_isRecording) {
-      // ایمن: اگر هنوز در حال ضبط است، متوقف کن
-      try {
-        context.read<AudioService>().stopRecording();
-      } catch (_) {}
+      final audio = _audioService;
+      if (audio != null) {
+        // fire-and-forget: نباید await کنیم چون dispose sync است
+        unawaited(
+          audio.cancelRecording().catchError((_) {}),
+        );
+      }
     }
+    _audioService = null;
     super.dispose();
   }
 
@@ -114,7 +130,8 @@ class _RecordScreenState extends State<RecordScreen>
   Future<void> _toggleRecording() async {
     if (_isProcessing) return;
 
-    final audioService = context.read<AudioService>();
+    final audioService = _audioService ?? context.read<AudioService>();
+    _audioService = audioService;
     final soundAnalyzer = context.read<SoundAnalyzer>();
 
     if (_isRecording) {
@@ -202,7 +219,6 @@ class _RecordScreenState extends State<RecordScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // راهنما
                 if (!_isRecording && !_isProcessing)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -236,7 +252,6 @@ class _RecordScreenState extends State<RecordScreen>
                     ),
                   ),
 
-                // تایمر
                 if (_isRecording || _isProcessing)
                   Text(
                     _formattedTime,
@@ -253,7 +268,6 @@ class _RecordScreenState extends State<RecordScreen>
 
                 const SizedBox(height: 36),
 
-                // دکمه ضبط
                 ScaleTransition(
                   scale: _isRecording
                       ? Tween(begin: 1.0, end: 1.12).animate(_animController)
