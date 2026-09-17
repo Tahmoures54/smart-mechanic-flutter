@@ -84,6 +84,7 @@ class AuthProvider with ChangeNotifier {
     return 'کاربر';
   }
 
+  /// فقط برای UX — منبع حقیقت سرور است (402 / پروفایل).
   bool get canDiagnose =>
       isAuthenticated && (isGoldenActive || _credits > 0 || _remainingFree > 0);
 
@@ -262,6 +263,10 @@ class AuthProvider with ChangeNotifier {
     _saveCachedProfile();
   }
 
+  /// فقط به‌روزرسانی خوش‌بینانه UI.
+  /// کسر واقعی اعتبار فقط روی سرور انجام می‌شود؛ بعد از هر diagnose باید
+  /// [fetchProfile] یا [applyDiagnoseQuota] صدا زده شود.
+  @Deprecated('Use server response + fetchProfile/applyDiagnoseQuota instead')
   void consumeCredit() {
     if (_credits > 0) {
       _credits--;
@@ -273,6 +278,7 @@ class AuthProvider with ChangeNotifier {
     _saveCachedProfile();
   }
 
+  /// اعمال سهمیه برگشتی از پاسخ سرور (منبع حقیقت).
   void applyDiagnoseQuota({
     int? remainingCredits,
     int? remainingFreeQuestions,
