@@ -3,14 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../models/audio_features.dart';
 import 'api_service.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── مدل کد OBD ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticCode {
-  final String code;           // مثال: P0300
-  final String description;    // توضیح کد
-  final OBDSeverity severity;  // شدت خطا
-  final String? system;        // سیستم مربوطه: موتور، گیربکس، ...
+  final String code;
+  final String description;
+  final OBDSeverity severity;
+  final String? system;
 
   const DiagnosticCode({
     required this.code,
@@ -64,9 +61,6 @@ enum OBDSeverity {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── نتیجه عیب‌یابی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticResult {
   final String text;
   final String prompt;
@@ -97,9 +91,6 @@ enum DiagnosticInputType {
       };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── پارامترهای عیب‌یابی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticRequest {
   final String token;
   final String carId;
@@ -147,9 +138,6 @@ class DiagnosticRequest {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── سرویس اصلی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class AIDiagnosticService {
   final ApiService _apiService;
 
@@ -271,7 +259,6 @@ class AIDiagnosticService {
     throw lastError ?? DiagnosticException('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
   }
 
-  /// ساخت پرامپت حرفه‌ای‌تر برای عیب‌یابی
   String _buildPrompt(DiagnosticRequest req) {
     final buf = StringBuffer();
 
@@ -349,11 +336,16 @@ class AIDiagnosticService {
   }
 
   String _buildCacheKey(DiagnosticRequest req, String prompt) {
-    return '${req.carId}_${req.year}_$prompt';
+    final promptHash = prompt.hashCode;
+    final audioHint = req.audioFeatures != null
+        ? '${req.audioFeatures!.rms.toStringAsFixed(3)}_${req.audioFeatures!.dominantFrequency.toStringAsFixed(0)}'
+        : 'noaudio';
+    final descHint = (req.userDescription ?? '').trim().hashCode;
+    return '${req.carId}|${req.year}|$descHint|$audioHint|$promptHash';
   }
 
   void _saveToCache(String key, DiagnosticResult result) {
-    if (_cache.length >= _cacheMaxSize) {
+    while (_cache.length >= _cacheMaxSize) {
       _cache.remove(_cache.keys.first);
     }
     _cache[key] = result;
@@ -367,9 +359,6 @@ class AIDiagnosticService {
   int get cacheSize => _cache.length;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── خطای اختصاصی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class DiagnosticException implements Exception {
   final String message;
   final Object? cause;
