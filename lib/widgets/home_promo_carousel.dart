@@ -9,11 +9,14 @@ typedef PromoAction = void Function();
 class HomePromoCarousel extends StatefulWidget {
   final PromoAction onDiagnose;
   final PromoAction onAudio;
+  // Kept for compatibility with existing HomeScreen wiring.
+  final PromoAction? onShop;
 
   const HomePromoCarousel({
     super.key,
     required this.onDiagnose,
     required this.onAudio,
+    this.onShop,
   });
 
   @override
@@ -264,7 +267,7 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
                                   const SizedBox(height: 7),
                                   Text(
                                     slide.title,
-                                    maxLines: compact ? 2 : 2,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: Colors.white,
@@ -290,7 +293,9 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: ConstrainedBox(
-                                      constraints: BoxConstraints(maxWidth: compact ? width * 0.62 : width * 0.58),
+                                      constraints: BoxConstraints(
+                                        maxWidth: compact ? width * 0.62 : width * 0.58,
+                                      ),
                                       child: FilledButton.icon(
                                         onPressed: slide.action,
                                         icon: const Icon(Icons.arrow_back_rounded, size: 16),
