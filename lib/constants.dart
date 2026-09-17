@@ -30,7 +30,7 @@ class EnvironmentConfig {
     this.enableCrashReporting = true,
   });
 
-  /// دامنه رسمی سایت / API (هم‌تراز با smart-mec-backend)
+  /// Official Smart Mechanic API root.
   static const String _defaultBaseUrl = 'https://smart-mec.ir/api';
 
   static String get _baseUrlFromEnv {
@@ -83,16 +83,20 @@ class Constants {
 
   static EnvironmentConfig get env => EnvironmentConfig.current;
 
+  /// The backend currently serves its canonical routes directly under /api.
+  /// Keeping this configurable allows future versioned routes without making
+  /// production authentication depend on a rewrite layer.
   static String get _apiVersion {
     try {
       final v = dotenv.env['API_VERSION']?.trim();
-      if (v != null && v.isNotEmpty) return v;
+      if (v != null && v.isNotEmpty) return v.replaceAll(RegExp(r'^/+|/+$'), '');
     } catch (_) {}
-    return 'v1';
+    return '';
   }
 
   static String get baseUrl => env.baseUrl;
-  static String get apiUrl => '$baseUrl/$_apiVersion';
+  static String get apiUrl =>
+      _apiVersion.isEmpty ? baseUrl : '$baseUrl/$_apiVersion';
 
   // Account
   static String get account => '$apiUrl/account';
@@ -117,33 +121,31 @@ class Constants {
   static String garageDetails(String id) => '$apiUrl/garages/$id';
   static String get garages => '$apiUrl/garages';
 
-  // Static (روی همان origin سایت، نه زیر /api)
+  // Static files are served from the site origin, not under /api.
   static String get carsJson {
     final uri = Uri.parse(baseUrl);
-    // baseUrl مثل https://smart-mec.ir/api → cars در ریشه سایت
-    final origin = uri.replace(path: '', query: null).toString().replaceAll(RegExp(r'/+$'), '');
+    final origin = uri
+        .replace(path: '', query: null)
+        .toString()
+        .replaceAll(RegExp(r'/+$'), '');
     return '$origin/cars.json';
   }
 
   static String get health => '$apiUrl/health';
 
-  // Site / Enamad
   static const String websiteUrl = 'https://smart-mec.ir';
   static const String enamadProfileUrl =
       'https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
 
-  // Timeouts
   static const Duration defaultTimeout = Duration(seconds: 20);
   static const Duration diagnoseTimeout = Duration(seconds: 60);
   static const Duration uploadTimeout = Duration(seconds: 90);
   static const Duration longPollTimeout = Duration(minutes: 2);
 
-  // Cache
   static const Duration carsCacheDuration = Duration(hours: 6);
   static const Duration profileCacheDuration = Duration(seconds: 30);
   static const Duration garagesCacheDuration = Duration(minutes: 10);
 
-  // App Info
   static const String appName = 'مکانیک هوشمند';
   static const String appNameEn = 'Smart Mechanic';
   static const String appTagline = 'بزرگترین بانک اطلاعات فنی خودرویی کشور';
@@ -152,7 +154,6 @@ class Constants {
   static const String packageName = 'ir.smartmec.app';
   static const String supportEmail = 'support@smart-mec.ir';
 
-  // Storage Keys
   static const String keyJwtToken = 'jwt_token';
   static const String keySelectedLocale = 'selected_locale';
   static const String keyLastCarId = 'last_car_id';
@@ -160,12 +161,10 @@ class Constants {
   static const String keyLastYear = 'last_year';
   static const String keyThemeMode = 'theme_mode';
 
-  // Hive
   static const String boxDiagnostics = 'diagnostics';
   static const String boxHistory = 'history';
   static const String boxUserProfile = 'user_profile';
 
-  // Limits
   static const int maxDescriptionLength = 300;
   static const int minDescriptionLength = 5;
   static const int maxRecordingSeconds = 30;
@@ -174,14 +173,12 @@ class Constants {
   static const int otpLength = 6;
   static const int phoneLength = 11;
 
-  // Feature Flags
   static const bool featureAudioDiagnosis = true;
   static const bool featureGarageMap = true;
   static const bool featureReferral = true;
   static const bool featureWithdraw = true;
   static const bool featureObdDiagnosis = false;
 
-  // Rate Limiting
   static const Duration minRequestInterval = Duration(milliseconds: 500);
   static const Duration otpResendCooldown = Duration(seconds: 60);
 
