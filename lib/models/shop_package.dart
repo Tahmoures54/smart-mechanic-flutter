@@ -1,4 +1,4 @@
-/// مدل بسته فروشگاهی
+/// مدل بسته فروشگاهی — شناسه‌ها باید با PRODUCTS بک‌اند یکی باشند
 class ShopPackage {
   final String id;
   final String title;
@@ -35,7 +35,7 @@ class ShopPackage {
   }
 }
 
-/// لیست بسته‌های قابل خرید
+/// لیست بسته‌ها — هم‌تراز با smart-mec-backend PRODUCTS
 const shopPackages = <ShopPackage>[
   ShopPackage(
     id: 'credit_5',
@@ -63,7 +63,7 @@ const shopPackages = <ShopPackage>[
     ],
   ),
   ShopPackage(
-    id: 'golden_30',
+    id: 'gold_monthly',
     title: 'طلایی ۳۰ روزه',
     subtitle: 'عیب‌یابی نامحدود',
     priceToman: 199000,
@@ -76,7 +76,7 @@ const shopPackages = <ShopPackage>[
     ],
   ),
   ShopPackage(
-    id: 'golden_90',
+    id: 'gold_quarterly',
     title: 'طلایی ۹۰ روزه',
     subtitle: 'به‌صرفه‌ترین اشتراک',
     priceToman: 499000,
