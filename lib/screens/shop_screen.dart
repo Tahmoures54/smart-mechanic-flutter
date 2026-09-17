@@ -53,21 +53,31 @@ class _ShopScreenState extends State<ShopScreen> {
 
     try {
       final api = context.read<ApiService>();
-      final url = await api.getPaymentUrl(auth.token!, productId);
+      final launch = await api.createPurchase(auth.token!, productId);
 
       if (!mounted) return;
 
-      await Navigator.push(
+      final paid = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (context) => PaymentWebView(url: url)),
+        MaterialPageRoute(builder: (context) => PaymentWebView(url: launch.url)),
       );
 
-      // بعد از برگشت از درگاه، پروفایل را تازه کن
-      if (mounted) await auth.fetchProfile(force: true);
+      if (!mounted) return;
+      await auth.fetchProfile(force: true);
+      if (!mounted) return;
+
+      if (paid == true) {
+        _showSnack('پرداخت موفق ✅ موجودی شما به‌روز شد.');
+      } else if (paid == false) {
+        _showSnack('پرداخت لغو شد یا تأیید نشد.', color: Colors.redAccent);
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _showSnack(e.message, color: Colors.redAccent);
     } catch (e) {
       if (!mounted) return;
       _showSnack(
-        'خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.',
+        'خطا در اتصال به درگاه زیبال. اینترنت را بررسی کنید.',
         color: Colors.redAccent,
       );
     } finally {
@@ -805,7 +815,7 @@ class _ShopScreenState extends State<ShopScreen> {
             Icon(Icons.lock_rounded, size: 14, color: theme.hintColor),
             const SizedBox(width: 6),
             Text(
-              'پرداخت امن · فعال‌سازی آنی پس از پرداخت',
+              'پرداخت امن از طریق درگاه زیبال · فعال‌سازی آنی',
               style: TextStyle(color: theme.hintColor, fontSize: 12),
             ),
           ],

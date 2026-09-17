@@ -51,20 +51,35 @@ chmod +x scripts/generate_release_keystore.sh
 3. کلید API بسازید و محدودیت package name روی `ir.smartmec.app` بگذارید
 4. کلید را در Secrets ذخیره کنید
 
-### ۳. بک‌اند
+### ۳. بک‌اند و درگاه زیبال
 
-- آدرس production در `lib/constants.dart` بررسی شود
-- HTTPS و CORS صحیح باشد
-- OTP و پرداخت تست شوند
+- آدرس production در `lib/constants.dart` / `.env`: `https://smart-mec.ir/api`
+- روی سرور (Liara) این متغیر **حتماً** ست شود:
+
+| متغیر بک‌اند | مقدار |
+|----------------|--------|
+| `ZIBAL_MERCHANT_ID` | کد مرچنت درگاه «مکانیک هوشمند» از پنل [zibal.ir](https://zibal.ir) |
+| `APP_URL` | `https://smart-mec.ir` (دامنه ثبت‌شده در زیبال) |
+
+کد بک‌اند `ZIBAL_MERCHANT_ID` را می‌خواند (نه `ZIBAL_MERCHANT`). اگر خالی باشد، پرداخت **شبیه‌سازی (MOCK)** می‌شود و پول واقعی گرفته نمی‌شود.
+
+مبلغ ارسالی به زیبال **ریال** است (تومان × ۱۰). callback:
+
+`https://smart-mec.ir/api/purchase/verify?productId=...`
+
+دامنه callback باید با دامنه ثبت‌شده درگاه یکی باشد.
+
+OTP و یک خرید واقعی تست شوند.
 
 ---
 
 ## مراحل انتشار
 
 ### نسخه فعلی
-- **Version name:** `1.2.0`
-- **Version code:** `3`
+- **Version name:** `1.2.1`
+- **Version code:** `4`
 - **Package:** `ir.smartmec.app`
+- **درگاه:** زیبال (WebView + `smartmec://success` / `smartmec://failed`)
 
 ### بیلد از طریق GitHub Actions
 
@@ -93,11 +108,11 @@ flutter build appbundle --release --target-platform android-arm64 --obfuscate --
 - [ ] `enableLogging` در production خاموش است
 - [ ] keystore واقعی (نه تست) در Secrets است
 - [ ] کلید Google Maps محدود به package name است
-- [ ] DISCLAIMER در اپ قابل مشاهده است
+- [ ] DISCLAIMER / قوانین در اپ قابل مشاهده است
 - [ ] OTP واقعی تست شده
-- [ ] پرداخت / درگاه تست شده
+- [ ] `ZIBAL_MERCHANT_ID` روی سرور ست شده (نه sandbox `zibal` برای انتشار)
+- [ ] یک خرید آزمایشی زیبال تا شارژ اعتبار تست شده
 - [ ] تحلیل صدا روی دستگاه واقعی تست شده
-- [ ] نقشه و تعمیرگاه‌های نزدیک کار می‌کنند
 - [ ] تم تاریک/روشن و RTL درست هستند
 - [ ] هیچ secretی در کد hardcode نشده
 

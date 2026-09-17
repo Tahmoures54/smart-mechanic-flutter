@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../constants.dart';
 import '../models/car.dart';
 import '../models/diagnostic.dart';
+import 'payment_flow.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -414,18 +415,26 @@ class ApiService {
   }
 
   Future<String> getPaymentUrl(String token, String productId) async {
+    final launch = await createPurchase(token, productId);
+    return launch.url;
+  }
+
+  /// Creates a Zibal (or mock) payment session on the backend.
+  Future<PaymentLaunchInfo> createPurchase(String token, String productId) async {
     if (productId.isEmpty) throw const ApiException(400, 'شناسه محصول نامعتبر است.');
     final response = await _safeCall(
       () => _httpClient.post(
         Uri.parse(Constants.purchase),
         headers: _getHeaders(token),
-        body: jsonEncode({'productId': productId}),
+        body: jsonEncode({'productId': productId, 'from': 'app'}),
       ),
       rateLimitKey: 'getPaymentUrl',
     );
     final data = _parseAndEnsure(response, defaultError: 'خطا در ایجاد لینک پرداخت');
-    final url = data['url']?.toString() ?? (data['data'] is Map ? (data['data'] as Map)['url']?.toString() : null);
-    if (url == null || url.isEmpty) throw const ApiException(500, 'لینک پرداخت از سرور دریافت نشد.');
-    return url;
+    final launch = PaymentFlow.parseLaunch(data);
+    if (launch == null) {
+      throw const ApiException(500, 'لینک پرداخت از سرور دریافت نشد.');
+    }
+    return launch;
   }
 }
