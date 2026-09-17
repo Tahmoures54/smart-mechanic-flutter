@@ -49,7 +49,6 @@ class PaginationParams {
 
 class ApiService {
   final http.Client _httpClient;
-
   final Duration _defaultTimeout;
   final Duration _diagnoseTimeout;
   final Duration _uploadTimeout;
@@ -72,27 +71,39 @@ class ApiService {
         _diagnoseTimeout = diagnoseTimeout,
         _uploadTimeout = uploadTimeout;
 
-  Map<String, String> _getHeaders([String? token]) {
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
+  Map<String, String> _getHeaders([String? token]) => {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
 
-  Map<String, String> _getMultipartHeaders(String token) {
-    return {
-      'Accept': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  Map<String, String> _getMultipartHeaders(String token) => {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
 
   dynamic _parseBody(http.Response response) {
-    if (response.body.isEmpty) return <String, dynamic>{};
+    if (response.bodyBytes.isEmpty) return <String, dynamic>{};
+
+    final raw = utf8.decode(response.bodyBytes, allowMalformed: true)
+        .replaceFirst('\uFEFF', '')
+        .trim();
+    if (raw.isEmpty) return <String, dynamic>{};
+
     try {
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      return jsonDecode(raw);
     } catch (_) {
-      throw ApiException(response.statusCode, 'خطا در پردازش پاسخ سرور.');
+      final contentType = response.headers['content-type'] ?? 'unknown';
+      debugPrint(
+        '[API Error] Invalid JSON: ${response.statusCode}, '
+        'content-type=$contentType, body=${_truncate(raw, max: 180)}',
+      );
+      throw ApiException(
+        response.statusCode,
+        response.statusCode >= 500
+            ? 'سرور موقتاً پاسخ معتبر نداد. لطفاً چند لحظه بعد دوباره تلاش کنید.'
+            : 'پاسخ سرور قابل پردازش نیست. لطفاً اتصال اینترنت را بررسی و دوباره تلاش کنید.',
+      );
     }
   }
 
@@ -106,14 +117,14 @@ class ApiService {
       final msg = data is Map
           ? (data['error'] ?? data['message'] ?? defaultError ?? 'خطای سرور')
           : (defaultError ?? 'خطای ناشناخته');
-
       final details = data is Map ? Map<String, dynamic>.from(data) : null;
-
       throw ApiException(response.statusCode, msg.toString(), details: details);
     }
 
     if (data is List) return {'data': data};
-    return data is Map<String, dynamic> ? data : <String, dynamic>{'data': data};
+    return data is Map<String, dynamic>
+        ? data
+        : <String, dynamic>{'data': data};
   }
 
   Future<void> _checkRateLimit(String key) async {
@@ -125,9 +136,7 @@ class ApiService {
     final interval = isSensitive ? _sensitiveRequestInterval : _minRequestInterval;
     if (last != null) {
       final elapsed = DateTime.now().difference(last);
-      if (elapsed < interval) {
-        await Future.delayed(interval - elapsed);
-      }
+      if (elapsed < interval) await Future.delayed(interval - elapsed);
     }
     _lastRequestTime[key] = DateTime.now();
   }
@@ -137,9 +146,7 @@ class ApiService {
     Duration? timeout,
     String? rateLimitKey,
   }) async {
-    if (rateLimitKey != null) {
-      await _checkRateLimit(rateLimitKey);
-    }
+    if (rateLimitKey != null) await _checkRateLimit(rateLimitKey);
 
     try {
       final response = await call().timeout(timeout ?? _defaultTimeout);
@@ -186,9 +193,7 @@ class ApiService {
     }
 
     final cars = _mergeCars(local, remote);
-    if (cars.isEmpty) {
-      throw const ApiException(404, 'لیست خودروها خالی است');
-    }
+    if (cars.isEmpty) throw const ApiException(404, 'لیست خودروها خالی است');
 
     _carsCache = cars;
     _carsCacheTime = DateTime.now();
@@ -245,12 +250,8 @@ class ApiService {
       out.add(car);
     }
 
-    for (final car in local) {
-      add(car);
-    }
-    for (final car in remote) {
-      add(car);
-    }
+    for (final car in local) add(car);
+    for (final car in remote) add(car);
     return out;
   }
 
@@ -318,7 +319,6 @@ class ApiService {
       'description': description,
       if (carName != null && carName.trim().isNotEmpty) 'carName': carName.trim(),
     };
-
     final response = await _safeCall(
       () => _httpClient.post(
         Uri.parse(Constants.diagnose),
@@ -328,7 +328,6 @@ class ApiService {
       timeout: _diagnoseTimeout,
       rateLimitKey: 'diagnose',
     );
-
     final data = _parseAndEnsure(response, defaultError: 'خطا در عیب‌یابی');
     final result = _extractResult(data);
     if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه‌ای برنگرداند.');
@@ -352,7 +351,6 @@ class ApiService {
   }) async {
     final file = File(filePath);
     if (!await file.exists()) throw const ApiException(0, 'فایل صوتی پیدا نشد.');
-
     final fileSize = await file.length();
     debugPrint('[API] آپلود فایل صوتی: ${fileSize ~/ 1024} KB');
 
@@ -364,17 +362,13 @@ class ApiService {
       ..files.add(await http.MultipartFile.fromPath(
             'audio',
             filePath,
-            filename: filePath.toLowerCase().endsWith('.wav')
-                ? 'engine_sound.wav'
-                : 'engine_sound.m4a',
+            filename: filePath.toLowerCase().endsWith('.wav') ? 'engine_sound.wav' : 'engine_sound.m4a',
           ));
-
     if (carName != null && carName.trim().isNotEmpty) request.fields['carName'] = carName.trim();
 
     try {
       final streamedResponse = await request.send().timeout(_uploadTimeout);
       final response = await http.Response.fromStream(streamedResponse);
-
       final data = _parseAndEnsure(response, defaultError: 'خطا در آپلود و تحلیل صدا');
       final result = _extractResult(data);
       if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه تحلیل صدا را برنگرداند.');
@@ -391,14 +385,11 @@ class ApiService {
   Future<List<Diagnostic>> getHistory(String token, {PaginationParams? pagination}) async {
     final params = {'history': 'true', ...?(pagination?.toQueryParams())};
     final uri = Uri.parse(Constants.diagnose).replace(queryParameters: params);
-
     final response = await _safeCall(
       () => _httpClient.get(uri, headers: _getHeaders(token)),
       rateLimitKey: 'getHistory',
     );
-
     final data = _parseAndEnsure(response, defaultError: 'خطا در دریافت تاریخچه');
-
     final List<dynamic> rawList;
     if (data['data'] is List) {
       rawList = data['data'] as List;
@@ -409,13 +400,11 @@ class ApiService {
     } else {
       rawList = [];
     }
-
     return rawList.whereType<Map<String, dynamic>>().map(Diagnostic.fromJson).toList();
   }
 
   Future<void> deleteHistory(String token, String diagnosticId) async {
     if (diagnosticId.isEmpty) throw const ApiException(400, 'شناسه تاریخچه نامعتبر است.');
-
     final uri = Uri.parse('${Constants.diagnose}/$diagnosticId');
     final response = await _safeCall(
       () => _httpClient.delete(uri, headers: _getHeaders(token)),
@@ -426,7 +415,6 @@ class ApiService {
 
   Future<String> getPaymentUrl(String token, String productId) async {
     if (productId.isEmpty) throw const ApiException(400, 'شناسه محصول نامعتبر است.');
-
     final response = await _safeCall(
       () => _httpClient.post(
         Uri.parse(Constants.purchase),
@@ -435,17 +423,9 @@ class ApiService {
       ),
       rateLimitKey: 'getPaymentUrl',
     );
-
-    final data = _parseAndEnsure(response, defaultError: 'خطا در ایجاد درگاه پرداخت');
-    final url = data['paymentUrl']?.toString() ?? data['payment_url']?.toString() ?? data['url']?.toString();
-
+    final data = _parseAndEnsure(response, defaultError: 'خطا در ایجاد لینک پرداخت');
+    final url = data['url']?.toString() ?? (data['data'] is Map ? (data['data'] as Map)['url']?.toString() : null);
     if (url == null || url.isEmpty) throw const ApiException(500, 'لینک پرداخت از سرور دریافت نشد.');
     return url;
-  }
-
-  void dispose() {
-    _httpClient.close();
-    _lastRequestTime.clear();
-    debugPrint('[API] ApiService بسته شد.');
   }
 }
