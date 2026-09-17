@@ -9,13 +9,11 @@ typedef PromoAction = void Function();
 class HomePromoCarousel extends StatefulWidget {
   final PromoAction onDiagnose;
   final PromoAction onAudio;
-  final PromoAction onShop;
 
   const HomePromoCarousel({
     super.key,
     required this.onDiagnose,
     required this.onAudio,
-    required this.onShop,
   });
 
   @override
@@ -162,120 +160,150 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
     final secondary = theme.colorScheme.secondary;
     final slides = _slides();
 
-    return Column(
-      children: [
-        MouseRegion(
-          onEnter: (_) => setState(() => _paused = true),
-          onExit: (_) => setState(() => _paused = false),
-          child: Focus(
-            onFocusChange: (focused) => setState(() => _paused = focused),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: secondary.withOpacity(0.16)),
-                gradient: LinearGradient(
-                  begin: Alignment.centerRight,
-                  end: Alignment.centerLeft,
-                  colors: [
-                    const Color(0xFF21130C),
-                    theme.cardColor,
-                    const Color(0xFF101114),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.24),
-                    blurRadius: 28,
-                    offset: const Offset(0, 14),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final compact = width < 370;
+        final bannerHeight = compact ? 238.0 : 224.0;
+        final iconSize = compact ? 50.0 : 56.0;
+        final titleSize = compact ? 17.0 : 19.0;
+        final bodySize = compact ? 11.5 : 12.5;
+
+        return Column(
+          children: [
+            MouseRegion(
+              onEnter: (_) => setState(() => _paused = true),
+              onExit: (_) => setState(() => _paused = false),
+              child: Focus(
+                onFocusChange: (focused) => setState(() => _paused = focused),
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 4),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: secondary.withOpacity(0.16)),
+                    gradient: LinearGradient(
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                      colors: [
+                        const Color(0xFF21130C),
+                        theme.cardColor,
+                        const Color(0xFF101114),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.24),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: -55,
-                    top: -65,
-                    child: _Glow(color: secondary.withOpacity(0.13), size: 170),
-                  ),
-                  Positioned(
-                    right: 80,
-                    bottom: -80,
-                    child: _Glow(color: BrandColors.gold.withOpacity(0.08), size: 150),
-                  ),
-                  SizedBox(
-                    height: 214,
-                    child: PageView.builder(
-                      controller: _controller,
-                      itemCount: slides.length,
-                      onPageChanged: (index) => setState(() => _active = index),
-                      itemBuilder: (context, index) {
-                        final slide = slides[index];
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 58,
-                                height: 58,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(18),
-                                  color: secondary.withOpacity(0.11),
-                                  border: Border.all(color: secondary.withOpacity(0.16)),
-                                ),
-                                child: Icon(slide.icon, color: secondary, size: 28),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: -65,
+                        top: -70,
+                        child: _Glow(color: secondary.withOpacity(0.12), size: 165),
+                      ),
+                      Positioned(
+                        right: -25,
+                        bottom: -75,
+                        child: _Glow(color: BrandColors.gold.withOpacity(0.08), size: 150),
+                      ),
+                      SizedBox(
+                        height: bannerHeight,
+                        child: PageView.builder(
+                          controller: _controller,
+                          itemCount: slides.length,
+                          onPageChanged: (index) {
+                            if (mounted) setState(() => _active = index);
+                          },
+                          itemBuilder: (context, index) {
+                            final slide = slides[index];
+                            return Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                compact ? 15 : 18,
+                                compact ? 16 : 18,
+                                compact ? 15 : 18,
+                                compact ? 14 : 16,
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      slide.eyebrow,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: secondary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: iconSize,
+                                        height: iconSize,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16),
+                                          color: secondary.withOpacity(0.11),
+                                          border: Border.all(color: secondary.withOpacity(0.16)),
+                                        ),
+                                        child: Icon(slide.icon, color: secondary, size: compact ? 25 : 27),
                                       ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      slide.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 19,
-                                        height: 1.35,
-                                        fontWeight: FontWeight.w900,
+                                      const SizedBox(width: 11),
+                                      Expanded(
+                                        child: Text(
+                                          slide.eyebrow,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: secondary,
+                                            fontSize: compact ? 11 : 12,
+                                            height: 1.35,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 7),
+                                  Text(
+                                    slide.title,
+                                    maxLines: compact ? 2 : 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: titleSize,
+                                      height: 1.3,
+                                      fontWeight: FontWeight.w900,
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Expanded(
+                                    child: Text(
                                       slide.body,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.62),
-                                        fontSize: 12.5,
-                                        height: 1.5,
+                                        fontSize: bodySize,
+                                        height: 1.45,
                                       ),
                                     ),
-                                    const SizedBox(height: 11),
-                                    Align(
-                                      alignment: Alignment.centerRight,
+                                  ),
+                                  const SizedBox(height: 7),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(maxWidth: compact ? width * 0.62 : width * 0.58),
                                       child: FilledButton.icon(
                                         onPressed: slide.action,
-                                        icon: const Icon(Icons.arrow_back_rounded, size: 17),
-                                        label: Text(slide.cta),
+                                        icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                                        label: Text(
+                                          slide.cta,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                         style: FilledButton.styleFrom(
+                                          minimumSize: const Size(0, 40),
                                           backgroundColor: secondary,
                                           foregroundColor: theme.colorScheme.onSecondary,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(12),
                                           ),
@@ -286,50 +314,50 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 7),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(slides.length, (index) {
-            final selected = index == _active;
-            return Semantics(
-              button: true,
-              label: 'اسلاید ${index + 1} از ${slides.length}',
-              selected: selected,
-              child: GestureDetector(
-                onTap: () => _controller.animateToPage(
-                  index,
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeOutCubic,
-                ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  width: selected ? 25 : 6,
-                  height: 6,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    color: selected ? secondary : theme.dividerColor,
-                    borderRadius: BorderRadius.circular(99),
+            const SizedBox(height: 7),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(slides.length, (index) {
+                final selected = index == _active;
+                return Semantics(
+                  button: true,
+                  label: 'اسلاید ${index + 1} از ${slides.length}',
+                  selected: selected,
+                  child: GestureDetector(
+                    onTap: () => _controller.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                    ),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: selected ? 22 : 5,
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                      decoration: BoxDecoration(
+                        color: selected ? secondary : theme.dividerColor,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
+                );
+              }),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -345,15 +373,10 @@ class _Glow extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       foregroundDecoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, color.withOpacity(0)],
-        ),
+        gradient: RadialGradient(colors: [color, color.withOpacity(0)]),
       ),
     );
   }
