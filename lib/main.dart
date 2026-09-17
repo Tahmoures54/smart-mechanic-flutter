@@ -25,7 +25,6 @@ import 'widgets/mechanic_backdrop.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // بارگذاری متغیرهای محیطی از .env (قبل از هر استفاده از Constants)
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
@@ -57,7 +56,8 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        Provider<ApiService>(create: (_) => services.api, dispose: (_, api) => api.dispose()),
+        // ApiService owns the HTTP client for the lifetime of the app.
+        Provider<ApiService>(create: (_) => services.api),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(services.api)..checkAuthStatus(),
         ),
