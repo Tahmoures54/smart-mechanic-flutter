@@ -53,7 +53,7 @@ class DiagnosisResultCard extends StatelessWidget {
             ...result.warnings.map((w) => _WarningLine(text: w)),
           ],
           if (result.responseMode == ResponseMode.questions) ...[
-            if (result.followUpQuestions.isNotEmpty) ...[
+            if (result.questionOptions.isNotEmpty || result.followUpQuestions.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Text('برای تشخیص دقیق‌تر، به این‌ها جواب بده:',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
