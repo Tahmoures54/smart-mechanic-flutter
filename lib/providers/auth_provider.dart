@@ -358,9 +358,9 @@ class AuthProvider with ChangeNotifier {
     for (final name in boxNames) {
       try {
         if (Hive.isBoxOpen(name)) {
-          await Hive.box(name).clear();
+          await Hive.box<dynamic>(name).clear();
         } else {
-          final box = await Hive.openBox(name);
+          final box = await Hive.openBox<dynamic>(name);
           await box.clear();
         }
       } catch (e) {

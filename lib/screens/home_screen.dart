@@ -348,7 +348,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<bool> _ensureAuthenticated() async {
     if (context.read<AuthProvider>().isAuthenticated) return true;
 
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(builder: (_) => const LoginScreen()),
+    );
     if (!mounted) return false;
     return context.read<AuthProvider>().isAuthenticated;
   }
@@ -383,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => ChatScreen(
           carName: car.name,
           carId: car.id,
@@ -418,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => RecordScreen(
           carName: car.name,
           carId: car.id,
@@ -623,7 +626,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           TextButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              MaterialPageRoute<bool>(builder: (_) => const LoginScreen()),
             ),
             child: Text(
               'ورود',

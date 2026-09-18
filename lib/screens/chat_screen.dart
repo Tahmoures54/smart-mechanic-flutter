@@ -155,14 +155,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Future<void> _goToStore() async {
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ShopScreen()),
+      MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
     );
   }
 
   Future<void> _reauthAndRetry(ChatMessage message) async {
     if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const LoginScreen()),
     );
     if (!mounted) return;
     if (context.read<AuthProvider>().isAuthenticated && message.retryText != null) {

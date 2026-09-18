@@ -230,10 +230,10 @@ class _LoginScreenState extends State<LoginScreen>
       if (navigator.canPop()) {
         navigator.pop(true);
       } else {
-        navigator.pushAndRemoveUntil(
+        unawaited(navigator.pushAndRemoveUntil(
           _fadeScaleRoute(const HomeScreen()),
           (route) => false,
-        );
+        ));
       }
     } on ApiException catch (e) {
       if (!mounted) return;

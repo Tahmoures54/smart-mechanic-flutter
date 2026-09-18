@@ -311,9 +311,9 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
 لطفاً بر اساس این اطلاعات بگو مشکل چیا ممکنه باشه؟
 '''.trim();
 
-      Navigator.pushReplacement(
+      unawaited(Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
+        MaterialPageRoute<void>(
           builder: (_) => ChatScreen(
             carName: widget.carName,
             carId: widget.carId,
@@ -325,7 +325,7 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
             initialStructuredResult: diagnosis.structured,
           ),
         ),
-      );
+      ));
     } on ApiException catch (e) {
       debugPrint('[RecordScreen] API error: $e');
       if (!mounted) return;
