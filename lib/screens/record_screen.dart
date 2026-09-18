@@ -171,7 +171,7 @@ Spectral rolloff: ${features.spectralRolloff.toStringAsFixed(1)} Hz
 SNR: ${features.snr.toStringAsFixed(1)} dB
 '''.trim();
 
-        final diagnosis = await context.read<ApiService>().uploadAudioAndDiagnose(
+        final diagnosis = await context.read<ApiService>().uploadAudioAndDiagnoseDetailed(
           auth.token!,
           filePath: info.filePath,
           carId: widget.carId,
@@ -201,7 +201,8 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
               carId: widget.carId,
               year: widget.year,
               initialUserMessage: voiceMessage,
-              initialDiagnosisResult: diagnosis,
+              initialDiagnosisResult: diagnosis.result,
+              initialDiagnosticId: diagnosis.diagnosticId,
             ),
           ),
         );
