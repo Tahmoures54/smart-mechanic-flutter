@@ -37,6 +37,7 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
 
   bool _isTyping = false;
+  bool _guidedAnswerReady = false;
   bool get isTyping => _isTyping;
 
   /// When the latest assistant response is a guided questionnaire, the user
@@ -44,7 +45,8 @@ class ChatController extends ChangeNotifier {
   bool get isAwaitingChoices {
     if (_isTyping || _messages.isEmpty) return false;
     final last = _messages.last;
-    return last.structured?.responseMode == ResponseMode.questions &&
+    return !_guidedAnswerReady &&
+        last.structured?.responseMode == ResponseMode.questions &&
         last.structured?.questionOptions.isNotEmpty == true;
   }
 
@@ -73,11 +75,17 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  Future<void> sendStructuredAnswer(String question, String answer) async {
-    if (question.trim().isEmpty || answer.trim().isEmpty || _isTyping || isAwaitingChoices) return;
-    final text = '${question.trim()}: ${answer.trim()}';
-    _append(ChatMessage.user(text));
-    await fetchDiagnosis(text);
+  /// Marks a guided answer as selected. The answer is intentionally not
+  /// sent to the backend yet; the user reviews it in the composer and taps Send.
+  void prepareGuidedAnswer() {
+    if (_isTyping) return;
+    _guidedAnswerReady = true;
+    _safeNotify();
+  }
+
+  void clearGuidedAnswer() {
+    _guidedAnswerReady = false;
+    _safeNotify();
   }
 
   @Deprecated('Use sendStructuredAnswer for the one-question-at-a-time flow.')
@@ -125,6 +133,7 @@ class ChatController extends ChangeNotifier {
       if (_disposed) return;
 
       _lastDiagnosticId = response.diagnosticId;
+      _guidedAnswerReady = false;
       unawaited(authProvider.fetchProfile());
 
       // فرض: ApiService به‌مرور فیلد اختیاری `structured` (Map<String,dynamic>؟)
