@@ -64,6 +64,13 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  Future<void> sendStructuredAnswers(Map<String, String> answers) async {
+    if (answers.isEmpty || _isTyping) return;
+    final text = answers.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+    _append(ChatMessage.user(text));
+    await fetchDiagnosis(text);
+  }
+
   Future<void> sendUserMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isTyping) return;
