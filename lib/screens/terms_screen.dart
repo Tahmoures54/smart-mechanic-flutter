@@ -169,7 +169,7 @@ class TermsScreen extends StatelessWidget {
   }
 
   Widget _buildSectionCard(
-    TermsOfUseSection s,
+    TermsSection s,
     ThemeData theme,
     Color orange,
   ) {
