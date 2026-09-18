@@ -845,6 +845,16 @@ class _ShopScreenState extends State<ShopScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
+                          if (pkg.compareAtPriceToman != null &&
+                              pkg.compareAtPriceToman! > pkg.priceToman)
+                            Text(
+                              _formatToman(pkg.compareAtPriceToman!),
+                              style: TextStyle(
+                                color: theme.hintColor,
+                                decoration: TextDecoration.lineThrough,
+                                fontSize: 12,
+                              ),
+                            ),
                           Text(
                             _formatToman(pkg.priceToman),
                             style: TextStyle(
@@ -853,6 +863,16 @@ class _ShopScreenState extends State<ShopScreen> {
                               fontSize: 17,
                             ),
                           ),
+                          if (pkg.compareAtPriceToman != null &&
+                              pkg.compareAtPriceToman! > pkg.priceToman)
+                            Text(
+                              'تخفیف: ${_formatToman(pkg.compareAtPriceToman! - pkg.priceToman)}',
+                              style: TextStyle(
+                                color: theme.colorScheme.secondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           if (unit != null)
                             Text(
                               pkg.credits != null
