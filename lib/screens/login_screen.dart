@@ -371,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen>
         return Opacity(
           opacity: t,
           child: Container(
-            color: theme.colorScheme.surface.withValues(alpha: 0.92 * t),
+            color: theme.colorScheme.surface.withOpacity(0.92 * t),
             alignment: Alignment.center,
             child: Transform.scale(
               scale: 0.7 + (0.3 * t),
@@ -388,10 +388,10 @@ class _LoginScreenState extends State<LoginScreen>
             height: 88,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: theme.colorScheme.secondary.withValues(alpha: 0.15),
+              color: theme.colorScheme.secondary.withOpacity(0.15),
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.25),
+                  color: theme.colorScheme.secondary.withOpacity(0.25),
                   blurRadius: 24,
                   spreadRadius: 2,
                 ),
@@ -509,10 +509,10 @@ class _LoginScreenState extends State<LoginScreen>
           firstChild: Container(
             margin: const EdgeInsets.only(bottom: 4),
             decoration: BoxDecoration(
-              color: theme.colorScheme.secondary.withValues(alpha: 0.08),
+              color: theme.colorScheme.secondary.withOpacity(0.08),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: theme.colorScheme.secondary.withValues(alpha: 0.25),
+                color: theme.colorScheme.secondary.withOpacity(0.25),
               ),
             ),
             child: TextButton.icon(
@@ -570,9 +570,9 @@ class _LoginScreenState extends State<LoginScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.12),
+                  color: Colors.amber.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+                  border: Border.all(color: Colors.amber.withOpacity(0.35)),
                 ),
                 child: const Column(
                   children: [
@@ -796,7 +796,7 @@ class _LoginScreenState extends State<LoginScreen>
               width: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: theme.colorScheme.onSecondary.withValues(alpha: 0.8),
+                color: theme.colorScheme.onSecondary.withOpacity(0.8),
               ),
             )
           : Icon(icon, size: 20),
@@ -811,8 +811,8 @@ class _LoginScreenState extends State<LoginScreen>
         padding: const EdgeInsets.symmetric(vertical: 15),
         backgroundColor: theme.colorScheme.secondary,
         foregroundColor: theme.colorScheme.onSecondary,
-        disabledBackgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.5),
-        disabledForegroundColor: theme.colorScheme.onSecondary.withValues(alpha: 0.6),
+        disabledBackgroundColor: theme.colorScheme.secondary.withOpacity(0.5),
+        disabledForegroundColor: theme.colorScheme.onSecondary.withOpacity(0.6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -855,9 +855,9 @@ class _LoginLegalNote extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.72),
+        color: theme.cardColor.withOpacity(0.72),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: orange.withValues(alpha: 0.28)),
+        border: Border.all(color: orange.withOpacity(0.28)),
       ),
       child: Column(
         children: [
