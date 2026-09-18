@@ -1,14 +1,18 @@
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+
+import '../constants.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
-import '../services/api_service.dart';
-import '../providers/auth_provider.dart';
-import '../constants.dart';
 import 'chat_screen.dart';
 
+/// صفحه ضبط و آنالیز صوتی موتور.
 class RecordScreen extends StatefulWidget {
   final String carName;
   final String carId;
@@ -25,13 +29,39 @@ class RecordScreen extends StatefulWidget {
   State<RecordScreen> createState() => _RecordScreenState();
 }
 
+// ---------------------------------------------------------------------------
+// Exceptionهای داخلی برای مدیریت دقیق خطا
+// ---------------------------------------------------------------------------
+
+class _ShortRecordingException implements Exception {
+  final int minSeconds;
+  const _ShortRecordingException(this.minSeconds);
+  @override
+  String toString() =>
+      'مدت ضبط خیلی کوتاه است. حداقل $minSeconds ثانیه ضبط کنید.';
+}
+
+class _RecordingSaveException implements Exception {
+  const _RecordingSaveException();
+  @override
+  String toString() => 'فایل صوتی ذخیره نشد.';
+}
+
+class _MissingTokenException implements Exception {
+  const _MissingTokenException();
+  @override
+  String toString() => 'لطفاً دوباره وارد شوید.';
+}
+
 class _RecordScreenState extends State<RecordScreen>
     with SingleTickerProviderStateMixin {
   bool _isRecording = false;
   bool _isProcessing = false;
   int _secondsElapsed = 0;
   Timer? _timer;
-  late AnimationController _animController;
+  late final AnimationController _animController;
+  late final Animation<double> _scaleAnim;
+  static const Animation<double> _stillScale = AlwaysStoppedAnimation(1.0);
 
   /// نگهداری مرجع سرویس تا در dispose به context وابسته نباشیم.
   AudioService? _audioService;
@@ -46,6 +76,9 @@ class _RecordScreenState extends State<RecordScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.12).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -58,15 +91,16 @@ class _RecordScreenState extends State<RecordScreen>
   @override
   void dispose() {
     _timer?.cancel();
+    _timer = null;
     _animController.dispose();
 
-    // بدون context.read — فقط از مرجع ذخیره‌شده استفاده کن
     if (_isRecording) {
       final audio = _audioService;
       if (audio != null) {
-        // fire-and-forget: نباید await کنیم چون dispose sync است
         unawaited(
-          audio.cancelRecording().catchError((_) {}),
+          audio.cancelRecording().catchError((Object e) {
+            debugPrint('[RecordScreen] cancelRecording on dispose: $e');
+          }),
         );
       }
     }
@@ -74,22 +108,32 @@ class _RecordScreenState extends State<RecordScreen>
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // تایمر
+  // ---------------------------------------------------------------------------
+
   void _startTimer() {
-    _secondsElapsed = 0;
     _timer?.cancel();
+    _secondsElapsed = 0;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      setState(() {
-        _secondsElapsed++;
-        if (_secondsElapsed >= _maxRecordingDuration) {
-          timer.cancel();
-          _toggleRecording();
-        }
-      });
+      setState(() => _secondsElapsed++);
+
+      if (_secondsElapsed >= _maxRecordingDuration) {
+        timer.cancel();
+        _timer = null;
+        // بیرون از setState تا از setState تودرتو جلوگیری شود.
+        unawaited(_toggleRecording());
+      }
     });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
   }
 
   String get _formattedTime {
@@ -97,6 +141,10 @@ class _RecordScreenState extends State<RecordScreen>
     final seconds = (_secondsElapsed % 60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
+
+  // ---------------------------------------------------------------------------
+  // کمکی‌ها
+  // ---------------------------------------------------------------------------
 
   void _showSnack(String msg, {Color? color}) {
     if (!mounted) return;
@@ -113,55 +161,123 @@ class _RecordScreenState extends State<RecordScreen>
   }
 
   Future<bool> _requestMicPermission() async {
-    var status = await Permission.microphone.status;
-    if (status.isGranted) return true;
+    try {
+      var status = await Permission.microphone.status;
+      if (status.isGranted) return true;
 
-    status = await Permission.microphone.request();
+      status = await Permission.microphone.request();
+      if (status.isGranted) return true;
 
-    if (status.isGranted) return true;
+      if (status.isPermanentlyDenied) {
+        if (!mounted) return false;
+        final goToSettings = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('دسترسی میکروفون'),
+            content: const Text(
+              'دسترسی میکروفون دائماً رد شده است. برای ادامه، از '
+              'تنظیمات برنامه آن را فعال کنید.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('بعداً'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('باز کردن تنظیمات'),
+              ),
+            ],
+          ),
+        );
+        if (goToSettings == true) {
+          await openAppSettings();
+        }
+        return false;
+      }
 
-    if (status.isPermanentlyDenied) {
-      _showSnack('دسترسی میکروفون دائماً رد شده. از تنظیمات فعال کنید.');
-      await openAppSettings();
-    } else {
       _showSnack('دسترسی به میکروفون داده نشد.');
+      return false;
+    } catch (e) {
+      debugPrint('[RecordScreen] permission error: $e');
+      _showSnack('در بررسی مجوز میکروفون خطایی رخ داد.');
+      return false;
     }
-    return false;
   }
+
+  // ---------------------------------------------------------------------------
+  // منطق اصلی
+  // ---------------------------------------------------------------------------
 
   Future<void> _toggleRecording() async {
     if (_isProcessing) return;
 
+    // همه Providerها را قبل از await می‌گیریم.
     final audioService = _audioService ?? context.read<AudioService>();
     _audioService = audioService;
     final soundAnalyzer = context.read<SoundAnalyzer>();
+    final authProvider = context.read<AuthProvider>();
+    final apiService = context.read<ApiService>();
 
     if (_isRecording) {
-      _timer?.cancel();
-      setState(() {
-        _isRecording = false;
-        _isProcessing = true;
-      });
+      await _stopAndProcess(
+        audioService: audioService,
+        soundAnalyzer: soundAnalyzer,
+        authProvider: authProvider,
+        apiService: apiService,
+      );
+    } else {
+      await _startRecording(audioService);
+    }
+  }
 
-      try {
-        final info = await audioService.stopRecording();
-        if (info == null) {
-          throw Exception('فایل صوتی ذخیره نشد.');
-        }
+  Future<void> _startRecording(AudioService audioService) async {
+    final hasPermission = await _requestMicPermission();
+    if (!hasPermission || !mounted) return;
 
-        if (info.duration.inSeconds < _minRecordingDuration) {
-          throw Exception(
-            'مدت ضبط خیلی کوتاه است. حداقل $_minRecordingDuration ثانیه ضبط کنید.',
-          );
-        }
+    try {
+      await audioService.startRecording(
+        config: RecordingConfig.engineAnalysis,
+      );
+      if (!mounted) return;
 
-        final features = await soundAnalyzer.analyze(info.filePath);
-        final auth = context.read<AuthProvider>();
-        if (auth.token == null || auth.token!.isEmpty) {
-          throw Exception('لطفاً دوباره وارد شوید.');
-        }
+      _startTimer();
+      setState(() => _isRecording = true);
+    } catch (e) {
+      debugPrint('[RecordScreen] startRecording failed: $e');
+      _showSnack('خطا در شروع ضبط صدا.');
+    }
+  }
 
-        final audioFeatures = '''
+  Future<void> _stopAndProcess({
+    required AudioService audioService,
+    required SoundAnalyzer soundAnalyzer,
+    required AuthProvider authProvider,
+    required ApiService apiService,
+  }) async {
+    _stopTimer();
+    setState(() {
+      _isRecording = false;
+      _isProcessing = true;
+    });
+
+    try {
+      final info = await audioService.stopRecording();
+      if (info == null) throw const _RecordingSaveException();
+
+      if (info.duration.inSeconds < _minRecordingDuration) {
+        throw const _ShortRecordingException(_minRecordingDuration);
+      }
+
+      final token = authProvider.token;
+      if (token == null || token.isEmpty) {
+        throw const _MissingTokenException();
+      }
+
+      final features = await soundAnalyzer.analyze(info.filePath);
+      if (!mounted) return;
+
+      final audioFeatures = '''
 RMS: ${features.rms.toStringAsFixed(4)}
 Dominant frequency: ${features.dominantFrequency.toStringAsFixed(1)} Hz
 Spectral centroid: ${features.spectralCentroid.toStringAsFixed(1)} Hz
@@ -171,18 +287,17 @@ Spectral rolloff: ${features.spectralRolloff.toStringAsFixed(1)} Hz
 SNR: ${features.snr.toStringAsFixed(1)} dB
 '''.trim();
 
-        final diagnosis = await context.read<ApiService>().uploadAudioAndDiagnoseDetailed(
-          auth.token!,
-          filePath: info.filePath,
-          carId: widget.carId,
-          year: widget.year,
-          carName: widget.carName,
-          audioFeatures: audioFeatures,
-        );
+      final diagnosis = await apiService.uploadAudioAndDiagnoseDetailed(
+        token,
+        filePath: info.filePath,
+        carId: widget.carId,
+        year: widget.year,
+        carName: widget.carName,
+        audioFeatures: audioFeatures,
+      );
+      if (!mounted) return;
 
-        if (!mounted) return;
-
-        final voiceMessage = '''
+      final voiceMessage = '''
 من صدای موتور ماشین رو با گوشی ضبط کردم.
 نتایج آنالیز صوتی نرم‌افزار:
 - قدرت صدا (RMS): ${features.rms.toStringAsFixed(3)}
@@ -193,43 +308,42 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
 لطفاً بر اساس این اطلاعات بگو مشکل چیا ممکنه باشه؟
 '''.trim();
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              carName: widget.carName,
-              carId: widget.carId,
-              year: widget.year,
-              initialUserMessage: voiceMessage,
-              initialDiagnosisResult: diagnosis.result,
-              initialDiagnosticId: diagnosis.diagnosticId,
-              initialStructuredResult: diagnosis.structured,
-            ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            carName: widget.carName,
+            carId: widget.carId,
+            year: widget.year,
+            initialUserMessage: voiceMessage,
+            initialDiagnosisResult: diagnosis.result,
+            initialDiagnosticId: diagnosis.diagnosticId,
+            initialStructuredResult: diagnosis.structured,
           ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        final msg = e.toString().contains('خیلی کوتاه')
-            ? e.toString().replaceFirst('Exception: ', '')
-            : 'خطا در پردازش صدا. لطفاً دوباره تلاش کنید.';
-        _showSnack(msg);
-        setState(() => _isProcessing = false);
-      }
-    } else {
-      final hasPermission = await _requestMicPermission();
-      if (!hasPermission) return;
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[RecordScreen] process failed: $e\n$st');
+      if (!mounted) return;
 
-      try {
-        await audioService.startRecording(
-          config: RecordingConfig.engineAnalysis,
-        );
-        _startTimer();
-        setState(() => _isRecording = true);
-      } catch (e) {
-        _showSnack('خطا در شروع ضبط صدا.');
-      }
+      final msg = switch (e) {
+        _ShortRecordingException() => e.toString(),
+        _RecordingSaveException() => e.toString(),
+        _MissingTokenException() => e.toString(),
+        _ => 'خطا در پردازش صدا. لطفاً دوباره تلاش کنید.',
+      };
+      _showSnack(msg);
+
+      setState(() {
+        _isProcessing = false;
+        _secondsElapsed = 0;
+      });
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -252,10 +366,12 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
                     padding: const EdgeInsets.all(16),
                     margin: const EdgeInsets.only(bottom: 32),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.secondary.withOpacity(0.08),
+                      color:
+                          theme.colorScheme.secondary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: theme.colorScheme.secondary.withOpacity(0.2),
+                        color: theme.colorScheme.secondary
+                            .withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -267,8 +383,10 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'موتور را روشن کنید و گوشی را نزدیک محفظه موتور نگه دارید.\n'
-                          'حداقل $_minRecordingDuration و حداکثر $_maxRecordingDuration ثانیه ضبط کنید.',
+                          'موتور را روشن کنید و گوشی را نزدیک محفظه موتور '
+                          'نگه دارید.\n'
+                          'حداقل $_minRecordingDuration و حداکثر '
+                          '$_maxRecordingDuration ثانیه ضبط کنید.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: theme.hintColor,
@@ -297,9 +415,7 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
                 const SizedBox(height: 36),
 
                 ScaleTransition(
-                  scale: _isRecording
-                      ? Tween(begin: 1.0, end: 1.12).animate(_animController)
-                      : const AlwaysStoppedAnimation(1.0),
+                  scale: _isRecording ? _scaleAnim : _stillScale,
                   child: GestureDetector(
                     onTap: _isProcessing ? null : _toggleRecording,
                     child: Container(
@@ -315,7 +431,7 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
                             color: (_isRecording
                                     ? Colors.red
                                     : theme.colorScheme.secondary)
-                                .withOpacity(0.35),
+                                .withValues(alpha: 0.35),
                             blurRadius: 28,
                             spreadRadius: 4,
                           ),
