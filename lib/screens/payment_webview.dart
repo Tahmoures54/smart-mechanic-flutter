@@ -167,33 +167,14 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       return true;
     }
 
+    // The gateway callback URL itself is NOT proof of payment success.
+    // The backend must verify the transaction with Zibal first and then return
+    // the signed application result via smartmec://success or smartmec://failed.
+    // This prevents the client from trusting success/status query parameters.
     if (lower.contains('/api/purchase/verify') ||
         lower.contains('/purchase/verify')) {
-      final uri = Uri.tryParse(url);
-      if (uri != null) {
-        final success = uri.queryParameters['success']?.toLowerCase();
-        final status = uri.queryParameters['status']?.toLowerCase();
-
-        final isSuccess = success == '1' ||
-            success == 'true' ||
-            status == 'ok' ||
-            status == 'success';
-        final isFailure = success == '0' ||
-            success == 'false' ||
-            status == 'failed' ||
-            status == 'fail';
-
-        if (isSuccess) {
-          _isProcessed = true;
-          _handlePaymentResult(isSuccess: true);
-          return true;
-        }
-        if (isFailure) {
-          _isProcessed = true;
-          _handlePaymentResult(isSuccess: false);
-          return true;
-        }
-      }
+      debugPrint('[PaymentWebView] backend payment callback reached: $url');
+      return false;
     }
     return false;
   }
