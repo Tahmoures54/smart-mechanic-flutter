@@ -14,6 +14,9 @@ class ChatMessage {
   /// تا دکمهٔ «تلاش دوباره» بتواند همان درخواست را از نو بفرستد.
   final String? retryText;
 
+  /// نوع خطا برای تعیین رفتار UI (مثلاً باز کردن فروشگاه برای 402).
+  final ChatErrorType? errorType;
+
   ChatMessage({
     required this.id,
     required this.text,
@@ -22,6 +25,7 @@ class ChatMessage {
     this.isDiagnosisResult = false,
     this.structured,
     this.retryText,
+    this.errorType,
   }) : timestamp = timestamp ?? DateTime.now();
 
   static int _seq = 0;
@@ -46,10 +50,24 @@ class ChatMessage {
         structured: structured,
       );
 
-  factory ChatMessage.error(String text, {String? retryText}) => ChatMessage(
+  factory ChatMessage.error(
+    String text, {
+    String? retryText,
+    ChatErrorType? errorType,
+  }) => ChatMessage(
         id: _nextId('e'),
         text: text,
         role: MessageRole.system,
         retryText: retryText,
+        errorType: errorType,
       );
 }
+
+enum ChatErrorType {
+  generic,
+  unauthorized,
+  insufficientCredits,
+  server,
+  network,
+}
+
