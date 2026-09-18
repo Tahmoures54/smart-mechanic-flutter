@@ -130,12 +130,12 @@ class TermsScreen extends StatelessWidget {
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [
-            orange.withValues(alpha: 0.28),
+            orange.withOpacity(0.28),
             theme.cardColor,
           ],
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: orange.withValues(alpha: 0.4)),
+        border: Border.all(color: orange.withOpacity(0.4)),
       ),
       child: Column(
         children: [
@@ -178,9 +178,9 @@ class TermsScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.cardColor.withValues(alpha: 0.92),
+          color: theme.cardColor.withOpacity(0.92),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: orange.withValues(alpha: 0.18)),
+          border: Border.all(color: orange.withOpacity(0.18)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,7 +199,7 @@ class TermsScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13.5,
                 height: 1.7,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+                color: theme.colorScheme.onSurface.withOpacity(0.9),
               ),
             ),
           ],
@@ -219,7 +219,7 @@ class TermsScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.cardColor.withValues(alpha: 0.92),
+          color: theme.cardColor.withOpacity(0.92),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: theme.dividerColor),
         ),
