@@ -417,6 +417,9 @@ class ApiService {
         result: result,
         diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
         responseMode: inner['structured'] is Map ? (inner['structured']['responseMode']?.toString() ?? 'diagnosis') : 'diagnosis',
+        structured: inner['structured'] is Map
+            ? Map<String, dynamic>.from(inner['structured'] as Map)
+            : null,
       );
     } on ApiException {
       rethrow;
