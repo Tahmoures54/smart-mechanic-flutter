@@ -199,7 +199,7 @@ class _NotificationSettingsScreenState
           if (!_permissionGranted)
             Card(
               margin: const EdgeInsets.all(16),
-              color: theme.colorScheme.secondary.withValues(alpha: 0.12),
+              color: theme.colorScheme.secondary.withOpacity(0.12),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
