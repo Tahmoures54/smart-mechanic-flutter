@@ -18,6 +18,7 @@ class ChatScreen extends StatefulWidget {
   final String initialUserMessage;
   final bool isCustomCar;
   final String? initialDiagnosisResult;
+  final String? initialDiagnosticId;
 
   const ChatScreen({
     super.key,
@@ -27,6 +28,7 @@ class ChatScreen extends StatefulWidget {
     required this.initialUserMessage,
     this.isCustomCar = false,
     this.initialDiagnosisResult,
+    this.initialDiagnosticId,
   });
 
   @override
@@ -55,6 +57,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
   bool _started = false;
+  String? _lastDiagnosticId;
 
   /// ایندکس آخرین پاسخ تشخیص برای اسکرول دقیق
   int? _resultMessageIndex;
@@ -93,6 +96,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           role: MessageRole.assistant,
           isDiagnosisResult: true,
         ));
+        _lastDiagnosticId = widget.initialDiagnosticId;
         _resultMessageIndex = _messages.length - 1;
         setState(() {});
         _focusResultAndShake();
@@ -181,13 +185,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         throw const ApiException(401, 'لطفاً دوباره وارد شوید.');
       }
 
-      final result = await api.diagnose(
+      final response = await api.diagnoseDetailed(
         auth.token!,
         widget.carId,
         description,
         year: widget.year,
         carName: widget.isCustomCar ? widget.carName : null,
+        previousDiagnosticId: _lastDiagnosticId,
       );
+      final result = response.result;
+      _lastDiagnosticId = response.diagnosticId;
 
       unawaited(auth.fetchProfile());
 
