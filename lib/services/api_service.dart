@@ -373,7 +373,7 @@ class ApiService {
     return data['result']?.toString() ?? data['answer']?.toString() ?? data['text']?.toString();
   }
 
-  Future<String> uploadAudioAndDiagnose(
+  Future<DiagnosisApiResult> uploadAudioAndDiagnoseDetailed(
     String token, {
     required String filePath,
     required String carId,
@@ -407,7 +407,12 @@ class ApiService {
       final data = _parseAndEnsure(response, defaultError: 'خطا در آپلود و تحلیل صدا');
       final result = _extractResult(data);
       if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه تحلیل صدا را برنگرداند.');
-      return result;
+      final inner = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : <String, dynamic>{};
+      return DiagnosisApiResult(
+        result: result,
+        diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
+        responseMode: inner['structured'] is Map ? (inner['structured']['responseMode']?.toString() ?? 'diagnosis') : 'diagnosis',
+      );
     } on ApiException {
       rethrow;
     } on TimeoutException {
@@ -415,6 +420,25 @@ class ApiService {
     } catch (e) {
       throw ApiException(500, 'خطا در آپلود فایل: $e');
     }
+  }
+
+  Future<String> uploadAudioAndDiagnose(
+    String token, {
+    required String filePath,
+    required String carId,
+    required String year,
+    String? carName,
+    String? audioFeatures,
+  }) async {
+    final response = await uploadAudioAndDiagnoseDetailed(
+      token,
+      filePath: filePath,
+      carId: carId,
+      year: year,
+      carName: carName,
+      audioFeatures: audioFeatures,
+    );
+    return response.result;
   }
 
   Future<List<Diagnostic>> getHistory(String token, {PaginationParams? pagination}) async {
