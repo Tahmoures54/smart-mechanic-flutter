@@ -31,11 +31,13 @@ class DiagnosisApiResult {
   final String result;
   final String? diagnosticId;
   final String responseMode;
+  final Map<String, dynamic>? structured;
 
   const DiagnosisApiResult({
     required this.result,
     this.diagnosticId,
     this.responseMode = 'diagnosis',
+    this.structured,
   });
 }
 
@@ -357,6 +359,9 @@ class ApiService {
       result: result,
       diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
       responseMode: inner['structured'] is Map ? (inner['structured']['responseMode']?.toString() ?? 'diagnosis') : 'diagnosis',
+      structured: inner['structured'] is Map
+          ? Map<String, dynamic>.from(inner['structured'] as Map)
+          : null,
     );
   }
 
