@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../constants.dart';
 import '../legal/terms_of_use.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -186,8 +187,8 @@ class _LoginScreenState extends State<LoginScreen>
     FocusScope.of(context).unfocus();
 
     final code = _codeController.text.trim();
-    if (code.length < 4 || !RegExp(r'^\d+$').hasMatch(code)) {
-      _showSnack('کد وارد‌شده معتبر نیست.', isError: true);
+    if (code.length != Constants.otpLength || !RegExp(r'^\d+$').hasMatch(code)) {
+      _showSnack('کد تأیید باید ${Constants.otpLength} رقم باشد.', isError: true);
       return;
     }
 
@@ -223,10 +224,17 @@ class _LoginScreenState extends State<LoginScreen>
       await _animCtrl.reverse();
       if (!mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
-        _fadeScaleRoute(const HomeScreen()),
-        (route) => false,
-      );
+      // اگر لاگین از صفحهٔ دیگری (خانه/عیب‌یابی) باز شده، فقط برگرد تا
+      // جریان اصلی ادامه پیدا کند. wipe کردن استک باعث abort شدن diagnose می‌شد.
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.pop(true);
+      } else {
+        navigator.pushAndRemoveUntil(
+          _fadeScaleRoute(const HomeScreen()),
+          (route) => false,
+        );
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -675,7 +683,7 @@ class _LoginScreenState extends State<LoginScreen>
           controller: _codeController,
           focusNode: _codeFocus,
           keyboardType: TextInputType.number,
-          maxLength: 6,
+          maxLength: Constants.otpLength,
           textAlign: TextAlign.center,
           textDirection: TextDirection.ltr,
           inputFormatters: const [_PersianLatinDigitFormatter()],
@@ -706,7 +714,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
           onChanged: (val) {
-            if (val.length == 6 && !_isLoading) {
+            if (val.length == Constants.otpLength && !_isLoading) {
               _verifyOtp();
             }
           },

@@ -281,7 +281,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildItemCard(Diagnostic item, int index, ThemeData theme) {
-    final isGolden = item.isGolden ?? false;
+    final isGolden = item.isGolden;
     final carLabel = item.carName ?? item.carId;
     final formattedDate = _formatDate(item.createdAt);
 

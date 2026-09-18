@@ -119,10 +119,14 @@ class DiagnosisResult {
     try {
       final causesRaw = json['causes'];
       final causes = causesRaw is List
-          ? causesRaw.whereType<Map<String, dynamic>>().map(DiagnosisCause.fromJson).toList()
+          ? causesRaw
+              .whereType<Map>()
+              .map((e) => DiagnosisCause.fromJson(Map<String, dynamic>.from(e)))
+              .where((e) => e.title.isNotEmpty)
+              .toList()
           : <DiagnosisCause>[];
 
-      return DiagnosisResult(
+      final parsed = DiagnosisResult(
         responseMode:
             _enumFromString(ResponseMode.values, json['responseMode'], ResponseMode.diagnosis),
         followUpRound: (json['followUpRound'] as num?)?.toInt() ?? 0,
@@ -149,8 +153,19 @@ class DiagnosisResult {
         nextStep: _nullableString(json['nextStep']) ?? '',
         footer: _nullableString(json['footer']) ?? '',
       );
+      return parsed.hasRenderableContent ? parsed : null;
     } catch (_) {
       return null;
     }
   }
+
+  /// اگر JSON ساختاری هیچ محتوای قابل‌نمایش نداشت، UI باید به متن ساده برگردد.
+  bool get hasRenderableContent =>
+      statusSummary.isNotEmpty ||
+      causes.isNotEmpty ||
+      questionOptions.isNotEmpty ||
+      followUpQuestions.isNotEmpty ||
+      mechanicQuestions.isNotEmpty ||
+      warnings.isNotEmpty ||
+      nextStep.isNotEmpty;
 }

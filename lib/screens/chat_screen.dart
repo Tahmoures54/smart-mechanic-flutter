@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/chat_controller.dart';
 import '../models/chat_message.dart';
+import 'login_screen.dart';
 import 'shop_screen.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -46,7 +47,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final FocusNode _focusNode = FocusNode();
-  final Map<int, GlobalKey> _bubbleKeys = {};
+  final Map<String, GlobalKey> _bubbleKeys = {};
 
   late final ChatController _chat;
   late final AnimationController _shakeCtrl;
@@ -120,7 +121,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _focusResultAndShake(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      final ctx = _bubbleKeys[index]?.currentContext;
+      final messages = _chat.messages;
+      if (index < 0 || index >= messages.length) {
+        _scrollToBottom();
+        return;
+      }
+      final ctx = _bubbleKeys[messages[index].id]?.currentContext;
       if (ctx != null) {
         await Scrollable.ensureVisible(
           ctx,
@@ -151,6 +157,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const ShopScreen()),
     );
+  }
+
+  Future<void> _reauthAndRetry(ChatMessage message) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+    if (!mounted) return;
+    if (context.read<AuthProvider>().isAuthenticated && message.retryText != null) {
+      await _chat.retry(message);
+    }
   }
 
   @override
@@ -225,8 +242,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         itemCount: messages.length,
         itemBuilder: (context, i) {
-          final key = _bubbleKeys.putIfAbsent(i, () => GlobalKey());
           final m = messages[i];
+          final key = _bubbleKeys.putIfAbsent(m.id, () => GlobalKey());
           final highlighted = m.isDiagnosisResult && i == lastResultIndex;
 
           Widget child;
@@ -244,9 +261,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               highlighted: highlighted,
               onRetry: m.errorType == ChatErrorType.insufficientCredits
                   ? _goToStore
-                  : m.retryText != null
-                      ? () => _chat.retry(m)
-                      : null,
+                  : m.errorType == ChatErrorType.unauthorized
+                      ? () => _reauthAndRetry(m)
+                      : m.retryText != null
+                          ? () => _chat.retry(m)
+                          : null,
             );
           }
 

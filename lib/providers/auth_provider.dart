@@ -181,8 +181,9 @@ class AuthProvider with ChangeNotifier {
     _isFetchingProfile = true;
     try {
       final response = await apiService.getProfile(_token!);
-      if (response['success'] == true && response['data'] != null) {
-        _updateProfileFromData(response['data'] as Map<String, dynamic>);
+      final payload = _profilePayload(response);
+      if (payload != null) {
+        _updateProfileFromData(payload);
         _profileLastFetched = DateTime.now();
         _isProfileLoaded = true;
         await _saveCachedProfile();
@@ -199,6 +200,37 @@ class AuthProvider with ChangeNotifier {
     } finally {
       _isFetchingProfile = false;
     }
+  }
+
+  Map<String, dynamic>? _asStringMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  /// هم پاسخ `{ success, data }` و هم پروفایل تخت را می‌پذیرد.
+  Map<String, dynamic>? _profilePayload(Map<String, dynamic> response) {
+    final nested = _asStringMap(response['data']);
+    if (nested != null) return nested;
+    const profileKeys = {
+      'credits',
+      'isGolden',
+      'is_golden',
+      'phone',
+      'referralCode',
+      'remainingFree',
+    };
+    if (profileKeys.any(response.containsKey)) return response;
+    return null;
+  }
+
+  String? _extractToken(Map<String, dynamic> res) {
+    final top = res['token']?.toString().trim();
+    if (top != null && top.isNotEmpty && top != 'null') return top;
+    final nested = _asStringMap(res['data']);
+    final inner = nested?['token']?.toString().trim();
+    if (inner != null && inner.isNotEmpty && inner != 'null') return inner;
+    return null;
   }
 
   void _updateProfileFromData(Map<String, dynamic> data) {
@@ -233,22 +265,23 @@ class AuthProvider with ChangeNotifier {
   Future<void> login(String phone, String code, {String? referralCode}) async {
     final res =
         await apiService.verifyOtp(phone, code, referralCode: referralCode);
-    if (res['success'] == true) {
-      _token = res['token'] as String?;
-      if (_token == null) {
-        throw Exception('توکن دریافت نشد. لطفاً دوباره تلاش کنید.');
-      }
-      await _storage.write(key: 'jwt_token', value: _token!);
-      final user = res['user'];
-      if (user is Map<String, dynamic>) {
-        _phone = phone;
-        _updateProfileFromData(user);
-      }
-      await fetchProfile(force: true);
-      notifyListeners();
-    } else {
+    if (res['success'] == false) {
       throw Exception(res['error'] ?? res['message'] ?? 'خطا در ورود');
     }
+    final token = _extractToken(res);
+    if (token == null) {
+      throw Exception('توکن دریافت نشد. لطفاً دوباره تلاش کنید.');
+    }
+    _token = token;
+    await _storage.write(key: 'jwt_token', value: _token!);
+    final nested = _asStringMap(res['data']);
+    final user = _asStringMap(res['user']) ?? _asStringMap(nested?['user']);
+    _phone = phone;
+    if (user != null) {
+      _updateProfileFromData(user);
+    }
+    await fetchProfile(force: true);
+    notifyListeners();
   }
 
   void updateCredits(int newCredits) {
@@ -326,11 +359,9 @@ class AuthProvider with ChangeNotifier {
       try {
         if (Hive.isBoxOpen(name)) {
           await Hive.box(name).clear();
-          await Hive.box(name).close();
         } else {
           final box = await Hive.openBox(name);
           await box.clear();
-          await box.close();
         }
       } catch (e) {
         debugPrint('خطا در پاکسازی box "$name": $e');

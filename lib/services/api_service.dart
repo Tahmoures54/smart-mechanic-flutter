@@ -136,9 +136,20 @@ class ApiService {
     }
 
     if (data is List) return {'data': data};
-    return data is Map<String, dynamic>
-        ? data
-        : <String, dynamic>{'data': data};
+    final asMap = _asStringMap(data);
+    return asMap ?? <String, dynamic>{'data': data};
+  }
+
+  Map<String, dynamic>? _asStringMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  Map<String, dynamic>? _extractStructured(Map<String, dynamic> data) {
+    final inner = _asStringMap(data['data']);
+    final raw = data['structured'] ?? inner?['structured'];
+    return _asStringMap(raw);
   }
 
   Future<void> _checkRateLimit(String key) async {
@@ -354,15 +365,8 @@ class ApiService {
     final data = _parseAndEnsure(response, defaultError: 'خطا در عیب‌یابی');
     final result = _extractResult(data);
     if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه‌ای برنگرداند.');
-    final inner = data['data'] is Map
-        ? Map<String, dynamic>.from(data['data'] as Map)
-        : <String, dynamic>{};
-    final structuredRaw = data['structured'] is Map
-        ? data['structured']
-        : inner['structured'];
-    final structured = structuredRaw is Map
-        ? Map<String, dynamic>.from(structuredRaw)
-        : null;
+    final inner = _asStringMap(data['data']) ?? const <String, dynamic>{};
+    final structured = _extractStructured(data);
     return DiagnosisApiResult(
       result: result,
       diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
@@ -377,10 +381,11 @@ class ApiService {
   }
 
   String? _extractResult(Map<String, dynamic> data) {
-    if (data['data'] is Map) {
-      final d = data['data'] as Map;
-      return d['result']?.toString() ?? d['answer']?.toString() ?? d['text']?.toString();
-    }
+    final inner = _asStringMap(data['data']);
+    final fromInner = inner?['result']?.toString() ??
+        inner?['answer']?.toString() ??
+        inner?['text']?.toString();
+    if (fromInner != null && fromInner.isNotEmpty) return fromInner;
     return data['result']?.toString() ?? data['answer']?.toString() ?? data['text']?.toString();
   }
 
@@ -418,14 +423,13 @@ class ApiService {
       final data = _parseAndEnsure(response, defaultError: 'خطا در آپلود و تحلیل صدا');
       final result = _extractResult(data);
       if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه تحلیل صدا را برنگرداند.');
-      final inner = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : <String, dynamic>{};
+      final inner = _asStringMap(data['data']) ?? const <String, dynamic>{};
+      final structured = _extractStructured(data);
       return DiagnosisApiResult(
         result: result,
         diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
-        responseMode: inner['structured'] is Map ? (inner['structured']['responseMode']?.toString() ?? 'diagnosis') : 'diagnosis',
-        structured: inner['structured'] is Map
-            ? Map<String, dynamic>.from(inner['structured'] as Map)
-            : null,
+        responseMode: structured?['responseMode']?.toString() ?? 'diagnosis',
+        structured: structured,
       );
     } on ApiException {
       rethrow;
@@ -473,7 +477,10 @@ class ApiService {
     } else {
       rawList = [];
     }
-    return rawList.whereType<Map<String, dynamic>>().map(Diagnostic.fromJson).toList();
+    return rawList
+        .whereType<Map>()
+        .map((e) => Diagnostic.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Future<void> deleteHistory(String token, String diagnosticId) async {

@@ -419,7 +419,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => RecordScreen(carName: car.name, carId: car.id, year: car.year),
+        builder: (_) => RecordScreen(
+          carName: car.name,
+          carId: car.id,
+          year: car.year,
+          isCustomCar: _isCustomCar,
+        ),
       ),
     );
   }

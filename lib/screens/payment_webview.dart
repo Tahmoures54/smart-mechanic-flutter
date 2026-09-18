@@ -232,7 +232,6 @@ class _PaymentWebViewState extends State<PaymentWebView> {
 
     setState(() => _showResultOverlay = true);
 
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     try {
@@ -241,28 +240,12 @@ class _PaymentWebViewState extends State<PaymentWebView> {
 
       setState(() => _showResultOverlay = false);
       navigator.pop(true);
-
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('پرداخت موفق ✅ موجودی شما به‌روز شد.'),
-          backgroundColor: Colors.green,
-        ),
-      );
     } catch (e) {
       debugPrint('[PaymentWebView] fetchProfile failed: $e');
       if (!mounted) return;
 
       setState(() => _showResultOverlay = false);
       navigator.pop(true);
-
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'پرداخت انجام شد اما بروزرسانی با تأخیر مواجه شد. '
-            'صفحه را بکشید تا تازه شود.',
-          ),
-        ),
-      );
     }
   }
 

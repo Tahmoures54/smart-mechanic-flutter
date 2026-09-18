@@ -61,14 +61,13 @@ class Diagnostic {
     final updatedAt = _parseDate(json['updatedAt'] ?? json['updated_at']);
 
     // ── پارس Car ──
-    final Car? car = json['car'] is Map<String, dynamic>
-        ? Car.fromJson(json['car'] as Map<String, dynamic>)
-        : null;
+    final carJson = _asMap(json['car']);
+    final Car? car = carJson != null ? Car.fromJson(carJson) : null;
 
     // ── پارس AudioFeatures ──
-    final AudioFeatures? audioFeatures = json['audioFeatures'] is Map<String, dynamic>
-        ? AudioFeatures.fromJson(json['audioFeatures'] as Map<String, dynamic>)
-        : null;
+    final audioJson = _asMap(json['audioFeatures']);
+    final AudioFeatures? audioFeatures =
+        audioJson != null ? AudioFeatures.fromJson(audioJson) : null;
 
     // ── پارس metadata (ایمن در برابر خطای نوع) ──
     final Map<String, dynamic>? metadata = json['metadata'] is Map
@@ -229,6 +228,12 @@ class Diagnostic {
   // ── توابع کمکی private ──
   // ─────────────────────────────────────────
   static String _str(dynamic value) => value == null ? '' : value.toString().trim();
+
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
 
   // ✅ پشتیبانی از Timestamp عددی (Unix) برای تاریخ‌ها
   static DateTime? _parseDate(dynamic value) {

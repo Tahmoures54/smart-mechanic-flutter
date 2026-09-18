@@ -110,7 +110,11 @@ class _TouchQuestionnaireState extends State<_TouchQuestionnaire> {
   Future<void> _submit() async {
     if (_answers.isEmpty || widget.onSubmit == null || _submitting) return;
     setState(() => _submitting = true);
-    await widget.onSubmit!(_answers);
+    try {
+      await widget.onSubmit!(_answers);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override

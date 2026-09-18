@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../constants.dart';
 import '../models/chat_message.dart';
 import '../models/diagnosis_result.dart';
 import '../providers/auth_provider.dart';
@@ -68,6 +69,7 @@ class ChatController extends ChangeNotifier {
     if (initialResultText != null && initialResultText.trim().isNotEmpty) {
       _lastDiagnosticId = initialDiagnosticId;
       _appendDiagnosisResult(initialResultText, initialResultJson);
+      unawaited(authProvider.fetchProfile());
     } else {
       unawaited(fetchDiagnosis(userMessage));
     }
@@ -127,6 +129,9 @@ class ChatController extends ChangeNotifier {
       _appendDiagnosisResult(response.result, structuredJson);
     } on ApiException catch (e) {
       if (_disposed) return;
+      if (e.statusCode == 401) {
+        unawaited(authProvider.logout());
+      }
       _append(ChatMessage.error(
         _messageForApiError(e),
         retryText: e.statusCode == 402 ? null : description,
@@ -150,6 +155,9 @@ class ChatController extends ChangeNotifier {
 
   void _append(ChatMessage message) {
     _messages.add(message);
+    if (_messages.length > Constants.maxChatMessages) {
+      _messages.removeRange(0, _messages.length - Constants.maxChatMessages);
+    }
     _safeNotify();
     onMessageAppended?.call(_messages.length - 1, message.isDiagnosisResult);
   }

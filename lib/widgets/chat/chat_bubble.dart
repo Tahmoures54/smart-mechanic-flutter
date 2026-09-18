@@ -48,15 +48,15 @@ class ChatBubble extends StatelessWidget {
             InkWell(
               onTap: onRetry,
               borderRadius: BorderRadius.circular(8),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 2),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh_rounded, size: 14, color: Colors.redAccent),
-                    SizedBox(width: 4),
-                    Text('تلاش دوباره',
-                        style: TextStyle(fontSize: 12.5, color: Colors.redAccent, fontWeight: FontWeight.w700)),
+                    Icon(_retryIcon, size: 14, color: Colors.redAccent),
+                    const SizedBox(width: 4),
+                    Text(_retryLabel,
+                        style: const TextStyle(fontSize: 12.5, color: Colors.redAccent, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
@@ -71,4 +71,16 @@ class ChatBubble extends StatelessWidget {
       child: bubble,
     );
   }
+
+  String get _retryLabel => switch (message.errorType) {
+        ChatErrorType.insufficientCredits => 'خرید بسته',
+        ChatErrorType.unauthorized => 'ورود مجدد',
+        _ => 'تلاش دوباره',
+      };
+
+  IconData get _retryIcon => switch (message.errorType) {
+        ChatErrorType.insufficientCredits => Icons.storefront_rounded,
+        ChatErrorType.unauthorized => Icons.login_rounded,
+        _ => Icons.refresh_rounded,
+      };
 }

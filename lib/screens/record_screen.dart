@@ -17,12 +17,14 @@ class RecordScreen extends StatefulWidget {
   final String carName;
   final String carId;
   final String year;
+  final bool isCustomCar;
 
   const RecordScreen({
     super.key,
     required this.carName,
     required this.carId,
     required this.year,
+    this.isCustomCar = false,
   });
 
   @override
@@ -292,10 +294,11 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
         filePath: info.filePath,
         carId: widget.carId,
         year: widget.year,
-        carName: widget.carName,
+        carName: widget.isCustomCar ? widget.carName : null,
         audioFeatures: audioFeatures,
       );
       if (!mounted) return;
+      unawaited(authProvider.fetchProfile());
 
       final voiceMessage = '''
 من صدای موتور ماشین رو با گوشی ضبط کردم.
@@ -315,6 +318,7 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
             carName: widget.carName,
             carId: widget.carId,
             year: widget.year,
+            isCustomCar: widget.isCustomCar,
             initialUserMessage: voiceMessage,
             initialDiagnosisResult: diagnosis.result,
             initialDiagnosticId: diagnosis.diagnosticId,
@@ -322,6 +326,22 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
           ),
         ),
       );
+    } on ApiException catch (e) {
+      debugPrint('[RecordScreen] API error: $e');
+      if (!mounted) return;
+      final msg = switch (e.statusCode) {
+        402 => 'اعتبار شما کافی نیست. لطفاً از فروشگاه بسته بخرید.',
+        401 => 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.',
+        _ => e.message,
+      };
+      _showSnack(msg);
+      if (e.statusCode == 401) {
+        unawaited(authProvider.logout());
+      }
+      setState(() {
+        _isProcessing = false;
+        _secondsElapsed = 0;
+      });
     } catch (e, st) {
       debugPrint('[RecordScreen] process failed: $e\n$st');
       if (!mounted) return;
