@@ -2,13 +2,48 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+import '../legal/terms_of_use.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../legal/terms_of_use.dart';
 import '../theme/brand.dart';
 import '../widgets/brand_logo.dart';
 import 'home_screen.dart';
 import 'terms_screen.dart';
+
+/// یک فرمتر اختصاصی برای نرمال‌سازی ارقام فارسی و عربی به لاتین در زمان تایپ.
+/// این فرمتر از قفل شدن فیلدهای عددی هنگام استفاده از کیبوردهای فارسی جلوگیری می‌کند.
+class _PersianLatinDigitFormatter extends TextInputFormatter {
+  const _PersianLatinDigitFormatter();
+
+  static const Map<String, String> _toLatin = {
+    '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+    '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+  };
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final buffer = StringBuffer();
+    for (final ch in newValue.text.split('')) {
+      final mapped = _toLatin[ch];
+      if (mapped != null) {
+        buffer.write(mapped);
+      } else if (RegExp(r'[0-9]').hasMatch(ch)) {
+        buffer.write(ch);
+      }
+    }
+    final newText = buffer.toString();
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,6 +65,9 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
   bool _showReferral = false;
   bool _loginSuccess = false;
+
+  /// فلگ سراسری برای جلوگیری از اجرای هم‌زمان ناوبری‌ها یا درخواست‌های API تکراری
+  bool _isOperationInFlight = false;
 
   static const int _resendCooldown = 60;
   int _secondsLeft = 0;
@@ -86,6 +124,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   String? _validatePhone(String phone) {
     final cleanPhone = phone.replaceAll(' ', '').trim();
+    if (cleanPhone.isEmpty) return 'لطفاً شماره موبایل را وارد کنید';
     if (cleanPhone.length != 11) return 'شماره باید ۱۱ رقم باشد';
     if (!RegExp(r'^09\d{9}$').hasMatch(cleanPhone)) {
       return 'شماره موبایل نامعتبر است (مثال: 09123456789)';
@@ -94,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _sendOtp({bool isResend = false}) async {
+    if (_isOperationInFlight || _isLoading) return;
     FocusScope.of(context).unfocus();
 
     final phone = _phoneController.text.trim();
@@ -103,7 +143,11 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isOperationInFlight = true;
+    });
+
     try {
       await context.read<ApiService>().sendOtp(phone);
       if (!mounted) return;
@@ -112,7 +156,8 @@ class _LoginScreenState extends State<LoginScreen>
       _startCountdown();
       _codeController.clear();
 
-      Future.delayed(const Duration(milliseconds: 300), () {
+      // انتقال امن و ملایم فوکوس به فیلد تایید بعد از پایان انیمیشن سوئیچ
+      Future.delayed(const Duration(milliseconds: 320), () {
         if (mounted) FocusScope.of(context).requestFocus(_codeFocus);
       });
 
@@ -127,11 +172,17 @@ class _LoginScreenState extends State<LoginScreen>
       if (!mounted) return;
       _showSnack('خطا در ارتباط با سرور. اینترنت را بررسی کنید.', isError: true);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isOperationInFlight = false;
+        });
+      }
     }
   }
 
   Future<void> _verifyOtp() async {
+    if (_isOperationInFlight || _isLoading) return;
     FocusScope.of(context).unfocus();
 
     final code = _codeController.text.trim();
@@ -140,7 +191,11 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isOperationInFlight = true;
+    });
+
     try {
       await context.read<AuthProvider>().login(
             _phoneController.text.trim(),
@@ -151,15 +206,18 @@ class _LoginScreenState extends State<LoginScreen>
           );
       if (!mounted) return;
 
-      // موفقیت: فیدبک لمسی + انیمیشن محو صفحه ورود
-      HapticFeedback.mediumImpact();
+      // فیدبک لمسی امن برای جلوگیری از بروز کرش روی دستگاه‌های خاص
+      try {
+        HapticFeedback.mediumImpact();
+      } catch (_) {}
+
       setState(() {
         _isLoading = false;
         _loginSuccess = true;
       });
 
-      // کمی مکث تا کاربر تیک موفقیت را ببیند، سپس محو شدن فرم
-      await Future.delayed(const Duration(milliseconds: 450));
+      // مکث هوشمند جهت تعامل بصری و نمایش تیک موفقیت
+      await Future.delayed(const Duration(milliseconds: 650));
       if (!mounted) return;
 
       await _animCtrl.reverse();
@@ -171,16 +229,21 @@ class _LoginScreenState extends State<LoginScreen>
       );
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isOperationInFlight = false;
+      });
       _showSnack(e.message, isError: true);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isOperationInFlight = false;
+      });
       _showSnack('خطای ناشناخته‌ای در ورود رخ داد.', isError: true);
     }
   }
 
-  /// مسیر سفارشی: محو + مقیاس ملایم (الگوی رایج صفحات لاگین زیبا)
   PageRouteBuilder<void> _fadeScaleRoute(Widget page) {
     return PageRouteBuilder<void>(
       pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -221,9 +284,10 @@ class _LoginScreenState extends State<LoginScreen>
     messenger.showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: isError ? Colors.redAccent : Colors.green,
+        backgroundColor: isError ? Colors.redAccent : Colors.green.shade700,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
       ),
     );
   }
@@ -307,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen>
         return Opacity(
           opacity: t,
           child: Container(
-            color: theme.canvasColor.withOpacity(0.92 * t),
+            color: theme.colorScheme.surface.withValues(alpha: 0.92 * t),
             alignment: Alignment.center,
             child: Transform.scale(
               scale: 0.7 + (0.3 * t),
@@ -324,10 +388,10 @@ class _LoginScreenState extends State<LoginScreen>
             height: 88,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: theme.colorScheme.secondary.withOpacity(0.15),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.15),
               boxShadow: [
                 BoxShadow(
-                  color: theme.colorScheme.secondary.withOpacity(0.25),
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.25),
                   blurRadius: 24,
                   spreadRadius: 2,
                 ),
@@ -408,7 +472,8 @@ class _LoginScreenState extends State<LoginScreen>
           maxLength: 11,
           textDirection: TextDirection.ltr,
           textAlign: TextAlign.center,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          // استفاده از فرمتر نرمالایزر اختصاصی به جای digitsOnly
+          inputFormatters: const [_PersianLatinDigitFormatter()],
           style: const TextStyle(
             fontSize: 20,
             letterSpacing: 4,
@@ -444,10 +509,10 @@ class _LoginScreenState extends State<LoginScreen>
           firstChild: Container(
             margin: const EdgeInsets.only(bottom: 4),
             decoration: BoxDecoration(
-              color: theme.colorScheme.secondary.withOpacity(0.08),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: theme.colorScheme.secondary.withOpacity(0.25),
+                color: theme.colorScheme.secondary.withValues(alpha: 0.25),
               ),
             ),
             child: TextButton.icon(
@@ -505,9 +570,9 @@ class _LoginScreenState extends State<LoginScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.12),
+                  color: Colors.amber.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withOpacity(0.35)),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
                 ),
                 child: const Column(
                   children: [
@@ -613,7 +678,7 @@ class _LoginScreenState extends State<LoginScreen>
           maxLength: 6,
           textAlign: TextAlign.center,
           textDirection: TextDirection.ltr,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          inputFormatters: const [_PersianLatinDigitFormatter()],
           style: const TextStyle(
             fontSize: 28,
             letterSpacing: 12,
@@ -731,7 +796,7 @@ class _LoginScreenState extends State<LoginScreen>
               width: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: theme.colorScheme.onSecondary.withOpacity(0.8),
+                color: theme.colorScheme.onSecondary.withValues(alpha: 0.8),
               ),
             )
           : Icon(icon, size: 20),
@@ -746,8 +811,8 @@ class _LoginScreenState extends State<LoginScreen>
         padding: const EdgeInsets.symmetric(vertical: 15),
         backgroundColor: theme.colorScheme.secondary,
         foregroundColor: theme.colorScheme.onSecondary,
-        disabledBackgroundColor: theme.colorScheme.secondary.withOpacity(0.5),
-        disabledForegroundColor: theme.colorScheme.onSecondary.withOpacity(0.6),
+        disabledBackgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.5),
+        disabledForegroundColor: theme.colorScheme.onSecondary.withValues(alpha: 0.6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -790,9 +855,9 @@ class _LoginLegalNote extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
-        color: theme.cardColor.withOpacity(0.72),
+        color: theme.cardColor.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: orange.withOpacity(0.28)),
+        border: Border.all(color: orange.withValues(alpha: 0.28)),
       ),
       child: Column(
         children: [
