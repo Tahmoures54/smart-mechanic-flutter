@@ -73,11 +73,18 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  Future<void> sendStructuredAnswers(Map<String, String> answers) async {
-    if (answers.isEmpty || _isTyping) return;
-    final text = answers.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+  Future<void> sendStructuredAnswer(String question, String answer) async {
+    if (question.trim().isEmpty || answer.trim().isEmpty || _isTyping || isAwaitingChoices) return;
+    final text = '${question.trim()}: ${answer.trim()}';
     _append(ChatMessage.user(text));
     await fetchDiagnosis(text);
+  }
+
+  @Deprecated('Use sendStructuredAnswer for the one-question-at-a-time flow.')
+  Future<void> sendStructuredAnswers(Map<String, String> answers) async {
+    if (answers.isEmpty || _isTyping) return;
+    final entry = answers.entries.first;
+    await sendStructuredAnswer(entry.key, entry.value);
   }
 
   Future<void> sendUserMessage(String text) async {
