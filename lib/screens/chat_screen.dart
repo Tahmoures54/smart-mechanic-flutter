@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/chat_controller.dart';
 import '../models/chat_message.dart';
+import 'shop_screen.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/brand_logo.dart';
@@ -145,9 +146,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _chat.sendUserMessage(text);
   }
 
-  void _goToStore() {
-    // مسیر واقعی فروشگاه پروژه‌ات را اینجا صدا بزن، مثلاً:
-    // Navigator.of(context).pushNamed('/store');
+  Future<void> _goToStore() async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ShopScreen()),
+    );
   }
 
   @override
@@ -231,12 +234,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             child = ChatBubble(
               message: m,
               highlighted: highlighted,
-              onRetry: m.retryText != null
-                  ? () {
-                      if (m.retryText!.contains('اعتبار')) _goToStore();
-                      _chat.retry(m);
-                    }
-                  : null,
+              onRetry: m.errorType == ChatErrorType.insufficientCredits
+                  ? _goToStore
+                  : m.retryText != null
+                      ? () => _chat.retry(m)
+                      : null,
             );
           }
 
