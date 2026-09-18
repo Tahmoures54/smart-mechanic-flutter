@@ -133,7 +133,7 @@ class DiagnosisResult {
                 .whereType<Map>()
                 .map((e) => DiagnosisQuestionOption.fromJson(Map<String, dynamic>.from(e)))
                 .where((e) => e.question.isNotEmpty && e.options.length >= 2)
-                .take(6)
+                .take(1)
                 .toList()
             : const [],
         // در ابهام، جانب احتیاط را می‌گیریم: پیش‌فرض «yellow» نه «green».
