@@ -27,6 +27,18 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
+class DiagnosisApiResult {
+  final String result;
+  final String? diagnosticId;
+  final String responseMode;
+
+  const DiagnosisApiResult({
+    required this.result,
+    this.diagnosticId,
+    this.responseMode = 'diagnosis',
+  });
+}
+
 class ApiResponse<T> {
   final T data;
   final int statusCode;
@@ -312,12 +324,21 @@ class ApiService {
     _parseAndEnsure(response, defaultError: 'خطا در ثبت درخواست برداشت');
   }
 
-  Future<String> diagnose(String token, String carId, String description, {required String year, String? carName}) async {
+  Future<DiagnosisApiResult> diagnoseDetailed(
+    String token,
+    String carId,
+    String description, {
+    required String year,
+    String? carName,
+    String? previousDiagnosticId,
+  }) async {
     final body = <String, dynamic>{
       'carId': carId,
       'year': year,
       'description': description,
       if (carName != null && carName.trim().isNotEmpty) 'carName': carName.trim(),
+      if (previousDiagnosticId != null && previousDiagnosticId.trim().isNotEmpty)
+        'previousDiagnosticId': int.tryParse(previousDiagnosticId.trim()) ?? previousDiagnosticId.trim(),
     };
     final response = await _safeCall(
       () => _httpClient.post(
@@ -331,7 +352,17 @@ class ApiService {
     final data = _parseAndEnsure(response, defaultError: 'خطا در عیب‌یابی');
     final result = _extractResult(data);
     if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه‌ای برنگرداند.');
-    return result;
+    final inner = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : <String, dynamic>{};
+    return DiagnosisApiResult(
+      result: result,
+      diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
+      responseMode: inner['structured'] is Map ? (inner['structured']['responseMode']?.toString() ?? 'diagnosis') : 'diagnosis',
+    );
+  }
+
+  Future<String> diagnose(String token, String carId, String description, {required String year, String? carName}) async {
+    final response = await diagnoseDetailed(token, carId, description, year: year, carName: carName);
+    return response.result;
   }
 
   String? _extractResult(Map<String, dynamic> data) {
