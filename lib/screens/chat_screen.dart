@@ -140,10 +140,24 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _onSend() {
-    final text = _inputCtrl.text;
-    if (text.trim().isEmpty || _chat.isTyping) return;
+    final text = _inputCtrl.text.trim();
+    if (text.isEmpty || _chat.isTyping) return;
     _inputCtrl.clear();
+    _chat.clearGuidedAnswer();
     _chat.sendUserMessage(text);
+  }
+
+  void _onGuidedAnswerSelected(String question, String answer) {
+    final text = question.trim() + ': ' + answer.trim();
+    if (text.trim().isEmpty || _chat.isTyping) return;
+    _inputCtrl
+      ..text = text
+      ..selection = TextSelection.collapsed(offset: text.length);
+    _chat.prepareGuidedAnswer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusNode.requestFocus();
+    });
   }
 
   Future<void> _goToStore() async {
@@ -189,15 +203,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ListenableBuilder(
                   listenable: _chat,
                   builder: (context, _) {
-                    if (_chat.isAwaitingChoices) {
-                      return const _ChoicePromptBar();
-                    }
-                    return ChatInputBar(
-                      controller: _inputCtrl,
-                      focusNode: _focusNode,
-                      enabled: !_chat.isTyping,
-                      onSend: _onSend,
-                      bottomInset: bottomInset,
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_chat.isAwaitingChoices) const _ChoicePromptBar(),
+                        ChatInputBar(
+                          controller: _inputCtrl,
+                          focusNode: _focusNode,
+                          enabled: !_chat.isTyping,
+                          onSend: _onSend,
+                          bottomInset: bottomInset,
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -235,7 +252,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               alignment: Alignment.centerLeft,
               child: DiagnosisResultCard(
                 result: m.structured!,
-                onSubmitAnswer: _chat.sendStructuredAnswer,
+                onSubmitAnswer: _onGuidedAnswerSelected,
               ),
             );
           } else {
