@@ -1,12 +1,34 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/diagnose_loading_overlay.dart';
-import '../models/diagnostic.dart';
+
+/// صفحه چت عیب‌یابی
+class ChatScreen extends StatefulWidget {
+  final String carName;
+  final String carId;
+  final String year;
+  final String initialUserMessage;
+  final bool isCustomCar;
+
+  const ChatScreen({
+    super.key,
+    required this.carName,
+    required this.carId,
+    required this.year,
+    required this.initialUserMessage,
+    this.isCustomCar = false,
+  });
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
 
 enum MessageRole { user, assistant, system }
 
@@ -16,43 +38,32 @@ class ChatMessage {
   ChatMessage({required this.text, required this.role});
 }
 
-class ChatScreen extends StatefulWidget {
-  final String carId;
-  final String carName;
-  final String year;
-  final bool isCustomCar;
-
-  const ChatScreen({
-    super.key,
-    required this.carId,
-    required this.carName,
-    required this.year,
-    this.isCustomCar = false,
-  });
-
-  @override
-  State<ChatScreen> createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final _controller = TextEditingController();
-  final _scrollCtrl = ScrollController();
-  final _focusNode = FocusNode();
+class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
+  final TextEditingController _inputCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
+  final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
   bool _isTyping = false;
+  bool _started = false;
 
   @override
   void initState() {
     super.initState();
-    _messages.add(ChatMessage(
-      text: 'سلام! مشکل «${widget.carName}» مدل ${widget.year} را شرح بده تا عیب‌یابی کنم.',
-      role: MessageRole.assistant,
-    ));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_started || !mounted) return;
+      _started = true;
+      _messages.add(ChatMessage(
+        text: 'سلام! دارم مشکل «${widget.carName}» مدل ${widget.year} را بررسی می‌کنم.\nمشکل: ${widget.initialUserMessage}',
+        role: MessageRole.assistant,
+      ));
+      setState(() {});
+      _fetchDiagnosis(widget.initialUserMessage);
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _inputCtrl.dispose();
     _scrollCtrl.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -83,6 +94,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final api = context.read<ApiService>();
 
     try {
+      if (auth.token == null || auth.token!.isEmpty) {
+        throw const ApiException(401, 'لطفاً دوباره وارد شوید.');
+      }
+
       final result = await api.diagnose(
         auth.token!,
         widget.carId,
@@ -99,24 +114,21 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       if (e.statusCode == 402) {
         _addMessage(ChatMessage(
-          text: 'اعتبار کافی نیست. از فروشگاه بسته بخرید.',
+          text: 'اعتبار شما کافی نیست. لطفاً از فروشگاه بسته بخرید.',
           role: MessageRole.system,
         ));
       } else if (e.statusCode == 401) {
         _addMessage(ChatMessage(
-          text: 'نشست منقضی شده. دوباره وارد شوید.',
+          text: 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.',
           role: MessageRole.system,
         ));
       } else {
-        _addMessage(ChatMessage(
-          text: e.message,
-          role: MessageRole.system,
-        ));
+        _addMessage(ChatMessage(text: e.message, role: MessageRole.system));
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       _addMessage(ChatMessage(
-        text: 'خطا در عیب‌یابی. دوباره تلاش کنید.',
+        text: 'خطا در عیب‌یابی. لطفاً دوباره تلاش کنید.',
         role: MessageRole.system,
       ));
     } finally {
@@ -125,40 +137,34 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onSend() {
-    final text = _controller.text.trim();
+    final text = _inputCtrl.text.trim();
     if (text.isEmpty || _isTyping) return;
-    _controller.clear();
+    _inputCtrl.clear();
     _addMessage(ChatMessage(text: text, role: MessageRole.user));
     unawaited(_fetchDiagnosis(text));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final auth = context.watch<AuthProvider>();
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: BrandAppBarTitle(
-          subtitle: '${widget.carName} · ${widget.year}',
+  Widget _buildCreditBadge(AuthProvider auth, ThemeData theme) {
+    if (auth.isGolden) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.amber.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
         ),
+        child: const Text('طلایی', style: TextStyle(fontSize: 12, color: Colors.amber)),
+      );
+    }
+    final credits = auth.credits;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondary.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
       ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(child: _buildMessageList(theme)),
-                if (_isTyping) _buildTypingBanner(theme),
-                _buildInputArea(theme, auth, bottomInset),
-              ],
-            ),
-          ),
-          DiagnoseLoadingOverlay(visible: _isTyping),
-        ],
+      child: Text(
+        'اعتبار: ${credits ?? '—'}',
+        style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary),
       ),
     );
   }
@@ -194,75 +200,125 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageList(ThemeData theme) {
-    return ListView.builder(
-      controller: _scrollCtrl,
-      padding: const EdgeInsets.all(12),
-      itemCount: _messages.length,
-      itemBuilder: (context, i) {
-        final m = _messages[i];
-        final isUser = m.role == MessageRole.user;
-        final isSystem = m.role == MessageRole.system;
-        return Align(
-          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.82,
-            ),
-            decoration: BoxDecoration(
-              color: isSystem
-                  ? Colors.red.withOpacity(0.12)
-                  : isUser
-                      ? Colors.orange.withOpacity(0.2)
-                      : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              m.text,
-              style: TextStyle(
-                height: 1.5,
-                color: isSystem ? Colors.redAccent.shade100 : null,
+    return GestureDetector(
+      onTap: () => _focusNode.unfocus(),
+      child: ListView.builder(
+        controller: _scrollCtrl,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        itemCount: _messages.length,
+        itemBuilder: (context, i) {
+          final m = _messages[i];
+          final isUser = m.role == MessageRole.user;
+          final isSystem = m.role == MessageRole.system;
+          return Align(
+            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.82,
+              ),
+              decoration: BoxDecoration(
+                color: isSystem
+                    ? Colors.red.withOpacity(0.12)
+                    : isUser
+                        ? Colors.orange.withOpacity(0.22)
+                        : theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: SelectableText(
+                m.text,
+                style: TextStyle(
+                  height: 1.55,
+                  fontSize: 14,
+                  color: isSystem ? Colors.redAccent.shade100 : null,
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   Widget _buildInputArea(ThemeData theme, AuthProvider auth, double bottomInset) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset * 0.05),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _onSend(),
-              decoration: InputDecoration(
-                hintText: 'مشکل را بنویس…',
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+    return Material(
+      elevation: 8,
+      color: theme.scaffoldBackgroundColor,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + (bottomInset > 0 ? 4 : 0)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _inputCtrl,
+                focusNode: _focusNode,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _onSend(),
+                enabled: !_isTyping,
+                decoration: InputDecoration(
+                  hintText: 'سوال پیگیری بنویس…',
+                  filled: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: _isTyping ? null : _onSend,
+              icon: const Icon(Icons.send_rounded),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.orange.withOpacity(0.4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final auth = context.watch<AuthProvider>();
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: BrandAppBarTitle(
+          subtitle: '${widget.carName} · ${widget.year}',
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(left: 8, right: 4),
+            child: Center(child: _buildCreditBadge(auth, theme)),
           ),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            onPressed: _isTyping ? null : _onSend,
-            icon: const Icon(Icons.send_rounded),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+        ],
+      ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(child: _buildMessageList(theme)),
+                if (_isTyping) _buildTypingBanner(theme),
+                _buildInputArea(theme, auth, bottomInset),
+              ],
             ),
           ),
+          DiagnoseLoadingOverlay(visible: _isTyping),
         ],
       ),
     );
