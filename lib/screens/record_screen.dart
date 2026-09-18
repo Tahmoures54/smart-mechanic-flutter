@@ -4,6 +4,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/sound_analyzer.dart';
+import '../services/api_service.dart';
+import '../providers/auth_provider.dart';
 import '../constants.dart';
 import 'chat_screen.dart';
 
@@ -154,6 +156,29 @@ class _RecordScreenState extends State<RecordScreen>
         }
 
         final features = await soundAnalyzer.analyze(info.filePath);
+        final auth = context.read<AuthProvider>();
+        if (auth.token == null || auth.token!.isEmpty) {
+          throw Exception('لطفاً دوباره وارد شوید.');
+        }
+
+        final audioFeatures = '''
+RMS: ${features.rms.toStringAsFixed(4)}
+Dominant frequency: ${features.dominantFrequency.toStringAsFixed(1)} Hz
+Spectral centroid: ${features.spectralCentroid.toStringAsFixed(1)} Hz
+Noise level: ${features.noiseLevel.label}
+Zero crossing rate: ${features.zeroCrossingRate.toStringAsFixed(4)}
+Spectral rolloff: ${features.spectralRolloff.toStringAsFixed(1)} Hz
+SNR: ${features.snr.toStringAsFixed(1)} dB
+'''.trim();
+
+        final diagnosis = await context.read<ApiService>().uploadAudioAndDiagnose(
+          auth.token!,
+          filePath: info.filePath,
+          carId: widget.carId,
+          year: widget.year,
+          carName: widget.carName,
+          audioFeatures: audioFeatures,
+        );
 
         if (!mounted) return;
 
@@ -176,6 +201,7 @@ class _RecordScreenState extends State<RecordScreen>
               carId: widget.carId,
               year: widget.year,
               initialUserMessage: voiceMessage,
+              initialDiagnosisResult: diagnosis,
             ),
           ),
         );
