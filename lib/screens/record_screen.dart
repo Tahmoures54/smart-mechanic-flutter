@@ -367,11 +367,11 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
                     margin: const EdgeInsets.only(bottom: 32),
                     decoration: BoxDecoration(
                       color:
-                          theme.colorScheme.secondary.withValues(alpha: 0.08),
+                          theme.colorScheme.secondary.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: theme.colorScheme.secondary
-                            .withValues(alpha: 0.2),
+                            .withOpacity(0.2),
                       ),
                     ),
                     child: Column(
@@ -431,7 +431,7 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
                             color: (_isRecording
                                     ? Colors.red
                                     : theme.colorScheme.secondary)
-                                .withValues(alpha: 0.35),
+                                .withOpacity(0.35),
                             blurRadius: 28,
                             spreadRadius: 4,
                           ),
