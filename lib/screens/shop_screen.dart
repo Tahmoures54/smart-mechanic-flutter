@@ -193,7 +193,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.secondary
-                            .withValues(alpha: 0.1),
+                            .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -401,15 +401,15 @@ class _ShopScreenState extends State<ShopScreen> {
           colors: isGold
               ? _goldGradient
               : [
-                  theme.colorScheme.primary.withValues(alpha: 0.85),
-                  theme.colorScheme.secondary.withValues(alpha: 0.75),
+                  theme.colorScheme.primary.withOpacity(0.85),
+                  theme.colorScheme.secondary.withOpacity(0.75),
                 ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: (isGold ? Colors.amber : theme.colorScheme.primary)
-                .withValues(alpha: 0.25),
+                .withOpacity(0.25),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -546,11 +546,11 @@ class _ShopScreenState extends State<ShopScreen> {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: theme.colorScheme.secondary.withValues(alpha: 0.35),
+          color: theme.colorScheme.secondary.withOpacity(0.35),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -564,7 +564,7 @@ class _ShopScreenState extends State<ShopScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.15),
+                  color: theme.colorScheme.secondary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -780,8 +780,7 @@ class _ShopScreenState extends State<ShopScreen> {
     final isGold = pkg.isGold;
 
     final cardColor = isGold
-        ? Colors.amber.withValues(
-            alpha: theme.brightness == Brightness.dark ? 0.12 : 0.18,
+        ? Colors.amber.withOpacity(theme.brightness == Brightness.dark ? 0.12 : 0.18,
           )
         : theme.cardColor;
 
@@ -811,9 +810,9 @@ class _ShopScreenState extends State<ShopScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isGold
-                            ? Colors.amber.withValues(alpha: 0.25)
+                            ? Colors.amber.withOpacity(0.25)
                             : theme.colorScheme.primary
-                                .withValues(alpha: 0.12),
+                                .withOpacity(0.12),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
@@ -887,7 +886,7 @@ class _ShopScreenState extends State<ShopScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.85),
+                                  .withOpacity(0.85),
                             ),
                           ),
                         ),
