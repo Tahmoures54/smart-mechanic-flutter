@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+
 import '../models/audio_features.dart';
 import '../providers/auth_provider.dart';
 import '../services/share_service.dart';
@@ -23,6 +24,19 @@ class ResultScreen extends StatefulWidget {
 
 class _ResultScreenState extends State<ResultScreen>
     with SingleTickerProviderStateMixin {
+  // ---------------------------------------------------------------------------
+  // ثابت‌ها
+  // ---------------------------------------------------------------------------
+
+  static const double _rmsLowThreshold = 0.05;
+  static const double _rmsNormalThreshold = 0.15;
+  static const double _rmsHighThreshold = 0.30;
+  static const double _rmsGaugeMax = 0.5;
+
+  // ---------------------------------------------------------------------------
+  // انیمیشن‌ها
+  // ---------------------------------------------------------------------------
+
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
@@ -44,10 +58,12 @@ class _ResultScreenState extends State<ResultScreen>
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animCtrl,
-      curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _animCtrl,
+        curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+      ),
+    );
 
     _gaugeAnim = CurvedAnimation(
       parent: _animCtrl,
@@ -63,50 +79,87 @@ class _ResultScreenState extends State<ResultScreen>
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // کمکی‌ها
+  // ---------------------------------------------------------------------------
+
   void _showSnack(String msg, Color color) {
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            const Icon(Icons.check_circle_rounded,
+                color: Colors.white, size: 18),
             const SizedBox(width: 8),
             Expanded(child: Text(msg)),
           ],
         ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  void _shareResult() {
-    if (widget.resultText == null) return;
-    final auth = context.read<AuthProvider>();
-    ShareService.shareDiagnosis(
-      result: widget.resultText!,
-      referralCode: auth.referralCode,
+  Future<void> _copyResult() async {
+    final text = widget.resultText;
+    if (text == null || text.isEmpty) return;
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      _showSnack('متن نتیجه کپی شد', Colors.green.shade700);
+    } catch (e) {
+      debugPrint('[ResultScreen] clipboard failed: $e');
+      _showSnack('کپی کردن ناموفق بود', Colors.redAccent);
+    }
+  }
+
+  Future<void> _shareResult() async {
+    final text = widget.resultText;
+    if (text == null || text.isEmpty) return;
+    try {
+      final auth = context.read<AuthProvider>();
+      await ShareService.shareDiagnosis(
+        result: text,
+        referralCode: auth.referralCode,
+      );
+    } catch (e) {
+      debugPrint('[ResultScreen] shareResult failed: $e');
+      _showSnack('اشتراک‌گذاری ناموفق بود', Colors.redAccent);
+    }
+  }
+
+  Future<void> _shareReferral() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      await ShareService.shareApp(referralCode: auth.referralCode);
+    } catch (e) {
+      debugPrint('[ResultScreen] shareReferral failed: $e');
+      _showSnack('اشتراک‌گذاری ناموفق بود', Colors.redAccent);
+    }
+  }
+
+  void _openShop() {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ShopScreen()),
     );
   }
 
-  void _copyResult(BuildContext context) {
-    if (widget.resultText == null) return;
-    Clipboard.setData(ClipboardData(text: widget.resultText!));
-    _showSnack('متن نتیجه کپی شد', Colors.green.shade700);
-  }
-
-  void _shareReferral() {
-    final auth = context.read<AuthProvider>();
-    ShareService.shareApp(referralCode: auth.referralCode);
-  }
+  // ---------------------------------------------------------------------------
+  // تفسیر مقادیر صوتی
+  // ---------------------------------------------------------------------------
 
   _AudioLevel _interpretRms(double rms) {
-    if (rms < 0.05) return _AudioLevel.low;
-    if (rms < 0.15) return _AudioLevel.normal;
-    if (rms < 0.30) return _AudioLevel.high;
+    if (rms < _rmsLowThreshold) return _AudioLevel.low;
+    if (rms < _rmsNormalThreshold) return _AudioLevel.normal;
+    if (rms < _rmsHighThreshold) return _AudioLevel.high;
     return _AudioLevel.critical;
   }
 
@@ -118,11 +171,17 @@ class _ResultScreenState extends State<ResultScreen>
     return 'بسیار بالا (ناکوبی احتمالی)';
   }
 
+  // ---------------------------------------------------------------------------
+  // build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasResult = widget.resultText != null;
-    final hasAudio = widget.audioFeatures != null;
+    final resultText = widget.resultText;
+    final audioFeatures = widget.audioFeatures;
+    final hasResult = resultText != null && resultText.isNotEmpty;
+    final hasAudio = audioFeatures != null;
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
@@ -136,7 +195,7 @@ class _ResultScreenState extends State<ResultScreen>
             IconButton(
               tooltip: 'کپی',
               icon: const Icon(Icons.copy_rounded),
-              onPressed: () => _copyResult(context),
+              onPressed: _copyResult,
             ),
             IconButton(
               tooltip: 'اشتراک‌گذاری',
@@ -167,7 +226,7 @@ class _ResultScreenState extends State<ResultScreen>
                       'تشخیص و راهکار پیشنهادی',
                       theme,
                     ),
-                    _buildResultCard(theme),
+                    _buildResultCard(theme, resultText),
                   ],
 
                   if (hasAudio) ...[
@@ -177,12 +236,11 @@ class _ResultScreenState extends State<ResultScreen>
                       'داده‌های استخراج‌شده از موتور',
                       theme,
                     ),
-                    _buildAudioCard(theme),
+                    _buildAudioCard(theme, audioFeatures),
                   ],
 
                   if (!hasResult && !hasAudio) _buildEmptyState(theme),
 
-                  // لحظه طلایی معرفی — بعد از ارزش دریافتی
                   if (hasResult) ...[
                     const SizedBox(height: 20),
                     _buildPostSuccessReferral(theme, auth),
@@ -204,25 +262,31 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // ویجت‌های بالای صفحه
+  // ---------------------------------------------------------------------------
+
   Widget _buildSuccessBanner(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.secondary.withOpacity(0.15),
-            theme.colorScheme.primary.withOpacity(0.08),
+            theme.colorScheme.secondary.withValues(alpha: 0.15),
+            theme.colorScheme.primary.withValues(alpha: 0.08),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.3)),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.secondary.withOpacity(0.15),
+              color: theme.colorScheme.secondary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -247,7 +311,11 @@ class _ResultScreenState extends State<ResultScreen>
                 const SizedBox(height: 2),
                 Text(
                   'این یک پیشنهاد هوشمند است؛ برای تصمیم نهایی با مکانیک مشورت کنید.',
-                  style: TextStyle(color: theme.hintColor, fontSize: 12, height: 1.35),
+                  style: TextStyle(
+                    color: theme.hintColor,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -290,15 +358,16 @@ class _ResultScreenState extends State<ResultScreen>
 
   /// Reciprocity + Identity بعد از دریافت ارزش
   Widget _buildPostSuccessReferral(ThemeData theme, AuthProvider auth) {
-    final hasCode = auth.referralCode != null && auth.referralCode!.isNotEmpty;
+    final hasCode =
+        auth.referralCode != null && auth.referralCode!.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondary.withOpacity(0.08),
+        color: theme.colorScheme.secondary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.25),
+          color: theme.colorScheme.secondary.withValues(alpha: 0.25),
         ),
       ),
       child: Column(
@@ -306,12 +375,19 @@ class _ResultScreenState extends State<ResultScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.favorite_rounded, color: Colors.pink.shade400, size: 22),
+              Icon(
+                Icons.favorite_rounded,
+                color: Colors.pink.shade400,
+                size: 22,
+              ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
                   'این نتیجه برات مفید بود؟',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
               ),
             ],
@@ -321,7 +397,11 @@ class _ResultScreenState extends State<ResultScreen>
             hasCode
                 ? 'دوستت هم ممکنه همین دغدغه رو داشته باشه. با کد معرف، هر دو اعتبار هدیه می‌گیرید.'
                 : 'می‌تونی نتیجه رو برای دوستت بفرستی یا اپ رو بهش معرفی کنی.',
-            style: TextStyle(fontSize: 13, height: 1.45, color: theme.hintColor),
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: theme.hintColor,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -362,12 +442,7 @@ class _ResultScreenState extends State<ResultScreen>
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ShopScreen()),
-          );
-        },
+        onTap: _openShop,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -381,7 +456,11 @@ class _ResultScreenState extends State<ResultScreen>
               Expanded(
                 child: Text(
                   msg,
-                  style: TextStyle(fontSize: 13, height: 1.4, color: theme.hintColor),
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: theme.hintColor,
+                  ),
                 ),
               ),
               Icon(Icons.chevron_left_rounded, color: theme.hintColor),
@@ -392,13 +471,19 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  Widget _buildResultCard(ThemeData theme) {
+  // ---------------------------------------------------------------------------
+  // کارت نتیجه
+  // ---------------------------------------------------------------------------
+
+  Widget _buildResultCard(ThemeData theme, String resultText) {
     return Card(
       elevation: 4,
-      shadowColor: theme.colorScheme.primary.withOpacity(0.2),
+      shadowColor: theme.colorScheme.primary.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.3)),
+        side: BorderSide(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -406,7 +491,7 @@ class _ResultScreenState extends State<ResultScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             MarkdownBody(
-              data: widget.resultText!,
+              data: resultText,
               selectable: true,
               styleSheet: MarkdownStyleSheet(
                 p: TextStyle(
@@ -424,7 +509,8 @@ class _ResultScreenState extends State<ResultScreen>
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.secondary,
                 ),
-                listBullet: TextStyle(color: theme.colorScheme.secondary),
+                listBullet:
+                    TextStyle(color: theme.colorScheme.secondary),
               ),
             ),
             const SizedBox(height: 16),
@@ -436,7 +522,7 @@ class _ResultScreenState extends State<ResultScreen>
                 _buildChipButton(
                   icon: Icons.copy_rounded,
                   label: 'کپی',
-                  onTap: () => _copyResult(context),
+                  onTap: _copyResult,
                   theme: theme,
                 ),
                 const SizedBox(width: 8),
@@ -466,9 +552,11 @@ class _ResultScreenState extends State<ResultScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: theme.colorScheme.secondary.withOpacity(0.1),
+          color: theme.colorScheme.secondary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.3)),
+          border: Border.all(
+            color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -489,13 +577,18 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  Widget _buildAudioCard(ThemeData theme) {
-    final f = widget.audioFeatures!;
+  // ---------------------------------------------------------------------------
+  // کارت صوت
+  // ---------------------------------------------------------------------------
+
+  Widget _buildAudioCard(ThemeData theme, AudioFeatures f) {
     final rmsLevel = _interpretRms(f.rms);
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -544,7 +637,8 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Widget _buildRmsGauge(double rms, _AudioLevel level, ThemeData theme) {
-    final normalizedRms = (rms / 0.5).clamp(0.0, 1.0);
+    final normalizedRms =
+        (rms / _rmsGaugeMax).clamp(0.0, 1.0).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,11 +655,14 @@ class _ResultScreenState extends State<ResultScreen>
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: level.color.withOpacity(0.15),
+                color: level.color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: level.color.withOpacity(0.4)),
+                border: Border.all(
+                  color: level.color.withValues(alpha: 0.4),
+                ),
               ),
               child: Text(
                 level.label,
@@ -587,7 +684,7 @@ class _ResultScreenState extends State<ResultScreen>
                 Container(
                   height: 14,
                   decoration: BoxDecoration(
-                    color: theme.dividerColor.withOpacity(0.3),
+                    color: theme.dividerColor.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(7),
                   ),
                 ),
@@ -597,12 +694,20 @@ class _ResultScreenState extends State<ResultScreen>
                     height: 14,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Colors.green, Colors.yellow, Colors.orange, Colors.red],
+                        colors: [
+                          Colors.green,
+                          Colors.yellow,
+                          Colors.orange,
+                          Colors.red,
+                        ],
                         stops: [0.0, 0.4, 0.7, 1.0],
                       ),
                       borderRadius: BorderRadius.circular(7),
                       boxShadow: [
-                        BoxShadow(color: level.color.withOpacity(0.4), blurRadius: 6),
+                        BoxShadow(
+                          color: level.color.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                        ),
                       ],
                     ),
                   ),
@@ -615,8 +720,10 @@ class _ResultScreenState extends State<ResultScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('آرام', style: TextStyle(color: theme.hintColor, fontSize: 10)),
-            Text('بلند', style: TextStyle(color: theme.hintColor, fontSize: 10)),
+            Text('آرام',
+                style: TextStyle(color: theme.hintColor, fontSize: 10)),
+            Text('بلند',
+                style: TextStyle(color: theme.hintColor, fontSize: 10)),
           ],
         ),
       ],
@@ -641,7 +748,10 @@ class _ResultScreenState extends State<ResultScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13)),
+                Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
+                ),
                 if (interpretation != null) ...[
                   const SizedBox(height: 2),
                   Text(
@@ -674,7 +784,7 @@ class _ResultScreenState extends State<ResultScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.dividerColor.withOpacity(0.08),
+        color: theme.dividerColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -682,7 +792,11 @@ class _ResultScreenState extends State<ResultScreen>
         children: [
           Text(
             'راهنمای سطح صدا:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: theme.hintColor),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: theme.hintColor,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -695,10 +809,17 @@ class _ResultScreenState extends State<ResultScreen>
                   Container(
                     width: 10,
                     height: 10,
-                    decoration: BoxDecoration(color: level.color, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: level.color,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                   const SizedBox(width: 4),
-                  Text(level.label, style: TextStyle(fontSize: 11, color: theme.hintColor)),
+                  Text(
+                    level.label,
+                    style:
+                        TextStyle(fontSize: 11, color: theme.hintColor),
+                  ),
                 ],
               );
             }).toList(),
@@ -708,21 +829,38 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // حالت خالی و دکمه‌ها
+  // ---------------------------------------------------------------------------
+
   Widget _buildEmptyState(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60),
       child: Column(
         children: [
-          Icon(Icons.search_off_rounded, size: 64, color: theme.hintColor.withOpacity(0.4)),
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: theme.hintColor.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 16),
           Text(
             'نتیجه‌ای دریافت نشد',
-            style: TextStyle(color: theme.hintColor, fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: theme.hintColor,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            'لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.\nنگران نباشید — اعتبار شما کسر نشده است.',
-            style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.6),
+            'لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.\n'
+            'نگران نباشید — اعتبار شما کسر نشده است.',
+            style: TextStyle(
+              color: theme.hintColor,
+              fontSize: 13,
+              height: 1.6,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -745,7 +883,9 @@ class _ResultScreenState extends State<ResultScreen>
             padding: const EdgeInsets.symmetric(vertical: 16),
             backgroundColor: theme.colorScheme.secondary,
             foregroundColor: theme.colorScheme.onSecondary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             elevation: 2,
           ),
         ),
@@ -772,6 +912,10 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// enum سطح صدا
+// ---------------------------------------------------------------------------
 
 enum _AudioLevel {
   low,
