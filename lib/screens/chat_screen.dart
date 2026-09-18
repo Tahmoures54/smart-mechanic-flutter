@@ -228,7 +228,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           if (m.structured != null) {
             child = Align(
               alignment: Alignment.centerLeft,
-              child: DiagnosisResultCard(result: m.structured!),
+              child: DiagnosisResultCard(
+                result: m.structured!,
+                onSubmitAnswers: _chat.sendStructuredAnswers,
+              ),
             );
           } else {
             child = ChatBubble(
