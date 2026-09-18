@@ -10,6 +10,7 @@ import '../models/car.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/share_service.dart';
+import '../utils/persian_numbers.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/car_selector_widget.dart';
 import '../widgets/enamad_badge.dart';
@@ -23,6 +24,70 @@ import 'terms_screen.dart';
 
 part 'home_screen_widgets.dart';
 
+const String _kCustomCarId = 'custom';
+
+/// TODO: بهتر است این کلید به Constants منتقل شود تا همهٔ کلیدهای
+/// SharedPreferences یک‌جا مدیریت شوند.
+const String _kKeyLastDescription = 'last_description';
+
+/* ---------------------------------------------------------------------------
+ * پیش‌نویس فرم — مدل + ذخیره‌سازی، جدا از UI تا قابل تست باشد.
+ * ------------------------------------------------------------------------ */
+
+class _HomeDraft {
+  const _HomeDraft({
+    this.year = '',
+    this.description = '',
+    this.customCarName = '',
+    this.carId,
+  });
+
+  final String year;
+  final String description;
+  final String customCarName;
+  final String? carId;
+
+  bool get isCustomCar => carId == _kCustomCarId && customCarName.trim().length >= 2;
+}
+
+class _DraftStore {
+  _DraftStore(this._prefs);
+  final SharedPreferences _prefs;
+
+  static Future<_DraftStore> open() async => _DraftStore(await SharedPreferences.getInstance());
+
+  _HomeDraft read() => _HomeDraft(
+        year: _prefs.getString(Constants.keyLastYear) ?? '',
+        description: _prefs.getString(_kKeyLastDescription) ?? '',
+        customCarName: _prefs.getString(Constants.keyLastCustomCar) ?? '',
+        carId: _prefs.getString(Constants.keyLastCarId),
+      );
+
+  Future<void> write(_HomeDraft draft) async {
+    await Future.wait<void>([
+      _prefs.setString(Constants.keyLastYear, draft.year),
+      _prefs.setString(_kKeyLastDescription, draft.description),
+      _prefs.setString(Constants.keyLastCustomCar, draft.customCarName),
+      if (draft.carId != null)
+        _prefs.setString(Constants.keyLastCarId, draft.carId!)
+      else
+        _prefs.remove(Constants.keyLastCarId),
+    ]);
+  }
+
+  Future<void> clearDescription() => _prefs.remove(_kKeyLastDescription);
+}
+
+/* ---------------------------------------------------------------------------
+ * اعتبارسنجی — خالص و بدون side-effect. تصمیم UI جداگانه گرفته می‌شود.
+ * ------------------------------------------------------------------------ */
+
+enum _FormIssue { noCar, customCarName, year, description, noCredit }
+
+/* ---------------------------------------------------------------------------
+ * صفحهٔ اصلی
+ * ------------------------------------------------------------------------ */
+
 /// صفحه اصلی — مسیر ساده: خودرو → شرح مشکل → ارسال
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,44 +96,137 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  List<Car> _cars = [];
-  Car? _selectedCar;
-
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _descController = TextEditingController();
   final _customCarController = TextEditingController();
   final _yearController = TextEditingController();
+
+  final _carCardKey = GlobalKey();
+  final _descFieldKey = GlobalKey();
+
+  List<Car> _cars = [];
+  Car? _selectedCar;
 
   bool _isLoadingCars = true;
   bool _isRefreshing = false;
   bool _hasCarLoadError = false;
   bool _isCustomCar = false;
-  SharedPreferences? _prefs;
+
+  String? _descError;
+
+  _DraftStore? _draftStore;
   String? _pendingCarId;
+
+  Timer? _draftDebounce;
+  bool _isRestoringDraft = false;
+
+  /// شمارندهٔ درخواست — پاسخ‌های قدیمی که دیر می‌رسند نادیده گرفته می‌شوند.
+  int _carsRequestId = 0;
 
   @override
   void initState() {
     super.initState();
-    _yearController.addListener(_saveDraft);
-    _customCarController.addListener(_saveDraft);
+    WidgetsBinding.instance.addObserver(this);
+
+    _yearController.addListener(_onFormChanged);
+    _customCarController.addListener(_onFormChanged);
+    _descController.addListener(_onDescriptionChanged);
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _restoreDraft();
+      if (!mounted) return;
       await _loadCars();
     });
   }
 
   @override
   void dispose() {
-    _yearController.removeListener(_saveDraft);
-    _customCarController.removeListener(_saveDraft);
+    WidgetsBinding.instance.removeObserver(this);
+    _draftDebounce?.cancel();
+
+    _yearController.removeListener(_onFormChanged);
+    _customCarController.removeListener(_onFormChanged);
+    _descController.removeListener(_onDescriptionChanged);
+
     _descController.dispose();
     _customCarController.dispose();
     _yearController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // وقتی اپ به پس‌زمینه می‌رود، پیش‌نویس را فوراً ذخیره کن (بدون منتظرماندن
+    // برای debounce) تا اگر سیستم اپ را kill کرد چیزی از دست نرود.
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      unawaited(_flushDraft());
+    }
+  }
+
+  /* ----------------------------- Draft ----------------------------- */
+
+  _HomeDraft _currentDraft() => _HomeDraft(
+        year: _yearController.text.trim(),
+        description: _descController.text.trim(),
+        customCarName: _customCarController.text.trim(),
+        carId: _isCustomCar ? _kCustomCarId : _selectedCar?.id,
+      );
+
+  void _onFormChanged() {
+    if (_isRestoringDraft) return;
+    _scheduleDraftSave();
+  }
+
+  void _onDescriptionChanged() {
+    if (_descError != null) setState(() => _descError = null);
+    if (_isRestoringDraft) return;
+    _scheduleDraftSave();
+  }
+
+  /// به‌جای نوشتن روی دیسک در هر کاراکتر، ۶۰۰ میلی‌ثانیه بعد از آخرین تغییر
+  /// یک‌بار می‌نویسیم.
+  void _scheduleDraftSave() {
+    _draftDebounce?.cancel();
+    _draftDebounce = Timer(const Duration(milliseconds: 600), () => unawaited(_flushDraft()));
+  }
+
+  Future<void> _flushDraft() async {
+    _draftDebounce?.cancel();
+    final store = _draftStore;
+    if (store == null) return;
+    await store.write(_currentDraft());
+  }
+
+  Future<void> _restoreDraft() async {
+    final store = await _DraftStore.open();
+    if (!mounted) return;
+
+    _draftStore = store;
+    final draft = store.read();
+
+    _isRestoringDraft = true;
+    setState(() {
+      _yearController.text = draft.year;
+      _descController.text = draft.description;
+
+      if (draft.isCustomCar) {
+        _isCustomCar = true;
+        _customCarController.text = draft.customCarName;
+        _pendingCarId = null;
+      } else {
+        _pendingCarId = draft.carId;
+      }
+    });
+    _isRestoringDraft = false;
+  }
+
+  /* ------------------------------ Cars ------------------------------ */
+
   Future<void> _loadCars({bool isRefresh = false}) async {
     if (!mounted) return;
+
+    final requestId = ++_carsRequestId;
+
     setState(() {
       if (isRefresh) {
         _isRefreshing = true;
@@ -79,26 +237,26 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final cars = await context.read<ApiService>().getCars();
-      if (!mounted) return;
-      cars.sort((a, b) => a.fullName.compareTo(b.fullName));
+      final fetched = await context.read<ApiService>().getCars();
+
+      // اگر درخواست تازه‌تری شروع شده، این پاسخ منسوخ است.
+      if (!mounted || requestId != _carsRequestId) return;
+
+      // کپی می‌گیریم تا اگر ApiService لیست cache داخلی‌اش را برگردانده باشد،
+      // با sort کردن، state مشترک را خراب نکنیم.
+      final cars = [...fetched]..sort((a, b) => a.fullName.compareTo(b.fullName));
+
       setState(() {
         _cars = cars;
-        if (_selectedCar != null) {
-          final found = cars.where((c) => c.id == _selectedCar!.id);
-          _selectedCar = found.isNotEmpty ? found.first : null;
-        } else if (_pendingCarId != null && !_isCustomCar) {
-          final found = cars.where((c) => c.id == _pendingCarId);
-          _selectedCar = found.isNotEmpty ? found.first : null;
-        }
+        _selectedCar = _resolveSelectedCar(cars);
+        _pendingCarId = null; // بعد از resolve دیگر لازم نیست
       });
     } catch (_) {
-      if (mounted) {
-        setState(() => _hasCarLoadError = true);
-        _snack('لیست وسایل نقلیه لود نشد. فایل داخلی یا اینترنت را چک کنید.');
-      }
+      if (!mounted || requestId != _carsRequestId) return;
+      setState(() => _hasCarLoadError = true);
+      _snack('لیست وسایل نقلیه لود نشد. فایل داخلی یا اینترنت را چک کنید.');
     } finally {
-      if (mounted) {
+      if (mounted && requestId == _carsRequestId) {
         setState(() {
           _isLoadingCars = false;
           _isRefreshing = false;
@@ -107,113 +265,123 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _restoreDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    _prefs = prefs;
-    final year = prefs.getString(Constants.keyLastYear) ?? '';
-    final custom = prefs.getString(Constants.keyLastCustomCar) ?? '';
-    final carId = prefs.getString(Constants.keyLastCarId);
-    setState(() {
-      if (year.isNotEmpty) _yearController.text = year;
-      if (carId == 'custom' && custom.length >= 2) {
-        _isCustomCar = true;
-        _customCarController.text = custom;
-      } else {
-        _pendingCarId = carId;
-      }
-    });
+  Car? _resolveSelectedCar(List<Car> cars) {
+    if (_isCustomCar) return null;
+
+    final targetId = _selectedCar?.id ?? _pendingCarId;
+    if (targetId == null) return null;
+
+    for (final car in cars) {
+      if (car.id == targetId) return car;
+    }
+    return null;
   }
 
-  void _saveDraft() {
-    final prefs = _prefs;
-    if (prefs == null) return;
-    unawaited(prefs.setString(Constants.keyLastYear, _yearController.text.trim()));
-    if (_isCustomCar) {
-      unawaited(prefs.setString(Constants.keyLastCarId, 'custom'));
-      unawaited(
-        prefs.setString(
-          Constants.keyLastCustomCar,
-          _customCarController.text.trim(),
-        ),
-      );
-    } else if (_selectedCar != null) {
-      unawaited(prefs.setString(Constants.keyLastCarId, _selectedCar!.id));
+  /* --------------------------- Validation --------------------------- */
+
+  bool _isValidYear(String raw) {
+    final n = parseFlexibleInt(raw);
+    if (n == null) return false;
+
+    // بازه‌ها از سال جاری محاسبه می‌شوند تا منطق با گذشت زمان منسوخ نشود.
+    final gregorianNow = DateTime.now().year;
+    final jalaliNow = gregorianNow - 621;
+
+    final isJalali = n >= 1300 && n <= jalaliNow + 1;
+    final isGregorian = n >= 1950 && n <= gregorianNow + 1;
+    return isJalali || isGregorian;
+  }
+
+  _FormIssue? _findIssue({required bool needDescription}) {
+    if (!_isCustomCar && _selectedCar == null) return _FormIssue.noCar;
+    if (_isCustomCar && _customCarController.text.trim().length < 2) {
+      return _FormIssue.customCarName;
+    }
+    if (!_isValidYear(_yearController.text)) return _FormIssue.year;
+    if (needDescription && _descController.text.trim().length < 5) {
+      return _FormIssue.description;
+    }
+    if (!context.read<AuthProvider>().canDiagnose) return _FormIssue.noCredit;
+    return null;
+  }
+
+  /// اعتبارسنجی side-effect ندارد؛ واکنش UI اینجا و فقط اینجا انجام می‌شود.
+  Future<void> _handleIssue(_FormIssue issue) async {
+    switch (issue) {
+      case _FormIssue.noCar:
+        _snack('اول خودرو را انتخاب کنید.');
+        await _ensureVisible(_carCardKey);
+        return;
+      case _FormIssue.customCarName:
+        _snack('نام خودرو را بنویسید (مثلاً تویوتا کمری).');
+        await _ensureVisible(_carCardKey);
+        return;
+      case _FormIssue.year:
+        _snack('سال ساخت را وارد کنید (مثلاً ۱۴۰۲ یا ۲۰۲۳).');
+        await _ensureVisible(_carCardKey);
+        return;
+      case _FormIssue.description:
+        setState(() => _descError = 'کمی واضح‌تر بنویس تا تشخیص دقیق‌تر باشد.');
+        await _ensureVisible(_descFieldKey);
+        return;
+      case _FormIssue.noCredit:
+        await _showNoCreditDialog();
+        return;
     }
   }
 
-  void _snack(String msg, {bool error = true}) {
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: error ? Colors.redAccent : Colors.green.shade700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(12),
-      ),
+  Future<void> _ensureVisible(GlobalKey key) async {
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+      alignment: 0.1,
     );
   }
 
-  bool _validYear(String year) {
-    final n = int.tryParse(year);
-    if (n == null) return false;
-    return (n >= 1340 && n <= 1420) || (n >= 1960 && n <= 2040);
+  /* ---------------------------- Actions ---------------------------- */
+
+  /// اگر کاربر لاگین نیست، لاگین را باز می‌کند و **بعد از موفقیت، جریان
+  /// اصلی ادامه پیدا می‌کند** — کاربر مجبور نیست دوباره دکمه بزند.
+  Future<bool> _ensureAuthenticated() async {
+    if (context.read<AuthProvider>().isAuthenticated) return true;
+
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    if (!mounted) return false;
+    return context.read<AuthProvider>().isAuthenticated;
   }
 
-  bool _validate({required bool needDescription}) {
-    final auth = context.read<AuthProvider>();
+  ({String id, String name, String year}) _carInfo() {
+    // سال همیشه با ارقام لاتین به بک‌اند/مدل زبانی فرستاده می‌شود.
+    final year = normalizeDigits(_yearController.text).trim();
 
-    if (!auth.isAuthenticated) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return false;
+    if (_isCustomCar) {
+      return (id: _kCustomCarId, name: _customCarController.text.trim(), year: year);
     }
-    if (!_isCustomCar && _selectedCar == null) {
-      _snack('اول خودرو را انتخاب کنید.');
-      return false;
-    }
-    if (_isCustomCar && _customCarController.text.trim().length < 2) {
-      _snack('نام خودرو را بنویسید (مثلاً تویوتا کمری).');
-      return false;
-    }
-    final year = _yearController.text.trim();
-    if (year.isEmpty || !_validYear(year)) {
-      _snack('سال ساخت را وارد کنید (مثلاً ۱۴۰۲ یا ۲۰۲۳).');
-      return false;
-    }
-    if (needDescription && _descController.text.trim().length < 5) {
-      _snack('مشکل را کمی واضح‌تر بنویسید.');
-      return false;
-    }
-    if (!auth.canDiagnose) {
-      _showNoCreditDialog();
-      return false;
-    }
-    return true;
+    final car = _selectedCar!; // _findIssue تضمین کرده null نیست
+    return (id: car.id, name: car.fullName, year: year);
   }
 
-  ({String id, String name, String year}) _carInfo() => (
-        id: _isCustomCar ? 'custom' : (_selectedCar?.id ?? 'custom'),
-        name: _isCustomCar
-            ? _customCarController.text.trim()
-            : (_selectedCar?.fullName ?? ''),
-        year: _yearController.text.trim(),
-      );
-
-  void _diagnose() {
+  Future<void> _diagnose() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!_validate(needDescription: true)) return;
+
+    if (!await _ensureAuthenticated()) return;
+    if (!mounted) return;
+
+    final issue = _findIssue(needDescription: true);
+    if (issue != null) {
+      await _handleIssue(issue);
+      return;
+    }
 
     final car = _carInfo();
     final text = _descController.text.trim();
-    _descController.clear();
+    await _flushDraft();
+    if (!mounted) return;
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
@@ -225,27 +393,67 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+
+    // متن فقط بعد از بازگشت پاک می‌شود (نه قبل از رفتن)، و با امکان بازگردانی —
+    // تا اگر چت خطا داد یا کاربر back زد، نوشتهٔ کاربر از بین نرود.
+    if (!mounted) return;
+    _clearDescriptionWithUndo(text);
   }
 
-  void _recordAudio() {
+  Future<void> _recordAudio() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!_validate(needDescription: false)) return;
+
+    if (!await _ensureAuthenticated()) return;
+    if (!mounted) return;
+
+    final issue = _findIssue(needDescription: false);
+    if (issue != null) {
+      await _handleIssue(issue);
+      return;
+    }
 
     final car = _carInfo();
-    Navigator.push(
+    await _flushDraft();
+    if (!mounted) return;
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => RecordScreen(
-          carName: car.name,
-          carId: car.id,
-          year: car.year,
+        builder: (_) => RecordScreen(carName: car.name, carId: car.id, year: car.year),
+      ),
+    );
+  }
+
+  void _clearDescriptionWithUndo(String previous) {
+    if (previous.isEmpty) return;
+
+    _descController.clear();
+    unawaited(_draftStore?.clearDescription() ?? Future<void>.value());
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('شرح مشکل پاک شد.'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'بازگردانی',
+          onPressed: () {
+            _descController.text = previous;
+            _descController.selection =
+                TextSelection.collapsed(offset: previous.length);
+            _scheduleDraftSave();
+          },
         ),
       ),
     );
   }
 
-  void _showNoCreditDialog() {
-    showDialog<bool>(
+  Future<void> _showNoCreditDialog() async {
+    final goToShop = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -255,100 +463,68 @@ class _HomeScreenState extends State<HomeScreen> {
           'برای ادامه می‌توانید بسته اعتبار یا اشتراک طلایی بگیرید.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('بعداً'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('بعداً')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('مشاهده بسته‌ها'),
           ),
         ],
       ),
-    ).then((go) {
-      if (go == true && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ShopScreen()),
-        );
-      }
-    });
+    );
+
+    if (goToShop != true || !mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
   }
+
+  void _snack(String msg, {bool error = true}) {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: error ? theme.colorScheme.error : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
+      ),
+    );
+  }
+
+  /* ------------------------------ Build ------------------------------ */
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.secondary;
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const BrandAppBarTitle(),
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          actions: [
-            IconButton(
-              tooltip: 'قوانین استفاده',
-              icon: const Icon(Icons.gavel_rounded),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TermsScreen()),
-              ),
-            ),
-            if (auth.isAuthenticated)
-              IconButton(
-                tooltip: 'تاریخچه',
-                icon: const Icon(Icons.history_rounded),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                ),
-              )
-            else
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
-                child: Text(
-                  'ورود',
-                  style: TextStyle(
-                    color: secondary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        appBar: _buildAppBar(auth, secondary),
         body: RefreshIndicator(
           color: secondary,
           onRefresh: () async {
             await _loadCars(isRefresh: true);
-            if (auth.isAuthenticated) {
-              await auth.fetchProfile(force: true);
+            if (!mounted) return;
+            if (context.read<AuthProvider>().isAuthenticated) {
+              await context.read<AuthProvider>().fetchProfile(force: true);
             }
           },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              24 + (keyboard > 0 ? keyboard * 0.15 : 0),
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               _StatusBanner(auth: auth),
               const SizedBox(height: 12),
               HomePromoCarousel(
-                onDiagnose: _diagnose,
-                onAudio: _recordAudio,
+                onDiagnose: () => unawaited(_diagnose()),
+                onAudio: () => unawaited(_recordAudio()),
                 onShop: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ShopScreen()),
@@ -369,76 +545,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
               _SectionLabel(number: '۱', title: 'وسیله نقلیه را انتخاب کنید'),
               const SizedBox(height: 10),
-              _CarCard(
-                isCustom: _isCustomCar,
-                cars: _cars,
-                selectedCar: _selectedCar,
-                isLoading: _isLoadingCars && !_isRefreshing,
-                hasError: _hasCarLoadError && _cars.isEmpty,
-                customController: _customCarController,
-                yearController: _yearController,
-                onRetry: () => _loadCars(),
-                onCarSelected: (c) => setState(() {
-                  _selectedCar = c;
-                  _saveDraft();
-                }),
-                onToggleCustom: () => setState(() {
-                  _isCustomCar = !_isCustomCar;
-                  _selectedCar = null;
-                  if (!_isCustomCar) {
-                    _customCarController.clear();
-                  }
-                  _saveDraft();
-                }),
+              KeyedSubtree(
+                key: _carCardKey,
+                child: _CarCard(
+                  isCustom: _isCustomCar,
+                  cars: _cars,
+                  selectedCar: _selectedCar,
+                  isLoading: _isLoadingCars && !_isRefreshing,
+                  hasError: _hasCarLoadError && _cars.isEmpty,
+                  customController: _customCarController,
+                  yearController: _yearController,
+                  onRetry: () => unawaited(_loadCars()),
+                  onCarSelected: _onCarSelected,
+                  onToggleCustom: _onToggleCustom,
+                ),
               ),
 
               const SizedBox(height: 22),
 
               _SectionLabel(number: '۲', title: 'مشکل را بنویسید'),
               const SizedBox(height: 10),
-              TextField(
-                controller: _descController,
-                maxLines: 4,
-                maxLength: 300,
-                textInputAction: TextInputAction.done,
-                onEditingComplete: () =>
-                    FocusManager.instance.primaryFocus?.unfocus(),
-                style: const TextStyle(height: 1.5),
-                decoration: InputDecoration(
-                  hintText:
-                      'مثال: صبح‌ها که هوا سرد است، موقع استارت ریپ می‌زند و صدای تق‌تق می‌آید...',
-                  hintStyle: TextStyle(
-                    color: theme.hintColor,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  contentPadding: const EdgeInsets.all(16),
-                  counterStyle:
-                      TextStyle(color: theme.hintColor, fontSize: 11),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: theme.dividerColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: secondary, width: 1.5),
-                  ),
-                ),
-              ),
+              _buildDescriptionField(theme, secondary),
 
               const SizedBox(height: 22),
 
               _SectionLabel(number: '۳', title: 'ارسال برای عیب‌یابی'),
               const SizedBox(height: 12),
-              _DiagnoseCtaButton(onPressed: _diagnose),
+              _DiagnoseCtaButton(onPressed: () => unawaited(_diagnose())),
               const SizedBox(height: 12),
-              _AudioCtaButton(onPressed: _recordAudio),
+              _AudioCtaButton(onPressed: () => unawaited(_recordAudio())),
               const SizedBox(height: 18),
               const _MechanicAllyCard(),
               const SizedBox(height: 22),
@@ -455,5 +590,92 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  PreferredSizeWidget _buildAppBar(AuthProvider auth, Color secondary) {
+    return AppBar(
+      title: const BrandAppBarTitle(),
+      centerTitle: true,
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      actions: [
+        IconButton(
+          tooltip: 'قوانین استفاده',
+          icon: const Icon(Icons.gavel_rounded),
+          onPressed: () =>
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsScreen())),
+        ),
+        if (auth.isAuthenticated)
+          IconButton(
+            tooltip: 'تاریخچه',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+            ),
+          )
+        else
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            ),
+            child: Text(
+              'ورود',
+              style: TextStyle(color: secondary, fontWeight: FontWeight.bold),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionField(ThemeData theme, Color secondary) {
+    return KeyedSubtree(
+      key: _descFieldKey,
+      child: TextField(
+        controller: _descController,
+        maxLines: 4,
+        maxLength: 300,
+        textInputAction: TextInputAction.done,
+        textCapitalization: TextCapitalization.sentences,
+        onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),
+        style: const TextStyle(height: 1.5),
+        decoration: InputDecoration(
+          hintText: 'مثال: صبح‌ها که هوا سرد است، موقع استارت ریپ می‌زند و صدای تق‌تق می‌آید...',
+          hintStyle: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
+          errorText: _descError,
+          filled: true,
+          fillColor: theme.cardColor,
+          contentPadding: const EdgeInsets.all(16),
+          counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: secondary, width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onCarSelected(Car car) {
+    setState(() => _selectedCar = car);
+    _scheduleDraftSave();
+  }
+
+  void _onToggleCustom() {
+    setState(() {
+      _isCustomCar = !_isCustomCar;
+      _selectedCar = null;
+      if (!_isCustomCar) _customCarController.clear();
+    });
+    _scheduleDraftSave();
   }
 }
