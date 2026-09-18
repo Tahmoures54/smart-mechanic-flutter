@@ -17,6 +17,7 @@ class ChatScreen extends StatefulWidget {
   final String year;
   final String initialUserMessage;
   final bool isCustomCar;
+  final String? initialDiagnosisResult;
 
   const ChatScreen({
     super.key,
@@ -25,6 +26,7 @@ class ChatScreen extends StatefulWidget {
     required this.year,
     required this.initialUserMessage,
     this.isCustomCar = false,
+    this.initialDiagnosisResult,
   });
 
   @override
@@ -84,8 +86,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             'سلام! دارم مشکل «${widget.carName}» مدل ${widget.year} را بررسی می‌کنم.\nمشکل: ${widget.initialUserMessage}',
         role: MessageRole.assistant,
       ));
-      setState(() {});
-      _fetchDiagnosis(widget.initialUserMessage);
+      if (widget.initialDiagnosisResult != null &&
+          widget.initialDiagnosisResult!.trim().isNotEmpty) {
+        _messages.add(ChatMessage(
+          text: widget.initialDiagnosisResult!,
+          role: MessageRole.assistant,
+          isDiagnosisResult: true,
+        ));
+        _resultMessageIndex = _messages.length - 1;
+        setState(() {});
+        _focusResultAndShake();
+      } else {
+        setState(() {});
+        _fetchDiagnosis(widget.initialUserMessage);
+      }
     });
   }
 
