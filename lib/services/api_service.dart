@@ -354,14 +354,20 @@ class ApiService {
     final data = _parseAndEnsure(response, defaultError: 'خطا در عیب‌یابی');
     final result = _extractResult(data);
     if (result == null || result.isEmpty) throw const ApiException(500, 'سرور نتیجه‌ای برنگرداند.');
-    final inner = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : <String, dynamic>{};
+    final inner = data['data'] is Map
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : <String, dynamic>{};
+    final structuredRaw = data['structured'] is Map
+        ? data['structured']
+        : inner['structured'];
+    final structured = structuredRaw is Map
+        ? Map<String, dynamic>.from(structuredRaw)
+        : null;
     return DiagnosisApiResult(
       result: result,
       diagnosticId: data['diagnosticId']?.toString() ?? inner['diagnosticId']?.toString(),
-      responseMode: inner['structured'] is Map ? (inner['structured']['responseMode']?.toString() ?? 'diagnosis') : 'diagnosis',
-      structured: inner['structured'] is Map
-          ? Map<String, dynamic>.from(inner['structured'] as Map)
-          : null,
+      responseMode: structured?['responseMode']?.toString() ?? 'diagnosis',
+      structured: structured,
     );
   }
 
