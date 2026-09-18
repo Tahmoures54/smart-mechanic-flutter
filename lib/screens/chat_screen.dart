@@ -188,13 +188,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ),
                 ListenableBuilder(
                   listenable: _chat,
-                  builder: (context, _) => ChatInputBar(
-                    controller: _inputCtrl,
-                    focusNode: _focusNode,
-                    enabled: !_chat.isTyping,
-                    onSend: _onSend,
-                    bottomInset: bottomInset,
-                  ),
+                  builder: (context, _) {
+                    if (_chat.isAwaitingChoices) {
+                      return const _ChoicePromptBar();
+                    }
+                    return ChatInputBar(
+                      controller: _inputCtrl,
+                      focusNode: _focusNode,
+                      enabled: !_chat.isTyping,
+                      onSend: _onSend,
+                      bottomInset: bottomInset,
+                    );
+                  },
                 ),
               ],
             ),
@@ -257,6 +262,38 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             child: wrapped,
           );
         },
+      ),
+    );
+  }
+}
+
+
+class _ChoicePromptBar extends StatelessWidget {
+  const _ChoicePromptBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      elevation: 8,
+      color: theme.scaffoldBackgroundColor,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 9, 14, 10),
+          child: Row(
+            children: [
+              Icon(Icons.touch_app_rounded, color: theme.colorScheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'گزینه‌های بالا را انتخاب کن؛ نیازی به تایپ نیست.',
+                  style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
