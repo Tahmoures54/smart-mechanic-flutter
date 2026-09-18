@@ -88,12 +88,6 @@ class ChatController extends ChangeNotifier {
     _safeNotify();
   }
 
-  @Deprecated('Use sendStructuredAnswer for the one-question-at-a-time flow.')
-  Future<void> sendStructuredAnswers(Map<String, String> answers) async {
-    if (answers.isEmpty || _isTyping) return;
-    final entry = answers.entries.first;
-    await sendStructuredAnswer(entry.key, entry.value);
-  }
 
   Future<void> sendUserMessage(String text) async {
     final trimmed = text.trim();
