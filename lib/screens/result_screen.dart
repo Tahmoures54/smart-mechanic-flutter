@@ -272,13 +272,13 @@ class _ResultScreenState extends State<ResultScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            theme.colorScheme.secondary.withValues(alpha: 0.15),
-            theme.colorScheme.primary.withValues(alpha: 0.08),
+            theme.colorScheme.secondary.withOpacity(0.15),
+            theme.colorScheme.primary.withOpacity(0.08),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+          color: theme.colorScheme.secondary.withOpacity(0.3),
         ),
       ),
       child: Row(
@@ -286,7 +286,7 @@ class _ResultScreenState extends State<ResultScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.secondary.withValues(alpha: 0.15),
+              color: theme.colorScheme.secondary.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -364,10 +364,10 @@ class _ResultScreenState extends State<ResultScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondary.withValues(alpha: 0.08),
+        color: theme.colorScheme.secondary.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: theme.colorScheme.secondary.withValues(alpha: 0.25),
+          color: theme.colorScheme.secondary.withOpacity(0.25),
         ),
       ),
       child: Column(
@@ -478,11 +478,11 @@ class _ResultScreenState extends State<ResultScreen>
   Widget _buildResultCard(ThemeData theme, String resultText) {
     return Card(
       elevation: 4,
-      shadowColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+      shadowColor: theme.colorScheme.primary.withOpacity(0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          color: theme.colorScheme.primary.withOpacity(0.3),
         ),
       ),
       child: Padding(
@@ -552,10 +552,10 @@ class _ResultScreenState extends State<ResultScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+          color: theme.colorScheme.secondary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: theme.colorScheme.secondary.withValues(alpha: 0.3),
+            color: theme.colorScheme.secondary.withOpacity(0.3),
           ),
         ),
         child: Row(
@@ -658,10 +658,10 @@ class _ResultScreenState extends State<ResultScreen>
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: level.color.withValues(alpha: 0.15),
+                color: level.color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: level.color.withValues(alpha: 0.4),
+                  color: level.color.withOpacity(0.4),
                 ),
               ),
               child: Text(
@@ -684,7 +684,7 @@ class _ResultScreenState extends State<ResultScreen>
                 Container(
                   height: 14,
                   decoration: BoxDecoration(
-                    color: theme.dividerColor.withValues(alpha: 0.3),
+                    color: theme.dividerColor.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(7),
                   ),
                 ),
@@ -705,7 +705,7 @@ class _ResultScreenState extends State<ResultScreen>
                       borderRadius: BorderRadius.circular(7),
                       boxShadow: [
                         BoxShadow(
-                          color: level.color.withValues(alpha: 0.4),
+                          color: level.color.withOpacity(0.4),
                           blurRadius: 6,
                         ),
                       ],
@@ -784,7 +784,7 @@ class _ResultScreenState extends State<ResultScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.dividerColor.withValues(alpha: 0.08),
+        color: theme.dividerColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -841,7 +841,7 @@ class _ResultScreenState extends State<ResultScreen>
           Icon(
             Icons.search_off_rounded,
             size: 64,
-            color: theme.hintColor.withValues(alpha: 0.4),
+            color: theme.hintColor.withOpacity(0.4),
           ),
           const SizedBox(height: 16),
           Text(
