@@ -75,10 +75,10 @@ class _DiagnoseCtaButton extends StatelessWidget {
     final theme = Theme.of(context);
     final disabled = onPressed == null;
     final bg = disabled
-        ? theme.colorScheme.onSurface.withValues(alpha: _kM3DisabledContainerOpacity)
+        ? theme.colorScheme.onSurface.withOpacity(_kM3DisabledContainerOpacity)
         : theme.colorScheme.secondary;
     final fg = disabled
-        ? theme.colorScheme.onSurface.withValues(alpha: _kM3DisabledContentOpacity)
+        ? theme.colorScheme.onSurface.withOpacity(_kM3DisabledContentOpacity)
         : theme.colorScheme.onSecondary;
 
     return Semantics(
@@ -88,7 +88,7 @@ class _DiagnoseCtaButton extends StatelessWidget {
       child: Material(
         color: bg,
         elevation: disabled ? 0 : 3,
-        shadowColor: theme.colorScheme.secondary.withValues(alpha: _kShadowOpacity),
+        shadowColor: theme.colorScheme.secondary.withOpacity(_kShadowOpacity),
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: onPressed,
@@ -101,7 +101,7 @@ class _DiagnoseCtaButton extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: _kIconBgOpacity),
+                    color: Colors.black.withOpacity(_kIconBgOpacity),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(Icons.send_rounded, color: fg, size: 24),
@@ -126,7 +126,7 @@ class _DiagnoseCtaButton extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: fg.withValues(alpha: _kSubtitleOpacity),
+                          color: fg.withOpacity(_kSubtitleOpacity),
                         ),
                       ),
                     ],
@@ -151,7 +151,7 @@ class _AudioCtaButton extends StatelessWidget {
     final theme = Theme.of(context);
     final disabled = onPressed == null;
     final secondary = disabled
-        ? theme.colorScheme.onSurface.withValues(alpha: _kM3DisabledContentOpacity)
+        ? theme.colorScheme.onSurface.withOpacity(_kM3DisabledContentOpacity)
         : theme.colorScheme.secondary;
 
     return Semantics(
@@ -162,7 +162,7 @@ class _AudioCtaButton extends StatelessWidget {
         color: theme.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: secondary.withValues(alpha: _kBorderOpacity), width: 1.6),
+          side: BorderSide(color: secondary.withOpacity(_kBorderOpacity), width: 1.6),
         ),
         child: InkWell(
           onTap: onPressed,
@@ -175,7 +175,7 @@ class _AudioCtaButton extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: secondary.withValues(alpha: _kSoftBgOpacity),
+                    color: secondary.withOpacity(_kSoftBgOpacity),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(Icons.mic_rounded, color: secondary, size: 24),
@@ -575,7 +575,7 @@ class _SupportCard extends StatelessWidget {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.secondary.withValues(alpha: _kSoftBgOpacity),
+                      color: theme.colorScheme.secondary.withOpacity(_kSoftBgOpacity),
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: Icon(Icons.favorite_rounded, color: theme.colorScheme.secondary, size: 27),
