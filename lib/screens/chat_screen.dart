@@ -235,7 +235,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               alignment: Alignment.centerLeft,
               child: DiagnosisResultCard(
                 result: m.structured!,
-                onSubmitAnswers: _chat.sendStructuredAnswers,
+                onSubmitAnswer: _chat.sendStructuredAnswer,
               ),
             );
           } else {
