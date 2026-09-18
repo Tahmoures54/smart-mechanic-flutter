@@ -4,6 +4,7 @@ class ShopPackage {
   final String title;
   final String subtitle;
   final int priceToman;
+  final int? compareAtPriceToman;
   final int? credits;
   final int? days;
   final bool isGold;
@@ -16,6 +17,7 @@ class ShopPackage {
     required this.title,
     required this.subtitle,
     required this.priceToman,
+    this.compareAtPriceToman,
     this.credits,
     this.days,
     this.isGold = false,
@@ -41,7 +43,8 @@ const shopPackages = <ShopPackage>[
     id: 'credit_5',
     title: '۵ عیب‌یابی',
     subtitle: 'شروع سریع',
-    priceToman: 65000,
+    priceToman: 49000,
+    compareAtPriceToman: 65000,
     credits: 5,
     benefits: [
       '۵ بار عیب‌یابی هوشمند',
@@ -53,7 +56,8 @@ const shopPackages = <ShopPackage>[
     id: 'credit_10',
     title: '۱۰ عیب‌یابی',
     subtitle: 'انتخاب اکثر کاربران',
-    priceToman: 120000,
+    priceToman: 89000,
+    compareAtPriceToman: 120000,
     credits: 10,
     isPopular: true,
     benefits: [
@@ -66,7 +70,8 @@ const shopPackages = <ShopPackage>[
     id: 'gold_monthly',
     title: 'طلایی ۳۰ روزه',
     subtitle: 'عیب‌یابی نامحدود',
-    priceToman: 199000,
+    priceToman: 179000,
+    compareAtPriceToman: 199000,
     days: 30,
     isGold: true,
     benefits: [
@@ -79,7 +84,8 @@ const shopPackages = <ShopPackage>[
     id: 'gold_quarterly',
     title: 'طلایی ۹۰ روزه',
     subtitle: 'به‌صرفه‌ترین اشتراک',
-    priceToman: 499000,
+    priceToman: 449000,
+    compareAtPriceToman: 537000,
     days: 90,
     isGold: true,
     isBestValue: true,
