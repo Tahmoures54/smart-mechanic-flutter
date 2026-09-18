@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+
+import '../models/shop_package.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../models/shop_package.dart';
 import 'payment_webview.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,6 +19,11 @@ class ShopScreen extends StatefulWidget {
 }
 
 class _ShopScreenState extends State<ShopScreen> {
+  static const List<Color> _goldGradient = [
+    Color(0xFFFFB300),
+    Color(0xFFFF8F00),
+  ];
+
   String? _loadingProductId;
   bool _withdrawLoading = false;
 
@@ -25,11 +31,17 @@ class _ShopScreenState extends State<ShopScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<AuthProvider>().fetchProfile();
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // کمکی‌ها
+  // ---------------------------------------------------------------------------
+
   void _showSnack(String msg, {Color color = Colors.green}) {
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
@@ -37,14 +49,33 @@ class _ShopScreenState extends State<ShopScreen> {
         content: Text(msg),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
   }
 
+  String _formatToman(int amount) {
+    final s = amount.abs().toString();
+    final formatted = s.replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (_) => ',',
+    );
+    final sign = amount < 0 ? '-' : '';
+    return '$sign$formatted تومان';
+  }
+
+  // ---------------------------------------------------------------------------
+  // خرید بسته
+  // ---------------------------------------------------------------------------
+
   Future<void> _buyProduct(String productId) async {
     final auth = context.read<AuthProvider>();
-    if (!auth.isAuthenticated || auth.token == null) {
+    final api = context.read<ApiService>();
+    final token = auth.token;
+
+    if (!auth.isAuthenticated || token == null || token.isEmpty) {
       _showSnack('ابتدا وارد حساب شوید.', color: Colors.orange);
       return;
     }
@@ -52,19 +83,15 @@ class _ShopScreenState extends State<ShopScreen> {
     setState(() => _loadingProductId = productId);
 
     try {
-      final api = context.read<ApiService>();
-      final url = await api.getPaymentUrl(auth.token!, productId);
-
+      final url = await api.getPaymentUrl(token, productId);
       if (!mounted) return;
 
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => PaymentWebView(url: url)),
-      );
-
-      // بعد از برگشت از درگاه، پروفایل را تازه کن
-      if (mounted) await auth.fetchProfile(force: true);
+      await _openPayment(url);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _showSnack(e.message, color: Colors.redAccent);
     } catch (e) {
+      debugPrint('[ShopScreen] buyProduct failed: $e');
       if (!mounted) return;
       _showSnack(
         'خطا در ایجاد درگاه پرداخت. اینترنت را بررسی کنید.',
@@ -75,152 +102,221 @@ class _ShopScreenState extends State<ShopScreen> {
     }
   }
 
-  void _copyReferralCode(String code) {
-    Clipboard.setData(ClipboardData(text: code));
-    _showSnack('کد معرف کپی شد ✨');
-  }
-
-  void _shareReferral(String code, int percent) {
-    Share.share(
-      '🚗 مکانیک هوشمند — عیب‌یابی ماشین با AI\n\n'
-      'با کد معرف من ثبت‌نام کن و اعتبار هدیه بگیر:\n'
-      '🎁 کد: $code\n\n'
-      'من هم $percent٪ از خریدت پاداش می‌گیرم.\n'
-      'لینک اپ: https://smart-mec.ir',
-      subject: 'دعوت به مکانیک هوشمند',
+  Future<void> _openPayment(String url) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentWebView(url: url),
+      ),
     );
+
+    if (!mounted) return;
+
+    // بعد از برگشت از درگاه، پروفایل را تازه کن
+    final auth = context.read<AuthProvider>();
+    try {
+      await auth.fetchProfile(force: true);
+    } catch (e) {
+      debugPrint('[ShopScreen] refresh after payment failed: $e');
+    }
+
+    if (result == true) {
+      _showSnack('پرداخت با موفقیت انجام شد ✅');
+    }
   }
 
-  String _formatToman(int amount) {
-    final s = amount.toString();
-    final buf = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
-      buf.write(s[i]);
+  // ---------------------------------------------------------------------------
+  // کد معرف
+  // ---------------------------------------------------------------------------
+
+  Future<void> _copyReferralCode(String code) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: code));
+      _showSnack('کد معرف کپی شد ✨');
+    } catch (e) {
+      debugPrint('[ShopScreen] clipboard failed: $e');
+      _showSnack('کپی کردن ناموفق بود', color: Colors.redAccent);
     }
-    return '${buf.toString()} تومان';
   }
+
+  Future<void> _shareReferral(String code, int percent) async {
+    try {
+      await Share.share(
+        '🚗 مکانیک هوشمند — عیب‌یابی ماشین با AI\n\n'
+        'با کد معرف من ثبت‌نام کن و اعتبار هدیه بگیر:\n'
+        '🎁 کد: $code\n\n'
+        'من هم $percent٪ از خریدت پاداش می‌گیرم.\n'
+        'لینک اپ: https://smart-mec.ir',
+        subject: 'دعوت به مکانیک هوشمند',
+      );
+    } catch (e) {
+      debugPrint('[ShopScreen] share failed: $e');
+      _showSnack('اشتراک‌گذاری ناموفق بود', color: Colors.redAccent);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // برداشت درآمد
+  // ---------------------------------------------------------------------------
 
   Future<void> _showWithdrawDialog(AuthProvider auth) async {
     final amountCtrl = TextEditingController(
-      text: auth.earnings >= auth.minWithdrawal ? auth.earnings.toString() : '',
+      text: auth.earnings >= auth.minWithdrawal
+          ? auth.earnings.toString()
+          : '',
     );
     final cardCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return AlertDialog(
-          title: const Text('برداشت درآمد معرفی'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+    int? amount;
+    String? card;
+    String? name;
+
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final theme = Theme.of(ctx);
+          return AlertDialog(
+            title: const Text('برداشت درآمد معرفی'),
+            content: Form(
+              key: formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondary
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'موجودی قابل برداشت: ${_formatToman(auth.earnings)}\n'
+                        'حداقل: ${_formatToman(auth.minWithdrawal)}',
+                        style: TextStyle(
+                          color: theme.hintColor,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      'موجودی قابل برداشت: ${_formatToman(auth.earnings)}\n'
-                      'حداقل: ${_formatToman(auth.minWithdrawal)}',
-                      style: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.5),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: amountCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'مبلغ (تومان)',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        final val = int.tryParse((v ?? '').trim());
+                        if (val == null || val < auth.minWithdrawal) {
+                          return 'حداقل مبلغ: ${auth.minWithdrawal}';
+                        }
+                        if (val > auth.earnings) {
+                          return 'موجودی کافی نیست';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'مبلغ (تومان)',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: cardCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 16,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'شماره کارت ۱۶ رقمی',
+                        border: OutlineInputBorder(),
+                        counterText: '',
+                      ),
+                      validator: (v) {
+                        final digits = (v ?? '')
+                            .replaceAll(RegExp(r'\s|-'), '');
+                        if (digits.length != 16) {
+                          return 'شماره کارت باید ۱۶ رقم باشد';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      final val = int.tryParse(v ?? '');
-                      if (val == null || val < auth.minWithdrawal) {
-                        return 'حداقل مبلغ: ${auth.minWithdrawal}';
-                      }
-                      if (val > auth.earnings) return 'موجودی کافی نیست';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: cardCtrl,
-                    keyboardType: TextInputType.number,
-                    maxLength: 16,
-                    decoration: const InputDecoration(
-                      labelText: 'شماره کارت ۱۶ رقمی',
-                      border: OutlineInputBorder(),
-                      counterText: '',
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'نام صاحب حساب',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().length < 3) {
+                          return 'نام را درست وارد کنید';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null ||
-                          v.replaceAll(RegExp(r'\s|-'), '').length != 16) {
-                        return 'شماره کارت باید ۱۶ رقم باشد';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'نام صاحب حساب',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'پس از تأیید، مبلغ طی ۱ تا ۳ روز کاری واریز می‌شود.',
+                      style: TextStyle(
+                        color: theme.hintColor,
+                        fontSize: 11,
+                      ),
                     ),
-                    validator: (v) =>
-                        (v == null || v.trim().length < 3) ? 'نام را درست وارد کنید' : null,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'پس از تأیید، مبلغ طی ۱ تا ۳ روز کاری واریز می‌شود.',
-                    style: TextStyle(color: theme.hintColor, fontSize: 11),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('انصراف'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.pop(ctx, true);
-                }
-              },
-              child: const Text('ثبت درخواست'),
-            ),
-          ],
-        );
-      },
-    );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('انصراف'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(ctx, true);
+                  }
+                },
+                child: const Text('ثبت درخواست'),
+              ),
+            ],
+          );
+        },
+      );
 
-    final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
-    final card = cardCtrl.text.replaceAll(RegExp(r'\s|-'), '');
-    final name = nameCtrl.text.trim();
+      if (ok != true) return;
 
-    amountCtrl.dispose();
-    cardCtrl.dispose();
-    nameCtrl.dispose();
+      amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
+      card = cardCtrl.text.replaceAll(RegExp(r'\s|-'), '');
+      name = nameCtrl.text.trim();
+    } finally {
+      amountCtrl.dispose();
+      cardCtrl.dispose();
+      nameCtrl.dispose();
+    }
 
-    if (ok != true || !mounted) return;
+    if (!mounted || amount == null || card == null || name == null) return;
+
+    final token = auth.token;
+    if (token == null || token.isEmpty) {
+      _showSnack('ابتدا وارد حساب شوید.', color: Colors.orange);
+      return;
+    }
 
     setState(() => _withdrawLoading = true);
     try {
       await context.read<ApiService>().requestWithdraw(
-            auth.token!,
+            token,
             amount: amount,
             cardNumber: card,
             fullName: name,
@@ -231,13 +327,18 @@ class _ShopScreenState extends State<ShopScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       _showSnack(e.message, color: Colors.redAccent);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[ShopScreen] withdraw failed: $e');
       if (!mounted) return;
       _showSnack('خطا در ثبت درخواست', color: Colors.redAccent);
     } finally {
       if (mounted) setState(() => _withdrawLoading = false);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -284,6 +385,10 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // کارت کیف پول
+  // ---------------------------------------------------------------------------
+
   Widget _buildWalletCard(AuthProvider auth, ThemeData theme) {
     final isGold = auth.isGoldenActive;
 
@@ -294,17 +399,17 @@ class _ShopScreenState extends State<ShopScreen> {
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: isGold
-              ? [const Color(0xFFFFB300), const Color(0xFFFF8F00)]
+              ? _goldGradient
               : [
-                  theme.colorScheme.primary.withOpacity(0.85),
-                  theme.colorScheme.secondary.withOpacity(0.75),
+                  theme.colorScheme.primary.withValues(alpha: 0.85),
+                  theme.colorScheme.secondary.withValues(alpha: 0.75),
                 ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: (isGold ? Colors.amber : theme.colorScheme.primary)
-                .withOpacity(0.25),
+                .withValues(alpha: 0.25),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -316,7 +421,9 @@ class _ShopScreenState extends State<ShopScreen> {
           Row(
             children: [
               Icon(
-                isGold ? Icons.workspace_premium : Icons.account_balance_wallet_rounded,
+                isGold
+                    ? Icons.workspace_premium
+                    : Icons.account_balance_wallet_rounded,
                 color: Colors.white,
                 size: 28,
               ),
@@ -333,7 +440,8 @@ class _ShopScreenState extends State<ShopScreen> {
               ),
               if (isGold && auth.goldenDaysLeft != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black26,
                     borderRadius: BorderRadius.circular(20),
@@ -363,7 +471,8 @@ class _ShopScreenState extends State<ShopScreen> {
               Expanded(
                 child: _walletStat(
                   label: 'وضعیت',
-                  value: auth.canDiagnose ? 'آماده عیب‌یابی' : 'نیاز به شارژ',
+                  value:
+                      auth.canDiagnose ? 'آماده عیب‌یابی' : 'نیاز به شارژ',
                   icon: auth.canDiagnose
                       ? Icons.check_circle_rounded
                       : Icons.warning_amber_rounded,
@@ -418,10 +527,18 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // کارت معرف
+  // ---------------------------------------------------------------------------
+
   Widget _buildReferralCard(AuthProvider auth, ThemeData theme) {
     final code = auth.referralCode!;
-    final canWithdraw = auth.earnings >= auth.minWithdrawal;
-    final progress = (auth.earnings / auth.minWithdrawal).clamp(0.0, 1.0);
+    final minWithdrawal = auth.minWithdrawal;
+    final earnings = auth.earnings;
+    final canWithdraw = earnings >= minWithdrawal;
+    final progress = minWithdrawal > 0
+        ? (earnings / minWithdrawal).clamp(0.0, 1.0).toDouble()
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -429,11 +546,11 @@ class _ShopScreenState extends State<ShopScreen> {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: theme.colorScheme.secondary.withOpacity(0.35),
+          color: theme.colorScheme.secondary.withValues(alpha: 0.35),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -447,7 +564,7 @@ class _ShopScreenState extends State<ShopScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary.withOpacity(0.15),
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -462,12 +579,19 @@ class _ShopScreenState extends State<ShopScreen> {
                   children: [
                     const Text(
                       'دوستانت را دعوت کن',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'تو ${auth.referralPercentage}٪ پاداش می‌گیری · دوستت اعتبار هدیه می‌گیرد',
-                      style: TextStyle(color: theme.hintColor, fontSize: 12),
+                      'تو ${auth.referralPercentage}٪ پاداش می‌گیری · '
+                      'دوستت اعتبار هدیه می‌گیرد',
+                      style: TextStyle(
+                        color: theme.hintColor,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -476,7 +600,8 @@ class _ShopScreenState extends State<ShopScreen> {
           ),
           const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: theme.canvasColor,
               borderRadius: BorderRadius.circular(12),
@@ -490,7 +615,10 @@ class _ShopScreenState extends State<ShopScreen> {
                     children: [
                       Text(
                         'کد اختصاصی شما',
-                        style: TextStyle(color: theme.hintColor, fontSize: 11),
+                        style: TextStyle(
+                          color: theme.hintColor,
+                          fontSize: 11,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -511,7 +639,8 @@ class _ShopScreenState extends State<ShopScreen> {
                   icon: const Icon(Icons.copy_rounded),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: () => _shareReferral(code, auth.referralPercentage),
+                  onPressed: () =>
+                      _shareReferral(code, auth.referralPercentage),
                   icon: const Icon(Icons.share_rounded, size: 18),
                   label: const Text('ارسال'),
                 ),
@@ -522,11 +651,19 @@ class _ShopScreenState extends State<ShopScreen> {
           Row(
             children: [
               Expanded(
-                child: _statChip(theme, 'دعوت‌شده‌ها', '${auth.referredCount} نفر'),
+                child: _statChip(
+                  theme,
+                  'دعوت‌شده‌ها',
+                  '${auth.referredCount} نفر',
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _statChip(theme, 'درآمد شما', _formatToman(auth.earnings)),
+                child: _statChip(
+                  theme,
+                  'درآمد شما',
+                  _formatToman(earnings),
+                ),
               ),
             ],
           ),
@@ -537,7 +674,10 @@ class _ShopScreenState extends State<ShopScreen> {
               children: [
                 Text(
                   'پیشرفت تا برداشت',
-                  style: TextStyle(color: theme.hintColor, fontSize: 12),
+                  style: TextStyle(
+                    color: theme.hintColor,
+                    fontSize: 12,
+                  ),
                 ),
                 Text(
                   '${(progress * 100).toStringAsFixed(0)}٪',
@@ -561,7 +701,7 @@ class _ShopScreenState extends State<ShopScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              '${_formatToman(auth.minWithdrawal - auth.earnings)} تا حداقل برداشت باقی مانده',
+              '${_formatToman(minWithdrawal - earnings)} تا حداقل برداشت باقی مانده',
               style: TextStyle(color: theme.hintColor, fontSize: 11),
             ),
             const SizedBox(height: 10),
@@ -582,14 +722,18 @@ class _ShopScreenState extends State<ShopScreen> {
               label: Text(
                 canWithdraw
                     ? 'درخواست برداشت'
-                    : 'حداقل برداشت: ${_formatToman(auth.minWithdrawal)}',
+                    : 'حداقل برداشت: ${_formatToman(minWithdrawal)}',
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '💡 هر دوست با کد تو ثبت‌نام کند، هر دو نفر سود می‌برید.',
-            style: TextStyle(color: theme.hintColor, fontSize: 12, height: 1.4),
+            style: TextStyle(
+              color: theme.hintColor,
+              fontSize: 12,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -607,34 +751,50 @@ class _ShopScreenState extends State<ShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: theme.hintColor, fontSize: 11)),
+          Text(
+            label,
+            style: TextStyle(color: theme.hintColor, fontSize: 11),
+          ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // کارت بسته
+  // ---------------------------------------------------------------------------
+
   Widget _buildPackageCard(ShopPackage pkg, ThemeData theme) {
     final isLoadingThis = _loadingProductId == pkg.id;
     final isAnyLoading = _loadingProductId != null;
     final unit = pkg.unitPrice;
+    final isHighlighted = pkg.isPopular || pkg.isBestValue;
+    final isGold = pkg.isGold;
+
+    final cardColor = isGold
+        ? Colors.amber.withValues(
+            alpha: theme.brightness == Brightness.dark ? 0.12 : 0.18,
+          )
+        : theme.cardColor;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: pkg.isGold
-            ? Colors.amber.withOpacity(theme.brightness == Brightness.dark ? 0.12 : 0.18)
-            : theme.cardColor,
+        color: cardColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: pkg.isPopular || pkg.isBestValue
+          color: isHighlighted
               ? theme.colorScheme.secondary
               : theme.dividerColor,
-          width: pkg.isPopular || pkg.isBestValue ? 1.5 : 1,
+          width: isHighlighted ? 1.5 : 1,
         ),
       ),
       child: Stack(
@@ -650,16 +810,17 @@ class _ShopScreenState extends State<ShopScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: pkg.isGold
-                            ? Colors.amber.withOpacity(0.25)
-                            : theme.colorScheme.primary.withOpacity(0.12),
+                        color: isGold
+                            ? Colors.amber.withValues(alpha: 0.25)
+                            : theme.colorScheme.primary
+                                .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
-                        pkg.isGold
+                        isGold
                             ? Icons.workspace_premium_rounded
                             : Icons.auto_awesome_rounded,
-                        color: pkg.isGold
+                        color: isGold
                             ? Colors.amber.shade700
                             : theme.colorScheme.primary,
                       ),
@@ -725,7 +886,8 @@ class _ShopScreenState extends State<ShopScreen> {
                             b,
                             style: TextStyle(
                               fontSize: 13,
-                              color: theme.colorScheme.onSurface.withOpacity(0.85),
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.85),
                             ),
                           ),
                         ),
@@ -738,17 +900,17 @@ class _ShopScreenState extends State<ShopScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: pkg.isGold
-                          ? Colors.amber.shade700
-                          : theme.colorScheme.secondary,
+                      backgroundColor:
+                          isGold ? Colors.amber.shade700 : theme.colorScheme.secondary,
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed:
-                        (isLoadingThis || isAnyLoading) ? null : () => _buyProduct(pkg.id),
+                    onPressed: (isLoadingThis || isAnyLoading)
+                        ? null
+                        : () => _buyProduct(pkg.id),
                     child: isLoadingThis
                         ? const SizedBox(
                             height: 20,
@@ -759,20 +921,22 @@ class _ShopScreenState extends State<ShopScreen> {
                             ),
                           )
                         : Text(
-                            pkg.isGold ? 'فعال‌سازی اشتراک' : 'خرید بسته',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            isGold ? 'فعال‌سازی اشتراک' : 'خرید بسته',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold),
                           ),
                   ),
                 ),
               ],
             ),
           ),
-          if (pkg.isPopular || pkg.isBestValue)
+          if (isHighlighted)
             Positioned(
               top: 0,
               left: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.secondary,
                   borderRadius: const BorderRadius.only(
@@ -794,6 +958,10 @@ class _ShopScreenState extends State<ShopScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // فوتر
+  // ---------------------------------------------------------------------------
 
   Widget _buildTrustFooter(ThemeData theme) {
     return Column(
