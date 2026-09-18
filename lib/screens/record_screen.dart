@@ -203,6 +203,7 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
               initialUserMessage: voiceMessage,
               initialDiagnosisResult: diagnosis.result,
               initialDiagnosticId: diagnosis.diagnosticId,
+              initialStructuredResult: diagnosis.structured,
             ),
           ),
         );
