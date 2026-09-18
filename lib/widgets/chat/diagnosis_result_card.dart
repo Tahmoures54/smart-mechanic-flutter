@@ -11,7 +11,7 @@ class DiagnosisResultCard extends StatelessWidget {
   const DiagnosisResultCard({super.key, required this.result, this.onSubmitAnswer});
 
   final DiagnosisResult result;
-  final Future<void> Function(String question, String answer)? onSubmitAnswer;
+  final void Function(String question, String answer)? onSubmitAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +97,7 @@ class DiagnosisResultCard extends StatelessWidget {
 class _TouchQuestionnaire extends StatefulWidget {
   const _TouchQuestionnaire({required this.questions, this.onAnswer});
   final List<DiagnosisQuestionOption> questions;
-  final Future<void> Function(String question, String answer)? onAnswer;
+  final void Function(String question, String answer)? onAnswer;
 
   @override
   State<_TouchQuestionnaire> createState() => _TouchQuestionnaireState();
@@ -109,7 +109,7 @@ class _TouchQuestionnaireState extends State<_TouchQuestionnaire> {
   Future<void> _select(DiagnosisQuestionOption question, String answer) async {
     if (_submitting || widget.onAnswer == null) return;
     setState(() => _submitting = true);
-    await widget.onAnswer!(question.question, answer);
+    widget.onAnswer!(question.question, answer);
   }
 
   @override
