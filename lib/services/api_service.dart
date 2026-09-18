@@ -348,6 +348,7 @@ class ApiService {
     required String carId,
     required String year,
     String? carName,
+    String? audioFeatures,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) throw const ApiException(0, 'فایل صوتی پیدا نشد.');
@@ -365,6 +366,9 @@ class ApiService {
             filename: filePath.toLowerCase().endsWith('.wav') ? 'engine_sound.wav' : 'engine_sound.m4a',
           ));
     if (carName != null && carName.trim().isNotEmpty) request.fields['carName'] = carName.trim();
+    if (audioFeatures != null && audioFeatures.trim().isNotEmpty) {
+      request.fields['audioFeatures'] = audioFeatures.trim();
+    }
 
     try {
       final streamedResponse = await request.send().timeout(_uploadTimeout);
