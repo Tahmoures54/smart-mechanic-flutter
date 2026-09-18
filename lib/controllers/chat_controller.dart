@@ -111,7 +111,11 @@ class ChatController extends ChangeNotifier {
       _appendDiagnosisResult(response.result, structuredJson);
     } on ApiException catch (e) {
       if (_disposed) return;
-      _append(ChatMessage.error(_messageForApiError(e), retryText: description));
+      _append(ChatMessage.error(
+        _messageForApiError(e),
+        retryText: e.statusCode == 402 ? null : description,
+        errorType: _errorTypeFor(e),
+      ));
     } catch (_) {
       if (_disposed) return;
       _append(ChatMessage.error('خطا در عیب‌یابی. لطفاً دوباره تلاش کنید.', retryText: description));
@@ -132,6 +136,14 @@ class ChatController extends ChangeNotifier {
     _messages.add(message);
     _safeNotify();
     onMessageAppended?.call(_messages.length - 1, message.isDiagnosisResult);
+  }
+
+  ChatErrorType _errorTypeFor(ApiException e) {
+    if (e.statusCode == 401) return ChatErrorType.unauthorized;
+    if (e.statusCode == 402) return ChatErrorType.insufficientCredits;
+    if (e.statusCode >= 500) return ChatErrorType.server;
+    if (e.statusCode == 0 || e.statusCode == 408) return ChatErrorType.network;
+    return ChatErrorType.generic;
   }
 
   String _messageForApiError(ApiException e) {
