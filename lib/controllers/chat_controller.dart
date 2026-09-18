@@ -39,6 +39,15 @@ class ChatController extends ChangeNotifier {
   bool _isTyping = false;
   bool get isTyping => _isTyping;
 
+  /// When the latest assistant response is a guided questionnaire, the user
+  /// should answer through touch options instead of the free-text composer.
+  bool get isAwaitingChoices {
+    if (_isTyping || _messages.isEmpty) return false;
+    final last = _messages.last;
+    return last.structured?.responseMode == ResponseMode.questions &&
+        last.structured?.questionOptions.isNotEmpty == true;
+  }
+
   String? _lastDiagnosticId;
   bool _disposed = false;
 
@@ -73,7 +82,7 @@ class ChatController extends ChangeNotifier {
 
   Future<void> sendUserMessage(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _isTyping) return;
+    if (trimmed.isEmpty || _isTyping || isAwaitingChoices) return;
     _append(ChatMessage.user(trimmed));
     await fetchDiagnosis(trimmed);
   }
