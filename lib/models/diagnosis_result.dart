@@ -35,6 +35,18 @@ String? _nullableString(dynamic raw) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
+class DiagnosisQuestionOption {
+  final String question;
+  final List<String> options;
+
+  const DiagnosisQuestionOption({required this.question, required this.options});
+
+  factory DiagnosisQuestionOption.fromJson(Map<String, dynamic> json) => DiagnosisQuestionOption(
+        question: _nullableString(json['question']) ?? '',
+        options: _stringList(json['options']),
+      );
+}
+
 class DiagnosisCause {
   final String title;
   final ProbabilityLevel probability;
@@ -68,6 +80,7 @@ class DiagnosisResult {
   final int followUpRound;
   final List<String> missingInfo;
   final List<String> followUpQuestions;
+  final List<DiagnosisQuestionOption> questionOptions;
   final DiagnosisUrgency urgency;
   final DiagnosisConfidence confidence;
   final bool? safeToDrive;
@@ -84,6 +97,7 @@ class DiagnosisResult {
     required this.followUpRound,
     required this.missingInfo,
     required this.followUpQuestions,
+    required this.questionOptions,
     required this.urgency,
     required this.confidence,
     required this.safeToDrive,
@@ -114,6 +128,14 @@ class DiagnosisResult {
         followUpRound: (json['followUpRound'] as num?)?.toInt() ?? 0,
         missingInfo: _stringList(json['missingInfo']),
         followUpQuestions: _stringList(json['followUpQuestions']),
+        questionOptions: json['questionOptions'] is List
+            ? (json['questionOptions'] as List)
+                .whereType<Map>()
+                .map((e) => DiagnosisQuestionOption.fromJson(Map<String, dynamic>.from(e)))
+                .where((e) => e.question.isNotEmpty && e.options.length >= 2)
+                .take(6)
+                .toList()
+            : const [],
         // در ابهام، جانب احتیاط را می‌گیریم: پیش‌فرض «yellow» نه «green».
         urgency: _enumFromString(DiagnosisUrgency.values, json['urgency'], DiagnosisUrgency.yellow),
         confidence:
