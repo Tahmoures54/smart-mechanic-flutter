@@ -8,10 +8,10 @@ import 'urgency_and_chips.dart';
 /// ساختاریافته (urgency, safeToDrive, causes, mechanicQuestions) را
 /// به‌صورت بصری و قابل‌اسکن نشان می‌دهد.
 class DiagnosisResultCard extends StatelessWidget {
-  const DiagnosisResultCard({super.key, required this.result, this.onSubmitAnswers});
+  const DiagnosisResultCard({super.key, required this.result, this.onSubmitAnswer});
 
   final DiagnosisResult result;
-  final Future<void> Function(Map<String, String> answers)? onSubmitAnswers;
+  final Future<void> Function(String question, String answer)? onSubmitAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,7 @@ class DiagnosisResultCard extends StatelessWidget {
               if (result.questionOptions.isNotEmpty)
                 _TouchQuestionnaire(
                   questions: result.questionOptions,
-                  onSubmit: onSubmitAnswers,
+                  onAnswer: onSubmitAnswer,
                 )
               else
                 ...result.followUpQuestions.asMap().entries.map(
@@ -95,61 +95,47 @@ class DiagnosisResultCard extends StatelessWidget {
 }
 
 class _TouchQuestionnaire extends StatefulWidget {
-  const _TouchQuestionnaire({required this.questions, this.onSubmit});
+  const _TouchQuestionnaire({required this.questions, this.onAnswer});
   final List<DiagnosisQuestionOption> questions;
-  final Future<void> Function(Map<String, String> answers)? onSubmit;
+  final Future<void> Function(String question, String answer)? onAnswer;
 
   @override
   State<_TouchQuestionnaire> createState() => _TouchQuestionnaireState();
 }
 
 class _TouchQuestionnaireState extends State<_TouchQuestionnaire> {
-  final Map<String, String> _answers = {};
   bool _submitting = false;
 
-  Future<void> _submit() async {
-    if (_answers.isEmpty || widget.onSubmit == null || _submitting) return;
+  Future<void> _select(DiagnosisQuestionOption question, String answer) async {
+    if (_submitting || widget.onAnswer == null) return;
     setState(() => _submitting = true);
-    await widget.onSubmit!(_answers);
+    await widget.onAnswer!(question.question, answer);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.questions.isEmpty) return const SizedBox.shrink();
+    final q = widget.questions.first;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...widget.questions.map((q) {
-          final selected = _answers[q.question];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(q.question, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 7),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: q.options.map((option) {
-                    final active = selected == option;
-                    return ChoiceChip(
-                      label: Text(option, style: const TextStyle(fontSize: 12)),
-                      selected: active,
-                      onSelected: _submitting ? null : (_) => setState(() => _answers[q.question] = option),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          );
-        }),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _answers.isEmpty || _submitting ? null : _submit,
-            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-            label: Text(_submitting ? 'در حال تحلیل...' : 'تحلیل پاسخ‌ها'),
-          ),
+        Text(q.question, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: q.options.map((option) {
+            return ChoiceChip(
+              label: Text(option, style: const TextStyle(fontSize: 12)),
+              selected: false,
+              onSelected: _submitting ? null : (_) => _select(q, option),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'با انتخاب یک گزینه، سؤال بعدی خودکار می‌آید.',
+          style: TextStyle(fontSize: 11.5, color: Theme.of(context).hintColor),
         ),
       ],
     );
