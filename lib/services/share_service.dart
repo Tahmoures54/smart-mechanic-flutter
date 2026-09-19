@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../constants.dart';
+
 /// متن‌ها و اکشن‌های اشتراک‌گذاری — یک منبع برای کل اپ
 class ShareService {
   ShareService._();
@@ -55,6 +57,26 @@ class ShareService {
   /// متن کوتاه برای بخش «درباره» / پروفایل واتساپ
   static String whatsappAbout() {
     return 'عیب‌یابی ماشین با $appName 🔧 $websiteUrl';
+  }
+
+  /// دعوت کوتاه و طبیعی برای فرستادن به یک دوست یا همکار.
+  static String supportInvite() {
+    return 'این ابزار را برای قبل از رفتن به تعمیرگاه امتحان کن 🔧\n'
+        'با چند سؤال، علت احتمالی مشکل ماشین را بهتر می‌فهمی و آماده‌تر تصمیم می‌گیری.\n\n'
+        '$websiteUrl';
+  }
+
+  static Future<void> contactSupport() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: Constants.supportEmail,
+      queryParameters: const {
+        'subject': 'پیشنهاد برای مکانیک هوشمند',
+        'body': 'سلام، پیشنهاد یا بازخورد من درباره مکانیک هوشمند:\n\n',
+      },
+    );
+    final opened = await launchUrl(uri);
+    if (!opened) throw StateError('برنامه ایمیل باز نشد');
   }
 
   static Future<void> shareApp({String? referralCode}) {
