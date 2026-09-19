@@ -79,9 +79,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      // Do not ask for permission here; use a cached position only when the
-      // user has already granted location access. The diagnosis remains usable
-      // without it, but approved garage promotions can then be sorted nearby.
       final position = await _lastKnownPosition();
       if (!mounted) return;
       _chat.setLocation(lat: position?.latitude, lng: position?.longitude);
@@ -135,8 +132,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
-  /// اسکرول دقیق به کارت نتیجه با Scrollable.ensureVisible روی RenderObject
-  /// واقعی — به‌جای حدس‌زدن زمان پایدارشدن layout با تأخیر ثابت.
   void _focusResultAndShake(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -162,25 +157,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _onSend() {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty || _chat.isTyping) return;
-
-    // Do not clear the guided-answer state before sending. The controller
-    // consumes it after accepting the message; clearing it here used to make
-    // `sendUserMessage` reject the answer as if no option had been selected.
     _inputCtrl.clear();
     unawaited(_chat.sendUserMessage(text));
   }
 
-  void _onGuidedAnswerSelected(String question, String answer) {
-    final text = '${question.trim()}: ${answer.trim()}';
-    if (text.trim().isEmpty || _chat.isTyping) return;
-    _inputCtrl
-      ..text = text
-      ..selection = TextSelection.collapsed(offset: text.length);
-    _chat.prepareGuidedAnswer();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focusNode.requestFocus();
-    });
+  /// پاسخ‌های چندگزینه‌ای یکجا از کارت تشخیص — مستقیم ارسال می‌شود
+  /// بدون نیاز به تایید دستی در کادر ورودی.
+  void _onSubmitGuidedAnswers(String combinedAnswers) {
+    final text = combinedAnswers.trim();
+    if (text.isEmpty || _chat.isTyping) return;
+    _inputCtrl.clear();
+    unawaited(_chat.sendUserMessage(text));
   }
 
   Future<void> _goToStore() async {
@@ -276,7 +263,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               child: DiagnosisResultCard(
                 result: m.structured!,
                 supplementalText: m.text,
-                onSubmitAnswer: _onGuidedAnswerSelected,
+                onSubmitAnswers: _onSubmitGuidedAnswers,
               ),
             );
           } else {
@@ -328,7 +315,7 @@ class _ChoicePromptBar extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'یک گزینه را انتخاب کن یا پاسخ را بنویس؛ سپس دکمه ارسال را بزن.',
+                  'گزینه‌ها را در کارت بالا انتخاب کن، یا پاسخ را بنویس و ارسال کن.',
                   style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
