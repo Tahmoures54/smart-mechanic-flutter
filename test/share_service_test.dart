@@ -34,7 +34,7 @@ void main() {
     });
 
     test('diagnosisShare با متن خالی هم کرش نمی‌کند', () {
-      final text = ShareService.diagnosis(result: '');
+      final text = ShareService.diagnosisShare(result: '');
       expect(text, isNotEmpty);
     });
   });
