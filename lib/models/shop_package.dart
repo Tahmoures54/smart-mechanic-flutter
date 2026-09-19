@@ -31,6 +31,42 @@ class ShopPackage {
   final bool isBestValue;
   final List<String> benefits;
 
+
+  factory ShopPackage.fromJson(Map<String, dynamic> json) {
+    final creditsRaw = json['credits'];
+    final daysRaw = json['days'];
+    final priceRaw = json['price'];
+    final compareRaw = json['compareAtPrice'] ?? json['originalPrice'];
+    final badge = (json['badge'] ?? '').toString();
+    final id = (json['id'] ?? '').toString();
+    final title = (json['title'] ?? json['name'] ?? id).toString();
+    final subtitle = (json['subtitle'] ?? '').toString();
+    final dailyCapRaw = json['dailyCap'];
+    final periodCapRaw = json['periodCap'];
+    return ShopPackage(
+      id: id,
+      title: title,
+      subtitle: subtitle,
+      priceToman: priceRaw is num ? priceRaw.round() : int.tryParse(priceRaw?.toString() ?? '') ?? 0,
+      compareAtPriceToman: compareRaw is num ? compareRaw.round() : int.tryParse(compareRaw?.toString() ?? ''),
+      credits: creditsRaw is num && creditsRaw > 0 ? creditsRaw.round() : null,
+      days: daysRaw is num && daysRaw > 0 ? daysRaw.round() : null,
+      dailyCap: dailyCapRaw is num && dailyCapRaw > 0 ? dailyCapRaw.round() : null,
+      periodCap: periodCapRaw is num && periodCapRaw > 0 ? periodCapRaw.round() : null,
+      isGold: (json['goldenDays'] is num && (json['goldenDays'] as num) > 0) || id.startsWith('gold_'),
+      isPopular: json['highlight'] == true || badge.contains('محبوب'),
+      isBestValue: badge.contains('ارزش') || badge.contains('به‌صرفه'),
+      benefits: <String>[
+        if (creditsRaw is num && creditsRaw > 0) creditsRaw.round().toString() + ' بار عیب‌یابی هوشمند',
+        if (daysRaw is num && daysRaw > 0) daysRaw.round().toString() + ' روز دسترسی',
+        if (dailyCapRaw is num && dailyCapRaw > 0) 'سقف روزانه: ' + dailyCapRaw.round().toString() + ' عیب‌یابی',
+        if (periodCapRaw is num && periodCapRaw > 0) 'سقف دوره: ' + periodCapRaw.round().toString() + ' عیب‌یابی',
+        if (json['monthlyLimit'] is num && (json['monthlyLimit'] as num) > 0) 'سقف ماهانه: ' + (json['monthlyLimit'] as num).round().toString() + ' عیب‌یابی',
+        if (subtitle.isNotEmpty) subtitle,
+      ],
+    );
+  }
+
   const ShopPackage({
     required this.id,
     required this.title,
