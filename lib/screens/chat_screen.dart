@@ -161,13 +161,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     unawaited(_chat.sendUserMessage(text));
   }
 
-  /// پاسخ‌های چندگزینه‌ای یکجا از کارت تشخیص — مستقیم ارسال می‌شود
-  /// بدون نیاز به تایید دستی در کادر ورودی.
-  void _onSubmitGuidedAnswers(String combinedAnswers) {
-    final text = combinedAnswers.trim();
-    if (text.isEmpty || _chat.isTyping) return;
-    _inputCtrl.clear();
-    unawaited(_chat.sendUserMessage(text));
+  /// پیشنهاد «ادامهٔ گفتگو» از کارت تشخیص — کادر ورودی را پر و فوکوس
+  /// می‌کند تا کاربر با یک لمس، سؤال بعدی را ویرایش/ارسال کند.
+  /// (ارسال خودکار انجام نمی‌شود تا ارسال ناخواسته و مصرف بی‌دلیل اعتبار رخ ندهد.)
+  void _onSuggestionTap(String text) {
+    if (_chat.isTyping) return;
+    _inputCtrl.text = text;
+    _inputCtrl.selection = TextSelection.collapsed(offset: text.length);
+    _focusNode.requestFocus();
   }
 
   Future<void> _goToStore() async {
@@ -212,21 +213,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ),
                 ListenableBuilder(
                   listenable: _chat,
-                  builder: (context, _) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_chat.isAwaitingChoices) const _ChoicePromptBar(),
-                        ChatInputBar(
-                          controller: _inputCtrl,
-                          focusNode: _focusNode,
-                          enabled: !_chat.isTyping,
-                          onSend: _onSend,
-                          bottomInset: bottomInset,
-                        ),
-                      ],
-                    );
-                  },
+                  builder: (context, _) => ChatInputBar(
+                    controller: _inputCtrl,
+                    focusNode: _focusNode,
+                    enabled: !_chat.isTyping,
+                    onSend: _onSend,
+                    bottomInset: bottomInset,
+                  ),
                 ),
               ],
             ),
@@ -263,7 +256,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               child: DiagnosisResultCard(
                 result: m.structured!,
                 supplementalText: m.text,
-                onSubmitAnswers: _onSubmitGuidedAnswers,
+                onSuggestionTap: _onSuggestionTap,
+                carName: widget.carName,
+                year: widget.year,
               ),
             );
           } else {
@@ -290,38 +285,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             child: wrapped,
           );
         },
-      ),
-    );
-  }
-}
-
-
-class _ChoicePromptBar extends StatelessWidget {
-  const _ChoicePromptBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      elevation: 8,
-      color: theme.scaffoldBackgroundColor,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 9, 14, 10),
-          child: Row(
-            children: [
-              Icon(Icons.touch_app_rounded, color: theme.colorScheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'گزینه‌ها را در کارت بالا انتخاب کن، یا پاسخ را بنویس و ارسال کن.',
-                  style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
