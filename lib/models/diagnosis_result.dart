@@ -128,12 +128,13 @@ class DiagnosisResult {
         followUpRound: (json['followUpRound'] as num?)?.toInt() ?? 0,
         missingInfo: _stringList(json['missingInfo']),
         followUpQuestions: _stringList(json['followUpQuestions']),
+        // همه سؤال‌های یک دور را نگه می‌داریم (حداکثر ۳ طبق قرارداد بک‌اند).
         questionOptions: json['questionOptions'] is List
             ? (json['questionOptions'] as List)
                 .whereType<Map>()
                 .map((e) => DiagnosisQuestionOption.fromJson(Map<String, dynamic>.from(e)))
                 .where((e) => e.question.isNotEmpty && e.options.length >= 2)
-                .take(1)
+                .take(3)
                 .toList()
             : const [],
         // در ابهام، جانب احتیاط را می‌گیریم: پیش‌فرض «yellow» نه «green».
