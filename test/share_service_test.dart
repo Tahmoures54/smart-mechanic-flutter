@@ -23,7 +23,7 @@ void main() {
     });
 
     test('diagnosisShare نام و سال خودرو را در سرصفحه می‌آورد', () {
-      final text = ShareService.diagnosis(
+      final text = ShareService.diagnosisShare(
         result: 'خلاصهٔ تشخیص',
         carName: 'پژو ۲۰۶',
         year: '۱۴۰۲',
