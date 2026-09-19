@@ -477,22 +477,64 @@ class _SupportCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'چطور از مکانیک هوشمند حمایت کنیم؟',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withOpacity(_kSoftBgOpacity),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.secondary.withOpacity(0.22)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.volunteer_activism_rounded, color: theme.colorScheme.secondary, size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'بهترین حمایت، معرفی به یک دوست صاحب خودرو یا گفتن یک پیشنهاد خوب است؛ همهٔ گزینه‌ها رایگان‌اند.',
+                        style: TextStyle(color: theme.colorScheme.onSurface, height: 1.5, fontSize: 12.5),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'ما یک استارتاپ نوپا هستیم و برای رشد این ابزار به حمایت شما نیاز داریم. لازم نیست هزینه‌ای پرداخت کنید؛ معرفی محصول برای ما بسیار ارزشمند است.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: theme.hintColor, height: 1.55, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               _SupportActionTile(
                 icon: Icons.person_add_alt_1_rounded,
+                title: 'دعوت از یک دوست صاحب خودرو',
+                subtitle: 'پیام کوتاه و طبیعی را با هر برنامه‌ای بفرست',
+                emphasized: true,
+                onTap: () => _runSupportAction(
+                  context,
+                  sheetContext,
+                  () => ShareService.shareApp(),
+                ),
+              ),
+              _SupportActionTile(
+                icon: Icons.chat_rounded,
+                title: 'ارسال مستقیم در واتساپ',
+                subtitle: 'برای یک نفر یا یک گروه واتساپی',
+                onTap: () => _runSupportAction(
+                  context,
+                  sheetContext,
+                  () => ShareService.shareToWhatsApp(ShareService.supportInvite()),
+                ),
+              ),
+              _SupportActionTile(
+                icon: Icons.content_copy_rounded,
+                title: 'کپی پیام معرفی',
+                subtitle: 'برای هر پیام‌رسان یا شبکه‌ای که دوست داری',
+                onTap: () => _runSupportAction(
+                  context,
+                  sheetContext,
+                  () => ShareService.copy(ShareService.supportInvite()),
+                  successMessage: 'پیام معرفی کپی شد.',
+                ),
+              ),
+              _SupportActionTile(
+                icon: Icons.account_circle_rounded,
                 title: 'لینک را در پروفایل واتساپ بگذارم',
-                subtitle: 'متن آماده پروفایل را کپی می‌کند',
+                subtitle: 'متن کوتاه و آمادهٔ پروفایل',
                 onTap: () => _runSupportAction(
                   context,
                   sheetContext,
@@ -501,45 +543,13 @@ class _SupportCard extends StatelessWidget {
                 ),
               ),
               _SupportActionTile(
-                icon: Icons.amp_stories_rounded,
-                title: 'برای وضعیت واتساپ آماده کنم',
-                subtitle: 'متن کوتاه همراه لینک برای Status',
+                icon: Icons.feedback_outlined,
+                title: 'پیشنهاد یا بازخورد برای ما',
+                subtitle: Constants.supportEmail,
                 onTap: () => _runSupportAction(
                   context,
                   sheetContext,
-                  () => ShareService.copy(ShareService.whatsappStatus()),
-                  successMessage: 'متن وضعیت واتساپ کپی شد.',
-                ),
-              ),
-              _SupportActionTile(
-                icon: Icons.chat_rounded,
-                title: 'در واتساپ برای دوستان بفرستم',
-                subtitle: 'پیام معرفی آماده ارسال می‌شود',
-                onTap: () => _runSupportAction(
-                  context,
-                  sheetContext,
-                  () => ShareService.shareToWhatsApp(ShareService.appPitch()),
-                ),
-              ),
-              _SupportActionTile(
-                icon: Icons.share_rounded,
-                title: 'در شبکه‌های اجتماعی معرفی کنم',
-                subtitle: 'منوی اشتراک‌گذاری گوشی باز می‌شود',
-                onTap: () => _runSupportAction(
-                  context,
-                  sheetContext,
-                  () => ShareService.shareApp(),
-                ),
-              ),
-              _SupportActionTile(
-                icon: Icons.link_rounded,
-                title: 'لینک سایت را کپی کنم',
-                subtitle: ShareService.websiteUrl,
-                onTap: () => _runSupportAction(
-                  context,
-                  sheetContext,
-                  () => ShareService.copy(ShareService.websiteUrl),
-                  successMessage: 'لینک سایت کپی شد.',
+                  ShareService.contactSupport,
                 ),
               ),
             ],
@@ -599,14 +609,14 @@ class _SupportCard extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                'ما یک استارتاپ نوپا هستیم؛ به حمایت شما نیاز داریم. اگر از اپ راضی بودید، لینک آن را در پروفایل یا وضعیت واتساپ و شبکه‌های اجتماعی خود قرار دهید.',
+                'اگر این اپ قبل از تعمیرگاه کمکت کرد، یک دوست صاحب خودرو را هم با آن آشنا کن. یک معرفی کوتاه از ده‌ها تبلیغ ارزشمندتر است.',
                 style: TextStyle(color: theme.hintColor, height: 1.55, fontSize: 12.5),
               ),
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: () => _openSupportSheet(context),
                 icon: const Icon(Icons.volunteer_activism_rounded, size: 19),
-                label: const Text('راه‌های حمایت و معرفی'),
+                label: const Text('حمایت در یک لمس'),
               ),
             ],
           ),
@@ -621,12 +631,14 @@ class _SupportActionTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool emphasized;
 
   const _SupportActionTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.emphasized = false,
   });
 
   @override
@@ -635,12 +647,29 @@ class _SupportActionTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        tileColor: theme.cardColor,
-        leading: Icon(icon, color: theme.colorScheme.secondary),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+          side: emphasized
+              ? BorderSide(color: theme.colorScheme.secondary.withOpacity(0.45))
+              : BorderSide.none,
+        ),
+        tileColor: emphasized
+            ? theme.colorScheme.secondary.withOpacity(_kSoftBgOpacity)
+            : theme.cardColor,
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: emphasized
+              ? theme.colorScheme.secondary.withOpacity(0.22)
+              : theme.colorScheme.secondary.withOpacity(_kSoftBgOpacity),
+          child: Icon(icon, color: theme.colorScheme.secondary, size: 19),
+        ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
         subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5)),
-        trailing: const Icon(Icons.arrow_back_ios_rounded, size: 14),
+        trailing: Icon(
+          emphasized ? Icons.ios_share_rounded : Icons.arrow_back_ios_rounded,
+          size: emphasized ? 18 : 14,
+          color: emphasized ? theme.colorScheme.secondary : null,
+        ),
         onTap: onTap,
       ),
     );

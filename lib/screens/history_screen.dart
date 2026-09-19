@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -90,7 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         _isLoading = false;
       });
 
-      _listAnimCtrl.forward(from: 0);
+      unawaited(_listAnimCtrl.forward(from: 0));
     } catch (e) {
       debugPrint('Error fetching history: $e');
       if (!mounted) return;
@@ -272,7 +274,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               ),
             ),
             confirmDismiss: (_) async => await _showDeleteConfirmDialog(item),
-            onDismissed: (_) => _deleteItem(item, index),
+            onDismissed: (_) => unawaited(_deleteItem(item, index)),
             child: _buildItemCard(item, index, theme),
           ),
         ),
@@ -281,7 +283,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildItemCard(Diagnostic item, int index, ThemeData theme) {
-    final isGolden = item.isGolden ?? false;
+    final isGolden = item.isGolden;
     final carLabel = item.carName ?? item.carId;
     final formattedDate = _formatDate(item.createdAt);
 
@@ -299,7 +301,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => ResultScreen(resultText: item.result)));
+          Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ResultScreen(resultText: item.result)));
         },
         onLongPress: () => _showItemOptions(item, index),
         child: Padding(
@@ -446,7 +448,7 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   void _showItemOptions(Diagnostic item, int index) {
     final theme = Theme.of(context);
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       backgroundColor: theme.cardColor,
@@ -467,7 +469,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 title: const Text('مشاهده نتیجه'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => ResultScreen(resultText: item.result)));
+                  Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ResultScreen(resultText: item.result)));
                 },
               ),
               if (item.result != null && item.result!.trim().isNotEmpty)
@@ -491,7 +493,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   Navigator.pop(ctx);
                   final confirm = await _showDeleteConfirmDialog(item);
                   if (confirm == true && mounted) {
-                    _deleteItem(item, index);
+                    unawaited(_deleteItem(item, index));
                   }
                 },
               ),

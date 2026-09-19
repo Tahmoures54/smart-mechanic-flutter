@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../constants.dart';
 import '../models/car.dart';
 import '../models/diagnostic.dart';
+import '../models/garage_registration.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -333,6 +334,9 @@ class ApiService {
     required String year,
     String? carName,
     String? previousDiagnosticId,
+    double? lat,
+    double? lng,
+    String? city,
   }) async {
     final body = <String, dynamic>{
       'carId': carId,
@@ -341,6 +345,11 @@ class ApiService {
       if (carName != null && carName.trim().isNotEmpty) 'carName': carName.trim(),
       if (previousDiagnosticId != null && previousDiagnosticId.trim().isNotEmpty)
         'previousDiagnosticId': int.tryParse(previousDiagnosticId.trim()) ?? previousDiagnosticId.trim(),
+      if (lat != null && lng != null && lat.isFinite && lng.isFinite) ...{
+        'lat': lat,
+        'lng': lng,
+      },
+      if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
     };
     final response = await _safeCall(
       () => _httpClient.post(
@@ -486,13 +495,76 @@ class ApiService {
     _parseAndEnsure(response, defaultError: 'خطا در حذف تاریخچه');
   }
 
-  Future<String> getPaymentUrl(String token, String productId) async {
+  Future<List<OwnedGarage>> getOwnedGarages(String token) async {
+    final response = await _safeCall(
+      () => _httpClient.get(
+        Uri.parse(Constants.garagesRegister),
+        headers: _getHeaders(token),
+      ),
+      rateLimitKey: 'getOwnedGarages',
+    );
+    final data = _parseAndEnsure(response, defaultError: 'خطا در دریافت تعمیرگاه‌های شما');
+    final raw = data['data'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) => OwnedGarage.fromJson(Map<String, dynamic>.from(item)))
+        .where((garage) => garage.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<OwnedGarage> registerGarage(
+    String token, {
+    required String name,
+    required double lat,
+    required double lng,
+    String? city,
+    String? address,
+    String? phone,
+    List<String> specialties = const [],
+    String? description,
+  }) async {
+    if (name.trim().length < 2) throw const ApiException(400, 'نام تعمیرگاه الزامی است.');
+    if (!lat.isFinite || !lng.isFinite || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      throw const ApiException(400, 'مختصات تعمیرگاه نامعتبر است.');
+    }
+
+    final body = <String, dynamic>{
+      'name': name.trim(),
+      'lat': lat,
+      'lng': lng,
+      if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+      if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (specialties.isNotEmpty) 'specialties': specialties,
+      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+    };
+    final response = await _safeCall(
+      () => _httpClient.post(
+        Uri.parse(Constants.garagesRegister),
+        headers: _getHeaders(token),
+        body: jsonEncode(body),
+      ),
+      rateLimitKey: 'registerGarage',
+    );
+    final data = _parseAndEnsure(response, defaultError: 'ثبت تعمیرگاه ناموفق بود');
+    final raw = data['data'];
+    if (raw is! Map) throw const ApiException(500, 'پاسخ ثبت تعمیرگاه نامعتبر است.');
+    return OwnedGarage.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  Future<String> getPaymentUrl(String token, String productId, {String? garageId}) async {
     if (productId.isEmpty) throw const ApiException(400, 'شناسه محصول نامعتبر است.');
+    final body = <String, dynamic>{
+      'productId': productId,
+      if (garageId != null && garageId.trim().isNotEmpty)
+        'garageId': int.tryParse(garageId.trim()) ?? garageId.trim(),
+    };
     final response = await _safeCall(
       () => _httpClient.post(
         Uri.parse(Constants.purchase),
         headers: _getHeaders(token),
-        body: jsonEncode({'productId': productId}),
+        body: jsonEncode(body),
       ),
       rateLimitKey: 'getPaymentUrl',
     );

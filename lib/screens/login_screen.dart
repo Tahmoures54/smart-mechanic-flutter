@@ -208,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       // فیدبک لمسی امن برای جلوگیری از بروز کرش روی دستگاه‌های خاص
       try {
-        HapticFeedback.mediumImpact();
+        unawaited(HapticFeedback.mediumImpact());
       } catch (_) {}
 
       setState(() {

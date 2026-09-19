@@ -1,4 +1,4 @@
-# Android Troubleshooting — Smart Mechanic 1.2.0
+# Android Troubleshooting — Smart Mechanic 1.2.2
 
 ## If APK installs but closes immediately
 

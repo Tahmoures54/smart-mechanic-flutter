@@ -20,6 +20,8 @@ class ChatController extends ChangeNotifier {
     required this.apiService,
     required this.authProvider,
     this.onMessageAppended,
+    this.latitude,
+    this.longitude,
   });
 
   final String carId;
@@ -28,6 +30,15 @@ class ChatController extends ChangeNotifier {
   final bool isCustomCar;
   final ApiService apiService;
   final AuthProvider authProvider;
+  double? latitude;
+  double? longitude;
+
+  /// مختصات آخرین موقعیت شناخته‌شدهٔ کاربر برای مرتب‌سازی تبلیغ‌های چت.
+  /// در صورت نبودن اجازه یا موقعیت، backend همچنان فقط تعمیرگاه‌های approved را برمی‌گرداند.
+  void setLocation({double? lat, double? lng}) {
+    latitude = lat;
+    longitude = lng;
+  }
 
   /// (index, isDiagnosisResult) — UI از این برای تصمیم «اسکرول ساده» یا
   /// «اسکرول به نتیجه + لرزش» استفاده می‌کند.
@@ -91,7 +102,18 @@ class ChatController extends ChangeNotifier {
 
   Future<void> sendUserMessage(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _isTyping || isAwaitingChoices) return;
+    if (trimmed.isEmpty || _isTyping) return;
+
+    // A follow-up question is still a normal chat message. The previous
+    // implementation rejected it while `isAwaitingChoices` was true. The
+    // screen cleared `_guidedAnswerReady` immediately before calling this
+    // method, so every answer to a structured question was silently dropped
+    // and the user was left on the same card with no loading state.
+    //
+    // Keep the choice chips as a helpful shortcut, but also accept typed
+    // answers. This makes the conversation resilient when the API returns a
+    // question without options or when the user prefers to type.
+    _guidedAnswerReady = false;
     _append(ChatMessage.user(trimmed));
     await fetchDiagnosis(trimmed);
   }
@@ -122,6 +144,8 @@ class ChatController extends ChangeNotifier {
         year: year,
         carName: isCustomCar ? carName : null,
         previousDiagnosticId: _lastDiagnosticId,
+        lat: latitude,
+        lng: longitude,
       );
 
       if (_disposed) return;

@@ -84,17 +84,17 @@ void main() async {
 void _setupErrorWidget() {
   ErrorWidget.builder = (details) {
     debugPrint('[ErrorBoundary] ${details.exception}');
-    return Material(
+    return const Material(
       color: BrandColors.darkBackground,
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const BrandLogo(size: 88),
-              const SizedBox(height: 20),
-              const Text(
+              BrandLogo(size: 88),
+              SizedBox(height: 20),
+              Text(
                 'مشکلی پیش آمد',
                 style: TextStyle(
                   fontSize: 20,
@@ -102,8 +102,8 @@ void _setupErrorWidget() {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8),
+              Text(
                 'لطفاً اپلیکیشن را مجدداً باز کنید.',
                 style: TextStyle(color: Colors.white54),
                 textAlign: TextAlign.center,
@@ -126,7 +126,7 @@ Future<void> _initHive() async {
   for (final name in boxNames) {
     try {
       if (!Hive.isBoxOpen(name)) {
-        await Hive.openBox(name);
+        await Hive.openBox<dynamic>(name);
       }
     } catch (e) {
       debugPrint('[Hive] خطا در باز کردن box "$name": $e');

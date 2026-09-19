@@ -21,6 +21,7 @@ import 'login_screen.dart';
 import 'record_screen.dart';
 import 'shop_screen.dart';
 import 'terms_screen.dart';
+import 'garage_registration_screen.dart';
 
 part 'home_screen_widgets.dart';
 
@@ -348,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<bool> _ensureAuthenticated() async {
     if (context.read<AuthProvider>().isAuthenticated) return true;
 
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const LoginScreen()));
     if (!mounted) return false;
     return context.read<AuthProvider>().isAuthenticated;
   }
@@ -383,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => ChatScreen(
           carName: car.name,
           carId: car.id,
@@ -418,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => RecordScreen(carName: car.name, carId: car.id, year: car.year),
       ),
     );
@@ -473,7 +474,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     if (goToShop != true || !mounted) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ShopScreen()));
+  }
+
+  Future<void> _openGarageRegistration() async {
+    if (!await _ensureAuthenticated()) return;
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const GarageRegistrationScreen()),
+    );
   }
 
   void _snack(String msg, {bool error = true}) {
@@ -527,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onAudio: () => unawaited(_recordAudio()),
                 onShop: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ShopScreen()),
+                  MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
                 ),
               ),
               const SizedBox(height: 18),
@@ -600,10 +610,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       backgroundColor: Colors.transparent,
       actions: [
         IconButton(
+          tooltip: 'ثبت تعمیرگاه',
+          icon: const Icon(Icons.handyman_rounded),
+          onPressed: () => unawaited(_openGarageRegistration()),
+        ),
+        IconButton(
           tooltip: 'قوانین استفاده',
           icon: const Icon(Icons.gavel_rounded),
           onPressed: () =>
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsScreen())),
+              Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TermsScreen())),
         ),
         if (auth.isAuthenticated)
           IconButton(
@@ -611,14 +626,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.history_rounded),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
             ),
           )
         else
           TextButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
             ),
             child: Text(
               'ورود',
@@ -632,37 +647,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildDescriptionField(ThemeData theme, Color secondary) {
     return KeyedSubtree(
       key: _descFieldKey,
-      child: TextField(
-        controller: _descController,
-        maxLines: 4,
-        maxLength: 300,
-        textInputAction: TextInputAction.done,
-        textCapitalization: TextCapitalization.sentences,
-        onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),
-        style: const TextStyle(height: 1.5),
-        decoration: InputDecoration(
-          hintText: 'مثال: صبح‌ها که هوا سرد است، موقع استارت ریپ می‌زند و صدای تق‌تق می‌آید...',
-          hintStyle: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
-          errorText: _descError,
-          filled: true,
-          fillColor: theme.cardColor,
-          contentPadding: const EdgeInsets.all(16),
-          counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _descController,
+            maxLines: 4,
+            maxLength: 300,
+            textInputAction: TextInputAction.done,
+            textCapitalization: TextCapitalization.sentences,
+            onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),
+            style: const TextStyle(height: 1.5),
+            decoration: InputDecoration(
+              hintText: 'مثال: صبح‌ها که هوا سرد است، موقع استارت ریپ می‌زند و صدای تق‌تق می‌آید...',
+              hintStyle: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
+              errorText: _descError,
+              filled: true,
+              fillColor: theme.cardColor,
+              contentPadding: const EdgeInsets.all(16),
+              counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: theme.dividerColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: secondary, width: 1.5),
+              ),
+            ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: theme.dividerColor),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, size: 15, color: secondary),
+              const SizedBox(width: 5),
+              Text(
+                'برای شروع سریع، یکی را انتخاب کن',
+                style: TextStyle(fontSize: 11.5, color: theme.hintColor, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: secondary, width: 1.5),
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (final symptom in const [
+                'روشن نمی‌شود',
+                'صدای غیرعادی',
+                'لرزش خودرو',
+                'چراغ چک روشن است',
+                'افت شتاب',
+              ])
+                ActionChip(
+                  label: Text(symptom, style: const TextStyle(fontSize: 11.5)),
+                  avatar: Icon(Icons.add_rounded, size: 15, color: secondary),
+                  onPressed: () => _appendSymptom(symptom),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(color: secondary.withOpacity(0.24)),
+                ),
+            ],
           ),
-        ),
+        ],
       ),
     );
+  }
+
+  void _appendSymptom(String symptom) {
+    final current = _descController.text.trim();
+    final next = current.isEmpty ? symptom : '$current، $symptom';
+    if (next.length > Constants.maxDescriptionLength) {
+      _snack('متن شرح مشکل به حداکثر ${Constants.maxDescriptionLength} کاراکتر رسیده است.');
+      return;
+    }
+    _descController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    _focusNodeAfterSuggestion();
+  }
+
+  void _focusNodeAfterSuggestion() {
+    // بعد از انتخاب نشانه، صفحه‌کلید باز نمی‌شود؛ فقط مکان‌نما در پایان متن
+    // قرار می‌گیرد تا کاربر بتواند جزئیات را ادامه دهد.
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   void _onCarSelected(Car car) {

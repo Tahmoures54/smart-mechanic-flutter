@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/chat_controller.dart';
@@ -75,8 +77,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       onMessageAppended: _handleMessageAppended,
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      // Do not ask for permission here; use a cached position only when the
+      // user has already granted location access. The diagnosis remains usable
+      // without it, but approved garage promotions can then be sorted nearby.
+      final position = await _lastKnownPosition();
+      if (!mounted) return;
+      _chat.setLocation(lat: position?.latitude, lng: position?.longitude);
       _chat.seedInitial(
         userMessage: widget.initialUserMessage,
         initialResultText: widget.initialDiagnosisResult,
@@ -84,6 +92,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         initialDiagnosticId: widget.initialDiagnosticId,
       );
     });
+  }
+
+  Future<Position?> _lastKnownPosition() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -133,22 +153,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       }
       if (!mounted) return;
       try {
-        HapticFeedback.mediumImpact();
+        unawaited(HapticFeedback.mediumImpact());
       } catch (_) {}
-      _shakeCtrl.forward(from: 0);
+      unawaited(_shakeCtrl.forward(from: 0));
     });
   }
 
   void _onSend() {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty || _chat.isTyping) return;
+
+    // Do not clear the guided-answer state before sending. The controller
+    // consumes it after accepting the message; clearing it here used to make
+    // `sendUserMessage` reject the answer as if no option had been selected.
     _inputCtrl.clear();
-    _chat.clearGuidedAnswer();
-    _chat.sendUserMessage(text);
+    unawaited(_chat.sendUserMessage(text));
   }
 
   void _onGuidedAnswerSelected(String question, String answer) {
-    final text = question.trim() + ': ' + answer.trim();
+    final text = '${question.trim()}: ${answer.trim()}';
     if (text.trim().isEmpty || _chat.isTyping) return;
     _inputCtrl
       ..text = text
@@ -163,7 +186,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Future<void> _goToStore() async {
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ShopScreen()),
+      MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
     );
   }
 
@@ -252,6 +275,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               alignment: Alignment.centerLeft,
               child: DiagnosisResultCard(
                 result: m.structured!,
+                supplementalText: m.text,
                 onSubmitAnswer: _onGuidedAnswerSelected,
               ),
             );
@@ -304,7 +328,7 @@ class _ChoicePromptBar extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'گزینه‌های بالا را انتخاب کن؛ نیازی به تایپ نیست.',
+                  'یک گزینه را انتخاب کن یا پاسخ را بنویس؛ سپس دکمه ارسال را بزن.',
                   style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
