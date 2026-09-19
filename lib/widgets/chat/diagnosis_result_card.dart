@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../models/diagnosis_result.dart';
 import 'urgency_and_chips.dart';
@@ -8,10 +9,25 @@ import 'urgency_and_chips.dart';
 /// ساختاریافته (urgency, safeToDrive, causes, mechanicQuestions) را
 /// به‌صورت بصری و قابل‌اسکن نشان می‌دهد.
 class DiagnosisResultCard extends StatelessWidget {
-  const DiagnosisResultCard({super.key, required this.result, this.onSubmitAnswer});
+  const DiagnosisResultCard({
+    super.key,
+    required this.result,
+    this.supplementalText,
+    this.onSubmitAnswer,
+  });
 
   final DiagnosisResult result;
+  final String? supplementalText;
   final void Function(String question, String answer)? onSubmitAnswer;
+
+  String? get _garagePromoText {
+    final text = supplementalText;
+    if (text == null) return null;
+    const marker = '## 🔧 تعمیرگاه‌های پیشنهادی';
+    final start = text.indexOf(marker);
+    if (start < 0) return null;
+    return text.substring(start).trim();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +103,31 @@ class DiagnosisResultCard extends StatelessWidget {
           if (result.footer.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(result.footer, style: TextStyle(fontSize: 11.5, color: theme.hintColor)),
+          ],
+          if (_garagePromoText != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.colorScheme.primary.withOpacity(0.25)),
+              ),
+              child: MarkdownBody(
+                data: _garagePromoText!,
+                shrinkWrap: true,
+                styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                  p: const TextStyle(fontSize: 12.5, height: 1.55),
+                  h2: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
           ],
         ],
       ),

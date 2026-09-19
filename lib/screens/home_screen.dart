@@ -21,6 +21,7 @@ import 'login_screen.dart';
 import 'record_screen.dart';
 import 'shop_screen.dart';
 import 'terms_screen.dart';
+import 'garage_registration_screen.dart';
 
 part 'home_screen_widgets.dart';
 
@@ -476,6 +477,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ShopScreen()));
   }
 
+  Future<void> _openGarageRegistration() async {
+    if (!await _ensureAuthenticated()) return;
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const GarageRegistrationScreen()),
+    );
+  }
+
   void _snack(String msg, {bool error = true}) {
     if (!mounted) return;
     final theme = Theme.of(context);
@@ -599,6 +609,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       elevation: 0,
       backgroundColor: Colors.transparent,
       actions: [
+        IconButton(
+          tooltip: 'ثبت تعمیرگاه',
+          icon: const Icon(Icons.handyman_rounded),
+          onPressed: () => unawaited(_openGarageRegistration()),
+        ),
         IconButton(
           tooltip: 'قوانین استفاده',
           icon: const Icon(Icons.gavel_rounded),

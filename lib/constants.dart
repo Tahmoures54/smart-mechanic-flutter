@@ -120,6 +120,7 @@ class Constants {
   static String get garagesNearby => '$apiUrl/garages/nearby';
   static String garageDetails(String id) => '$apiUrl/garages/$id';
   static String get garages => '$apiUrl/garages';
+  static String get garagesRegister => '$apiUrl/garages/register';
 
   // Static files are served from the site origin, not under /api.
   static String get carsJson {
@@ -134,6 +135,7 @@ class Constants {
   static String get health => '$apiUrl/health';
 
   static const String websiteUrl = 'https://smart-mec.ir';
+  static const String garageRegistrationUrl = '$websiteUrl/garage';
   static const String enamadProfileUrl =
       'https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
 

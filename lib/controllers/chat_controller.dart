@@ -20,6 +20,8 @@ class ChatController extends ChangeNotifier {
     required this.apiService,
     required this.authProvider,
     this.onMessageAppended,
+    this.latitude,
+    this.longitude,
   });
 
   final String carId;
@@ -28,6 +30,15 @@ class ChatController extends ChangeNotifier {
   final bool isCustomCar;
   final ApiService apiService;
   final AuthProvider authProvider;
+  double? latitude;
+  double? longitude;
+
+  /// مختصات آخرین موقعیت شناخته‌شدهٔ کاربر برای مرتب‌سازی تبلیغ‌های چت.
+  /// در صورت نبودن اجازه یا موقعیت، backend همچنان فقط تعمیرگاه‌های approved را برمی‌گرداند.
+  void setLocation({double? lat, double? lng}) {
+    latitude = lat;
+    longitude = lng;
+  }
 
   /// (index, isDiagnosisResult) — UI از این برای تصمیم «اسکرول ساده» یا
   /// «اسکرول به نتیجه + لرزش» استفاده می‌کند.
@@ -133,6 +144,8 @@ class ChatController extends ChangeNotifier {
         year: year,
         carName: isCustomCar ? carName : null,
         previousDiagnosticId: _lastDiagnosticId,
+        lat: latitude,
+        lng: longitude,
       );
 
       if (_disposed) return;
