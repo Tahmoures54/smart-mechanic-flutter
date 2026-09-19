@@ -112,7 +112,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadCachedProfile() async {
     try {
       if (!Hive.isBoxOpen('user_profile')) return;
-      final box = Hive.box('user_profile');
+      final box = Hive.box<dynamic>('user_profile');
       _userId = box.get('userId') as String?;
       _userName = box.get('userName') as String?;
       _phone = box.get('phone') as String?;
@@ -325,10 +325,10 @@ class AuthProvider with ChangeNotifier {
     for (final name in boxNames) {
       try {
         if (Hive.isBoxOpen(name)) {
-          await Hive.box(name).clear();
-          await Hive.box(name).close();
+          await Hive.box<dynamic>(name).clear();
+          await Hive.box<dynamic>(name).close();
         } else {
-          final box = await Hive.openBox(name);
+          final box = await Hive.openBox<dynamic>(name);
           await box.clear();
           await box.close();
         }
