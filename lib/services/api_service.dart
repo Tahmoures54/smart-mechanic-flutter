@@ -8,6 +8,7 @@ import '../constants.dart';
 import '../models/car.dart';
 import '../models/diagnostic.dart';
 import '../models/garage_registration.dart';
+import '../models/shop_package.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -307,6 +308,19 @@ class ApiService {
     return _parseAndEnsure(response, defaultError: 'خطا در ورود');
   }
 
+  Future<List<ShopPackage>> getProducts() async {
+    final response = await _safeCall(
+      () => _httpClient.get(Uri.parse(Constants.baseUrl + '/products'), headers: _getHeaders()),
+      rateLimitKey: 'getProducts',
+    );
+    final data = _parseAndEnsure(response, defaultError: 'خطا در دریافت بسته‌ها');
+    final raw = data['data'];
+    if (raw is! List) throw const ApiException(500, 'کاتالوگ بسته‌ها نامعتبر است.');
+    return raw.whereType<Map>()
+      .map((item) => ShopPackage.fromJson(Map<String, dynamic>.from(item)))
+      .where((p) => p.id.isNotEmpty && p.priceToman > 0)
+      .toList(growable: false);
+  }
   Future<Map<String, dynamic>> getProfile(String token) async {
     final response = await _safeCall(
       () => _httpClient.get(Uri.parse(Constants.credits), headers: _getHeaders(token)),
