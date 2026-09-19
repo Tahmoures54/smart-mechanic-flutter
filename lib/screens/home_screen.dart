@@ -348,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<bool> _ensureAuthenticated() async {
     if (context.read<AuthProvider>().isAuthenticated) return true;
 
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const LoginScreen()));
     if (!mounted) return false;
     return context.read<AuthProvider>().isAuthenticated;
   }
@@ -383,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => ChatScreen(
           carName: car.name,
           carId: car.id,
@@ -418,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => RecordScreen(carName: car.name, carId: car.id, year: car.year),
       ),
     );
@@ -473,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     if (goToShop != true || !mounted) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ShopScreen()));
   }
 
   void _snack(String msg, {bool error = true}) {
@@ -527,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onAudio: () => unawaited(_recordAudio()),
                 onShop: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ShopScreen()),
+                  MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
                 ),
               ),
               const SizedBox(height: 18),
@@ -603,7 +603,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           tooltip: 'قوانین استفاده',
           icon: const Icon(Icons.gavel_rounded),
           onPressed: () =>
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsScreen())),
+              Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TermsScreen())),
         ),
         if (auth.isAuthenticated)
           IconButton(
@@ -611,14 +611,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.history_rounded),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
             ),
           )
         else
           TextButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
             ),
             child: Text(
               'ورود',

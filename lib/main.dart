@@ -91,7 +91,7 @@ void _setupErrorWidget() {
           padding: EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               BrandLogo(size: 88),
               SizedBox(height: 20),
               Text(
