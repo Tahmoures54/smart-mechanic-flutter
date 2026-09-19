@@ -5,20 +5,20 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../models/diagnosis_result.dart';
 import 'urgency_and_chips.dart';
 
-/// نمایش غنی نتیجهٔ تشخیص — به‌جای یک پاراگراف متن یکنواخت، اطلاعات
-/// ساختاریافته (urgency, safeToDrive, causes, mechanicQuestions) را
-/// به‌صورت بصری و قابل‌اسکن نشان می‌دهد.
+/// نمایش غنی نتیجهٔ تشخیص.
+/// در حالت questions همه سؤال‌های یک دور یکجا نمایش داده می‌شوند و کاربر
+/// با یک دکمه «به‌روزرسانی تشخیص» همه پاسخ‌ها را یکجا ارسال می‌کند.
 class DiagnosisResultCard extends StatelessWidget {
   const DiagnosisResultCard({
     super.key,
     required this.result,
     this.supplementalText,
-    this.onSubmitAnswer,
+    this.onSubmitAnswers,
   });
 
   final DiagnosisResult result;
   final String? supplementalText;
-  final void Function(String question, String answer)? onSubmitAnswer;
+  final void Function(String combinedAnswers)? onSubmitAnswers;
 
   String? get _garagePromoText {
     final text = supplementalText;
@@ -71,13 +71,15 @@ class DiagnosisResultCard extends StatelessWidget {
           if (result.responseMode == ResponseMode.questions) ...[
             if (result.questionOptions.isNotEmpty || result.followUpQuestions.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text('برای تشخیص دقیق‌تر، به این‌ها جواب بده:',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const Text(
+                'برای تشخیص دقیق‌تر، به این‌ها جواب بده:',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
               if (result.questionOptions.isNotEmpty)
-                _TouchQuestionnaire(
+                _MultiTouchQuestionnaire(
                   questions: result.questionOptions,
-                  onAnswer: onSubmitAnswer,
+                  onSubmit: onSubmitAnswers,
                 )
               else
                 ...result.followUpQuestions.asMap().entries.map(
@@ -96,7 +98,7 @@ class DiagnosisResultCard extends StatelessWidget {
               _MechanicChecklist(items: result.mechanicQuestions),
             ],
           ],
-          if (result.nextStep.isNotEmpty) ...[
+          if (result.nextStep.isNotEmpty && result.responseMode != ResponseMode.questions) ...[
             const SizedBox(height: 12),
             _NextStepBox(text: result.nextStep),
           ],
@@ -135,53 +137,93 @@ class DiagnosisResultCard extends StatelessWidget {
   }
 }
 
-class _TouchQuestionnaire extends StatefulWidget {
-  const _TouchQuestionnaire({required this.questions, this.onAnswer});
+class _MultiTouchQuestionnaire extends StatefulWidget {
+  const _MultiTouchQuestionnaire({required this.questions, this.onSubmit});
   final List<DiagnosisQuestionOption> questions;
-  final void Function(String question, String answer)? onAnswer;
+  final void Function(String combinedAnswers)? onSubmit;
 
   @override
-  State<_TouchQuestionnaire> createState() => _TouchQuestionnaireState();
+  State<_MultiTouchQuestionnaire> createState() => _MultiTouchQuestionnaireState();
 }
 
-class _TouchQuestionnaireState extends State<_TouchQuestionnaire> {
-  bool _submitting = false;
-  String? _selectedAnswer;
+class _MultiTouchQuestionnaireState extends State<_MultiTouchQuestionnaire> {
+  final Map<int, String> _answers = {};
+  bool _submitted = false;
 
-  void _select(DiagnosisQuestionOption question, String answer) {
-    if (_submitting || widget.onAnswer == null) return;
-    setState(() {
-      _submitting = true;
-      _selectedAnswer = answer;
-    });
-    widget.onAnswer!(question.question, answer);
+  bool get _allAnswered =>
+      widget.questions.isNotEmpty && _answers.length == widget.questions.length;
+
+  void _select(int index, String option) {
+    if (_submitted) return;
+    setState(() => _answers[index] = option);
+  }
+
+  void _submit() {
+    if (!_allAnswered || _submitted || widget.onSubmit == null) return;
+    setState(() => _submitted = true);
+    final lines = <String>[];
+    for (var i = 0; i < widget.questions.length; i++) {
+      final q = widget.questions[i];
+      final a = _answers[i];
+      if (a != null) lines.add('${q.question}: $a');
+    }
+    widget.onSubmit!(lines.join('\n'));
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.questions.isEmpty) return const SizedBox.shrink();
-    final q = widget.questions.first;
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(q.question, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: q.options.map((option) {
-            return ChoiceChip(
-              label: Text(option, style: const TextStyle(fontSize: 12)),
-              selected: _selectedAnswer == option,
-              onSelected: _submitting ? null : (_) => _select(q, option),
-            );
-          }).toList(),
+        for (var i = 0; i < widget.questions.length; i++) ...[
+          if (i > 0) const SizedBox(height: 14),
+          Text(
+            widget.questions[i].question,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: widget.questions[i].options.map((option) {
+              final selected = _answers[i] == option;
+              return ChoiceChip(
+                label: Text(option, style: const TextStyle(fontSize: 12)),
+                selected: selected,
+                onSelected: _submitted ? null : (_) => _select(i, option),
+              );
+            }).toList(),
+          ),
+        ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: (_allAnswered && !_submitted) ? _submit : null,
+            icon: Icon(
+              _submitted ? Icons.check_rounded : Icons.auto_awesome_rounded,
+              size: 18,
+            ),
+            label: Text(
+              _submitted ? 'در حال به‌روزرسانی…' : 'به‌روزرسانی تشخیص',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'پس از انتخاب گزینه، متن پاسخ در کادر پایین قرار می‌گیرد؛ برای ادامه دکمه ارسال را بزن.',
-          style: TextStyle(fontSize: 11.5, color: Theme.of(context).hintColor),
-        ),
+        if (!_allAnswered && !_submitted) ...[
+          const SizedBox(height: 8),
+          Text(
+            'همه گزینه‌ها را انتخاب کن، سپس دکمه بالا را بزن.',
+            style: TextStyle(fontSize: 11.5, color: theme.hintColor),
+          ),
+        ],
       ],
     );
   }
