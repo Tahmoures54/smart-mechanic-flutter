@@ -82,6 +82,11 @@ jobs:
           flutter analyze > analyze.log 2>&1
           code=$?
           cat analyze.log
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            safe=$(printf '%s' "$line" | sed 's/%/%25/g; s/\r/%0D/g')
+            echo "::error file=lib::$safe"
+          done < analyze.log
           {
             echo '## Flutter analyze'
             echo '```text'
@@ -99,6 +104,11 @@ jobs:
           flutter test --reporter expanded > test.log 2>&1
           code=$?
           cat test.log
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            safe=$(printf '%s' "$line" | sed 's/%/%25/g; s/\r/%0D/g')
+            echo "::error file=test::$safe"
+          done < test.log
           {
             echo '## Flutter test'
             echo '```text'
