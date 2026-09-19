@@ -530,8 +530,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              _StatusBanner(auth: auth),
-              const SizedBox(height: 12),
               HomePromoCarousel(
                 onDiagnose: () => unawaited(_diagnose()),
                 onAudio: () => unawaited(_recordAudio()),
@@ -541,17 +539,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(
-                'عیب‌یابی در ۳ قدم — کمتر از ۲ دقیقه',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: theme.hintColor,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
 
               _SectionLabel(number: '۱', title: 'وسیله نقلیه را انتخاب کنید'),
               const SizedBox(height: 10),
@@ -591,10 +578,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const _WhyItWorksSection(),
               const SizedBox(height: 18),
 
+              const _GarageRegistrationBanner(),
+              const SizedBox(height: 14),
               const _SupportCard(),
               const SizedBox(height: 20),
               const Center(child: EnamadBadge()),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(builder: (_) => const TermsScreen()),
+                  ),
+                  child: const Text('قوانین و مقررات', style: TextStyle(fontSize: 12)),
+                ),
+              ),
             ],
           ),
         ),
@@ -609,25 +607,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       elevation: 0,
       backgroundColor: Colors.transparent,
       actions: [
-        IconButton(
-          tooltip: 'ثبت تعمیرگاه',
-          icon: const Icon(Icons.handyman_rounded),
-          onPressed: () => unawaited(_openGarageRegistration()),
-        ),
-        IconButton(
-          tooltip: 'قوانین استفاده',
-          icon: const Icon(Icons.gavel_rounded),
-          onPressed: () =>
-              Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const TermsScreen())),
-        ),
         if (auth.isAuthenticated)
           IconButton(
-            tooltip: 'تاریخچه',
-            icon: const Icon(Icons.history_rounded),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
-            ),
+            tooltip: 'حساب کاربری',
+            icon: const Icon(Icons.account_circle_rounded),
+            onPressed: () => _showAccountDialog(auth),
           )
         else
           TextButton(
@@ -641,6 +625,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
       ],
+    );
+  }
+
+  Future<void> _showAccountDialog(AuthProvider auth) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('حساب کاربری', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              ListTile(leading: const Icon(Icons.phone_rounded), title: const Text('شماره موبایل'), subtitle: Text(_orDash(auth.phone))),
+              ListTile(leading: const Icon(Icons.person_rounded), title: const Text('نام'), subtitle: Text(_orDash(auth.userName))),
+              ListTile(leading: const Icon(Icons.credit_card_rounded), title: const Text('اعتبار'), subtitle: Text('${auth.credits} اعتبار')),
+              if (auth.isGoldenActive) const ListTile(leading: Icon(Icons.workspace_premium_rounded), title: Text('اشتراک طلایی'), subtitle: Text('فعال')),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const HistoryScreen()));
+                },
+                icon: const Icon(Icons.history_rounded),
+                label: const Text('مشاهده تاریخچه'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
