@@ -139,12 +139,12 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
 
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (_paused || !mounted) return;
       final next = (_active + 1) % _slides().length;
       _controller.animateToPage(
         next,
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 380),
         curve: Curves.easeOutCubic,
       );
     });
@@ -343,7 +343,7 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
                   child: GestureDetector(
                     onTap: () => _controller.animateToPage(
                       index,
-                      duration: const Duration(milliseconds: 350),
+                      duration: const Duration(milliseconds: 280),
                       curve: Curves.easeOutCubic,
                     ),
                     child: AnimatedContainer(
