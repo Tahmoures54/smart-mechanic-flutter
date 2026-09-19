@@ -17,7 +17,7 @@ class ThemeProvider extends ChangeNotifier {
     final saved = prefs.getString(_key);
 
     // ✅ پارس خودکار با استفاده از نام ThemeMode
-    ThemeMode mode = ThemeMode.values.firstWhere(
+    final mode = ThemeMode.values.firstWhere(
       (m) => m.name == saved,
       orElse: () => ThemeMode.dark, // تم پیش‌فرض
     );

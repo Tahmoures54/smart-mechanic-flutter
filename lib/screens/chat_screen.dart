@@ -152,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _onGuidedAnswerSelected(String question, String answer) {
-    final text = question.trim() + ': ' + answer.trim();
+    final text = '${question.trim()}: ${answer.trim()}';
     if (text.trim().isEmpty || _chat.isTyping) return;
     _inputCtrl
       ..text = text

@@ -91,10 +91,10 @@ void _setupErrorWidget() {
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              const BrandLogo(size: 88),
-              const SizedBox(height: 20),
-              const Text(
+            children: const [
+              BrandLogo(size: 88),
+              SizedBox(height: 20),
+              Text(
                 'مشکلی پیش آمد',
                 style: TextStyle(
                   fontSize: 20,
@@ -102,8 +102,8 @@ void _setupErrorWidget() {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8),
+              Text(
                 'لطفاً اپلیکیشن را مجدداً باز کنید.',
                 style: TextStyle(color: Colors.white54),
                 textAlign: TextAlign.center,
