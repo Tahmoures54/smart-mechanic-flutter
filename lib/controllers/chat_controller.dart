@@ -48,18 +48,7 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
 
   bool _isTyping = false;
-  bool _guidedAnswerReady = false;
   bool get isTyping => _isTyping;
-
-  /// When the latest assistant response is a guided questionnaire, the user
-  /// should answer through touch options instead of the free-text composer.
-  bool get isAwaitingChoices {
-    if (_isTyping || _messages.isEmpty) return false;
-    final last = _messages.last;
-    return !_guidedAnswerReady &&
-        last.structured?.responseMode == ResponseMode.questions &&
-        last.structured?.questionOptions.isNotEmpty == true;
-  }
 
   String? _lastDiagnosticId;
   bool _disposed = false;
@@ -81,39 +70,21 @@ class ChatController extends ChangeNotifier {
     if (initialResultText != null && initialResultText.trim().isNotEmpty) {
       _lastDiagnosticId = initialDiagnosticId;
       _appendDiagnosisResult(initialResultText, initialResultJson);
+      // عیب‌یابی اولیه (مثلاً تحلیل صوتی) سهمیه را سمت سرور کم کرده است؛
+      // نشان اعتبار در AppBar نباید کهنه بماند.
+      unawaited(authProvider.fetchProfile());
     } else {
       unawaited(fetchDiagnosis(userMessage));
     }
   }
 
-  /// Marks a guided answer as selected. The answer is intentionally not
-  /// sent to the backend yet; the user reviews it in the composer and taps Send.
-  void prepareGuidedAnswer() {
-    if (_isTyping) return;
-    _guidedAnswerReady = true;
-    _safeNotify();
-  }
-
-  void clearGuidedAnswer() {
-    _guidedAnswerReady = false;
-    _safeNotify();
-  }
-
-
+  /// سیاست «پاسخ مستقیم»: کاربر همیشه آزاد است هر متنی بنویسد و بفرستد؛
+  /// هیچ حالت قفل‌شدهٔ «منتظر انتخاب گزینه‌ها» وجود ندارد. کارت تشخیص
+  /// هرگز ورودی آزاد را غیرفعال نمی‌کند.
   Future<void> sendUserMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isTyping) return;
 
-    // A follow-up question is still a normal chat message. The previous
-    // implementation rejected it while `isAwaitingChoices` was true. The
-    // screen cleared `_guidedAnswerReady` immediately before calling this
-    // method, so every answer to a structured question was silently dropped
-    // and the user was left on the same card with no loading state.
-    //
-    // Keep the choice chips as a helpful shortcut, but also accept typed
-    // answers. This makes the conversation resilient when the API returns a
-    // question without options or when the user prefers to type.
-    _guidedAnswerReady = false;
     _append(ChatMessage.user(trimmed));
     await fetchDiagnosis(trimmed);
   }
@@ -151,7 +122,6 @@ class ChatController extends ChangeNotifier {
       if (_disposed) return;
 
       _lastDiagnosticId = response.diagnosticId;
-      _guidedAnswerReady = false;
       unawaited(authProvider.fetchProfile());
 
       // فرض: ApiService به‌مرور فیلد اختیاری `structured` (Map<String,dynamic>؟)
