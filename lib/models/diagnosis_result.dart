@@ -6,6 +6,10 @@
 /// کار خودش را ادامه دهد؛ هیچ‌وقت کل صفحهٔ چت کرش نمی‌کند.
 library;
 
+/// حالت پاسخ بک‌اند. نکته: کلاینت دیگر هیچ‌وقت حالت «questions» را نمایش
+/// نمی‌دهد؛ هر پاسخی که از بک‌اند برسد (حتی اگر هنوز responseMode=questions
+/// باشد) در [DiagnosisResult.tryParse] به حالت «diagnosis» تبدیل می‌شود تا
+/// کاربر در دورهای سؤال پی‌درپی (و مصرف اعتبار برای هر دور) گیر نیفتد.
 enum ResponseMode { questions, diagnosis }
 
 enum DiagnosisUrgency { green, yellow, red }
@@ -112,6 +116,20 @@ class DiagnosisResult {
 
   bool get isUrgent => urgency == DiagnosisUrgency.red;
 
+  /// سؤال‌های راهنمای «اختیاری» — فقط وقتی بک‌اندِ قدیمی هنوز حالت
+  /// questions برگردانده باشد مقدار دارند. این‌ها دیگر سؤالِ اجباری نیستند؛
+  /// صرفاً به‌صورت متن ساده و غیرمسدودکننده در کارت نشان داده می‌شوند.
+  List<String> get optionalHints {
+    final hints = <String>[...followUpQuestions];
+    for (final q in questionOptions) {
+      if (q.question.isEmpty) continue;
+      hints.add(
+        q.options.isEmpty ? q.question : '${q.question} (${q.options.join(' / ')})',
+      );
+    }
+    return hints;
+  }
+
   /// پارس محافظه‌کارانه. اگر ورودی نامعتبر بود null برمی‌گرداند تا UI
   /// به‌جای کرش، از fallback متنی استفاده کند.
   static DiagnosisResult? tryParse(Map<String, dynamic>? json) {
@@ -123,12 +141,14 @@ class DiagnosisResult {
           : <DiagnosisCause>[];
 
       return DiagnosisResult(
-        responseMode:
-            _enumFromString(ResponseMode.values, json['responseMode'], ResponseMode.diagnosis),
-        followUpRound: (json['followUpRound'] as num?)?.toInt() ?? 0,
+        // ── سیاست «پاسخ مستقیم» ──
+        // responseMode عمداً همیشه «diagnosis» است: دور سؤال‌های پی‌درپی
+        // حذف شده است. followUpRound هم به همین دلیل ریست می‌شود.
+        responseMode: ResponseMode.diagnosis,
+        followUpRound: 0,
         missingInfo: _stringList(json['missingInfo']),
         followUpQuestions: _stringList(json['followUpQuestions']),
-        // همه سؤال‌های یک دور را نگه می‌داریم (حداکثر ۳ طبق قرارداد بک‌اند).
+        // سؤال‌ها فقط برای بخش «راهنمای اختیاری» نگه داشته می‌شوند.
         questionOptions: json['questionOptions'] is List
             ? (json['questionOptions'] as List)
                 .whereType<Map>()

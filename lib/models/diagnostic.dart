@@ -1,3 +1,4 @@
+import '../constants.dart';
 import 'car.dart';
 import 'audio_features.dart';
 
@@ -84,7 +85,9 @@ class Diagnostic {
       car: car,
       createdAt: createdAt,
       updatedAt: updatedAt,
-      description: json['description']?.toString(),
+      // دستور سیاست «پاسخ مستقیم» بخشی از متنِ ذخیره‌شده در بک‌اند است؛
+      // هنگام نمایش (تاریخچه/جست‌وجو) همیشه از متن پاک‌شده استفاده می‌کنیم.
+      description: _cleanDescription(json['description']),
       result: json['result']?.toString(),
       audioFeatures: audioFeatures,
       confidenceScore: _parseDouble(json['confidenceScore'] ?? json['confidence_score']),
@@ -255,6 +258,14 @@ class Diagnostic {
     if (value is double) return value.toInt();
     if (value is String) return int.tryParse(value);
     return null;
+  }
+
+  /// توضیحِ پاک‌شده از دستور داخلی سیاست پاسخ — فقط برای نمایش.
+  static String? _cleanDescription(dynamic value) {
+    if (value == null) return null;
+    final raw = value.toString();
+    if (raw.trim().isEmpty) return null;
+    return DiagnosisPolicy.stripDirective(raw);
   }
 
   static bool _bool(dynamic value, {bool defaultValue = false}) {

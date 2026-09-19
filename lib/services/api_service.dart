@@ -341,7 +341,9 @@ class ApiService {
     final body = <String, dynamic>{
       'carId': carId,
       'year': year,
-      'description': description,
+      // سیاست «پاسخ مستقیم»: دستور عدم پرسیدن سؤال + مقالهٔ چنداحتمالی
+      // همراهِ شرح مشکل ارسال می‌شود (DiagnosisPolicy را ببینید).
+      'description': DiagnosisPolicy.withDirective(description),
       if (carName != null && carName.trim().isNotEmpty) 'carName': carName.trim(),
       if (previousDiagnosticId != null && previousDiagnosticId.trim().isNotEmpty)
         'previousDiagnosticId': int.tryParse(previousDiagnosticId.trim()) ?? previousDiagnosticId.trim(),
@@ -418,7 +420,10 @@ class ApiService {
           ));
     if (carName != null && carName.trim().isNotEmpty) request.fields['carName'] = carName.trim();
     if (audioFeatures != null && audioFeatures.trim().isNotEmpty) {
-      request.fields['audioFeatures'] = audioFeatures.trim();
+      // سیاست «پاسخ مستقیم» برای عیب‌یابی صوتی هم اعمال می‌شود تا اولین
+      // پاسخ، مقالهٔ کامل تشخیص باشد نه دور اول سؤال‌ها.
+      request.fields['audioFeatures'] =
+          DiagnosisPolicy.withDirective(audioFeatures.trim());
     }
 
     try {
