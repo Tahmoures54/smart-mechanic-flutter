@@ -26,6 +26,8 @@ class _ShopScreenState extends State<ShopScreen> {
 
   String? _loadingProductId;
   bool _withdrawLoading = false;
+  List<ShopPackage> _products = shopPackages;
+  bool _productsLoading = true;
 
   @override
   void initState() {
@@ -33,9 +35,20 @@ class _ShopScreenState extends State<ShopScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<AuthProvider>().fetchProfile();
+      _loadProducts();
     });
   }
 
+  Future<void> _loadProducts() async {
+    try {
+      final products = await context.read<ApiService>().getProducts();
+      if (mounted && products.isNotEmpty) setState(() => _products = products);
+    } catch (e) {
+      debugPrint('[ShopScreen] product catalog fallback: $e');
+    } finally {
+      if (mounted) setState(() => _productsLoading = false);
+    }
+  }
   // ---------------------------------------------------------------------------
   // کمکی‌ها
   // ---------------------------------------------------------------------------
@@ -352,7 +365,7 @@ class _ShopScreenState extends State<ShopScreen> {
         centerTitle: true,
       ),
       body: RefreshIndicator(
-        onRefresh: () => auth.fetchProfile(force: true),
+        onRefresh: () async { await auth.fetchProfile(force: true); await _loadProducts(); },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: [
@@ -376,7 +389,8 @@ class _ShopScreenState extends State<ShopScreen> {
               style: TextStyle(color: theme.hintColor, fontSize: 13),
             ),
             const SizedBox(height: 14),
-            ...shopPackages.map((p) => _buildPackageCard(p, theme)),
+            if (_productsLoading && _products.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
+            ..._products.map((p) => _buildPackageCard(p, theme)),
             const SizedBox(height: 12),
             _buildTrustFooter(theme),
           ],
@@ -463,7 +477,7 @@ class _ShopScreenState extends State<ShopScreen> {
               Expanded(
                 child: _walletStat(
                   label: 'اعتبار باقی‌مانده',
-                  value: isGold ? 'نامحدود' : '${auth.credits}',
+                  value: isGold ? 'فعال' : '${auth.credits}',
                   icon: Icons.bolt_rounded,
                 ),
               ),
@@ -940,7 +954,7 @@ class _ShopScreenState extends State<ShopScreen> {
                             ),
                           )
                         : Text(
-                            isGold ? 'فعال‌سازی اشتراک' : 'خرید بسته',
+                            isGold ? 'فعال‌سازی' : 'خرید',
                             style:
                                 const TextStyle(fontWeight: FontWeight.bold),
                           ),
