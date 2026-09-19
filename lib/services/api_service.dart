@@ -308,19 +308,6 @@ class ApiService {
     return _parseAndEnsure(response, defaultError: 'خطا در ورود');
   }
 
-  Future<List<ShopPackage>> getProducts() async {
-    final response = await _safeCall(
-      () => _httpClient.get(Uri.parse(Constants.baseUrl + '/products'), headers: _getHeaders()),
-      rateLimitKey: 'getProducts',
-    );
-    final data = _parseAndEnsure(response, defaultError: 'خطا در دریافت بسته‌ها');
-    final raw = data['data'];
-    if (raw is! List) throw const ApiException(500, 'کاتالوگ بسته‌ها نامعتبر است.');
-    return raw.whereType<Map>()
-      .map((item) => ShopPackage.fromJson(Map<String, dynamic>.from(item)))
-      .where((p) => p.id.isNotEmpty && p.priceToman > 0)
-      .toList(growable: false);
-  }
   Future<Map<String, dynamic>> getProfile(String token) async {
     final response = await _safeCall(
       () => _httpClient.get(Uri.parse(Constants.credits), headers: _getHeaders(token)),
@@ -355,7 +342,9 @@ class ApiService {
     final body = <String, dynamic>{
       'carId': carId,
       'year': year,
-      'description': description,
+      // سیاست «پاسخ مستقیم»: دستور عدم پرسیدن سؤال + مقالهٔ چنداحتمالی
+      // همراهِ شرح مشکل ارسال می‌شود (DiagnosisPolicy را ببینید).
+      'description': DiagnosisPolicy.withDirective(description),
       if (carName != null && carName.trim().isNotEmpty) 'carName': carName.trim(),
       if (previousDiagnosticId != null && previousDiagnosticId.trim().isNotEmpty)
         'previousDiagnosticId': int.tryParse(previousDiagnosticId.trim()) ?? previousDiagnosticId.trim(),
@@ -432,7 +421,10 @@ class ApiService {
           ));
     if (carName != null && carName.trim().isNotEmpty) request.fields['carName'] = carName.trim();
     if (audioFeatures != null && audioFeatures.trim().isNotEmpty) {
-      request.fields['audioFeatures'] = audioFeatures.trim();
+      // سیاست «پاسخ مستقیم» برای عیب‌یابی صوتی هم اعمال می‌شود تا اولین
+      // پاسخ، مقالهٔ کامل تشخیص باشد نه دور اول سؤال‌ها.
+      request.fields['audioFeatures'] =
+          DiagnosisPolicy.withDirective(audioFeatures.trim());
     }
 
     try {
@@ -594,4 +586,18 @@ class ApiService {
     }
     return url;
   }
+  Future<List<ShopPackage>> getProducts() async {
+    final response = await _safeCall(
+      () => _httpClient.get(Uri.parse(Constants.baseUrl + '/products'), headers: _getHeaders()),
+      rateLimitKey: 'getProducts',
+    );
+    final data = _parseAndEnsure(response, defaultError: 'خطا در دریافت بسته‌ها');
+    final raw = data['data'];
+    if (raw is! List) throw const ApiException(500, 'کاتالوگ بسته‌ها نامعتبر است.');
+    return raw.whereType<Map>()
+      .map((item) => ShopPackage.fromJson(Map<String, dynamic>.from(item)))
+      .where((p) => p.id.isNotEmpty && p.priceToman > 0)
+      .toList(growable: false);
+  }
+
 }
