@@ -2,7 +2,11 @@ name: Build Flutter APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      # Temporary session branch is included so its release checks run on every
+      # push; remove this entry when the PR is merged.
+      - arena/01a0b82f-smart-mechanic-flutter
     tags:
       - 'v*'
   pull_request:
