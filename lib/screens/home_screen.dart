@@ -574,6 +574,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(height: 22),
 
               const _WhyItWorksSection(),
+              const SizedBox(height: 14),
+              const _GrowthShareBanner(),
               const SizedBox(height: 18),
 
               const _GarageRegistrationBanner(),
