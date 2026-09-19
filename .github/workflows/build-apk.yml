@@ -70,10 +70,29 @@ jobs:
           chmod +x android/gradlew || true
           test -f android/gradle/wrapper/gradle-wrapper.properties
 
-      - name: Analyze and test
+      - name: Analyze
+        id: analyze
+        continue-on-error: true
         run: |
-          flutter analyze
-          flutter test
+          set +e
+          flutter analyze > analyze.log 2>&1
+          code=$?
+          cat analyze.log
+          {
+            echo '## Flutter analyze'
+            echo '```text'
+            cat analyze.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+
+      - name: Test
+        if: always()
+        run: flutter test
+
+      - name: Fail if analyze failed
+        if: steps.analyze.outcome == 'failure'
+        run: exit 1
 
       - name: Generate orange mechanical branding + launcher icons
         run: |
