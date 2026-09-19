@@ -37,7 +37,7 @@ class AppTheme {
     surface: BrandColors.darkSurface,
     onSurface: BrandColors.textOnDark,
     divider: const Color(0xFF3D2A1C),
-    inputFill: BrandColors.darkSurface,
+    inputFill: const Color(0xFF38241A),
   );
 
   static final ThemeData lightTheme = _build(
