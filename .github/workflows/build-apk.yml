@@ -88,9 +88,33 @@ jobs:
 
       - name: Test
         if: always()
-        run: flutter test
+        id: test
+        continue-on-error: true
+        run: |
+          set +e
+          flutter test --reporter expanded > test.log 2>&1
+          code=$?
+          cat test.log
+          {
+            echo '## Flutter test'
+            echo '```text'
+            cat test.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
 
-      - name: Fail if analyze failed
+      - name: Upload diagnostics when checks fail
+        if: failure() || steps.analyze.outcome == 'failure' || steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-check-logs
+          path: |
+            analyze.log
+            test.log
+          if-no-files-found: ignore
+
+      - name: Fail if checks failed
+        if: steps.analyze.outcome == 'failure' || steps.test.outcome == 'failure'
         if: steps.analyze.outcome == 'failure'
         run: exit 1
 
