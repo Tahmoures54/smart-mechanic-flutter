@@ -95,7 +95,7 @@ class AuthProvider with ChangeNotifier {
       _token = await _storage.read(key: 'jwt_token');
       if (_token != null) {
         if (!Hive.isBoxOpen('user_profile')) {
-          await Hive.openBox('user_profile');
+          await Hive.openBox<dynamic>('user_profile');
         }
         await _loadCachedProfile();
         await fetchProfile(force: true);
@@ -146,9 +146,9 @@ class AuthProvider with ChangeNotifier {
     try {
       late final Box box;
       if (Hive.isBoxOpen('user_profile')) {
-        box = Hive.box('user_profile');
+        box = Hive.box<dynamic>('user_profile');
       } else {
-        box = await Hive.openBox('user_profile');
+          box = await Hive.openBox<dynamic>('user_profile');
       }
       await box.putAll({
         if (_userId != null) 'userId': _userId,

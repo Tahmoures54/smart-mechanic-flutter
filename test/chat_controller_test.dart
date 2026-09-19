@@ -25,7 +25,7 @@ void main() {
     controller.seedInitial(
       userMessage: 'صدای غیرعادی دارم',
       initialResultText: 'برای تشخیص دقیق‌تر پاسخ بده.',
-      initialStructuredResult: {
+      initialResultJson: {
         'responseMode': 'questions',
         'questionOptions': [
           {

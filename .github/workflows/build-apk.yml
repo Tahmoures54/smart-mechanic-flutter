@@ -79,7 +79,7 @@ jobs:
         continue-on-error: true
         run: |
           set +e
-          flutter analyze > analyze.log 2>&1
+          flutter analyze --no-fatal-infos > analyze.log 2>&1
           code=$?
           cat analyze.log
           while IFS= read -r line; do

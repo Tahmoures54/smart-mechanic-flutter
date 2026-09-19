@@ -126,7 +126,7 @@ Future<void> _initHive() async {
   for (final name in boxNames) {
     try {
       if (!Hive.isBoxOpen(name)) {
-        await Hive.openBox(name);
+        await Hive.openBox<dynamic>(name);
       }
     } catch (e) {
       debugPrint('[Hive] خطا در باز کردن box "$name": $e');
