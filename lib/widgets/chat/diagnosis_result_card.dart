@@ -1,24 +1,42 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
 
+import '../../constants.dart';
 import '../../models/diagnosis_result.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/share_service.dart';
 import 'urgency_and_chips.dart';
 
-/// نمایش غنی نتیجهٔ تشخیص.
-/// در حالت questions همه سؤال‌های یک دور یکجا نمایش داده می‌شوند و کاربر
-/// با یک دکمه «به‌روزرسانی تشخیص» همه پاسخ‌ها را یکجا ارسال می‌کند.
+/// نمایش غنی نتیجهٔ تشخیص — همیشه به‌صورت «مقالهٔ کامل».
+///
+/// سیاست «پاسخ مستقیم»: کارت دیگر هیچ فرم پرسش‌وپاسخ اجباری (چیپ‌های
+/// سؤال + دکمهٔ به‌روزرسانی تشخیص) ندارد. اگر بک‌اندِ قدیمی هنوز سؤال
+/// بفرستد، آن سؤال‌ها صرفاً به‌صورت «راهنمای اختیاری» و بدون هیچ قفلی
+/// نمایش داده می‌شوند. در پایان هر کارت هم بخش «ادامهٔ گفتگو» با
+/// پیشنهادهای آماده، کاربر را به ادامهٔ مکالمه تشویق می‌کند و امکان
+/// اشتراک‌گذاری نتیجه (با کد معرف کاربر) فراهم است.
 class DiagnosisResultCard extends StatelessWidget {
   const DiagnosisResultCard({
     super.key,
     required this.result,
     this.supplementalText,
-    this.onSubmitAnswers,
+    this.onSuggestionTap,
+    this.carName,
+    this.year,
   });
 
   final DiagnosisResult result;
   final String? supplementalText;
-  final void Function(String combinedAnswers)? onSubmitAnswers;
+
+  /// لمس یکی از پیشنهادهای «ادامهٔ گفتگو» — کادر ورودی چت را پر می‌کند.
+  final ValueChanged<String>? onSuggestionTap;
+
+  /// برای متن اشتراک‌گذاری نتیجه.
+  final String? carName;
+  final String? year;
 
   String? get _garagePromoText {
     final text = supplementalText;
@@ -29,9 +47,43 @@ class DiagnosisResultCard extends StatelessWidget {
     return text.substring(start).trim();
   }
 
+  /// متن اصلی نتیجه بدون بخش تبلیغ تعمیرگاه‌ها — برای اشتراک‌گذاری.
+  String get _shareableText {
+    final raw = supplementalText ?? '';
+    const marker = '## 🔧 تعمیرگاه‌های پیشنهادی';
+    final cut = raw.indexOf(marker);
+    var body = (cut >= 0 ? raw.substring(0, cut) : raw).trim();
+    body = DiagnosisPolicy.stripDirective(body);
+    if (body.isEmpty) {
+      body = [
+        if (result.statusSummary.isNotEmpty) result.statusSummary,
+        ...result.causes.take(3).map((c) => '• ${c.title}'),
+        if (result.nextStep.isNotEmpty) result.nextStep,
+      ].join('\n');
+    }
+    if (body.length > 1200) body = '${body.substring(0, 1200)}…';
+    return body;
+  }
+
+  Future<void> _shareResult(BuildContext context) async {
+    try {
+      final auth = context.read<AuthProvider>();
+      await ShareService.shareDiagnosis(
+        result: _shareableText,
+        carName: carName,
+        year: year,
+        referralCode: auth.referralCode,
+      );
+    } catch (e) {
+      debugPrint('[DiagnosisResultCard] share failed: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hints = result.optionalHints;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
@@ -68,40 +120,30 @@ class DiagnosisResultCard extends StatelessWidget {
             const SizedBox(height: 8),
             ...result.warnings.map((w) => _WarningLine(text: w)),
           ],
-          if (result.responseMode == ResponseMode.questions) ...[
-            if (result.questionOptions.isNotEmpty || result.followUpQuestions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text(
-                'برای تشخیص دقیق‌تر، به این‌ها جواب بده:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              if (result.questionOptions.isNotEmpty)
-                _MultiTouchQuestionnaire(
-                  questions: result.questionOptions,
-                  onSubmit: onSubmitAnswers,
-                )
-              else
-                ...result.followUpQuestions.asMap().entries.map(
-                      (e) => _NumberedLine(index: e.key + 1, text: e.value),
-                    ),
-            ],
-          ] else ...[
-            if (result.causes.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text('علت‌های محتمل:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              ...result.causes.map((c) => _CauseTile(cause: c)),
-            ],
-            if (result.mechanicQuestions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _MechanicChecklist(items: result.mechanicQuestions),
-            ],
+          if (result.causes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('علت‌های محتمل:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            ...result.causes.map((c) => _CauseTile(cause: c)),
           ],
-          if (result.nextStep.isNotEmpty && result.responseMode != ResponseMode.questions) ...[
+          if (hints.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _OptionalHintsSection(hints: hints),
+          ],
+          if (result.mechanicQuestions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _MechanicChecklist(items: result.mechanicQuestions),
+          ],
+          if (result.nextStep.isNotEmpty) ...[
             const SizedBox(height: 12),
             _NextStepBox(text: result.nextStep),
           ],
+          // ── تشویق به ادامهٔ مکالمه (همیشه نمایش داده می‌شود) ──
+          const SizedBox(height: 12),
+          _ContinueChatSection(
+            onSuggestionTap: onSuggestionTap,
+            onShare: () => _shareResult(context),
+          ),
           if (result.footer.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(result.footer, style: TextStyle(fontSize: 11.5, color: theme.hintColor)),
@@ -137,94 +179,122 @@ class DiagnosisResultCard extends StatelessWidget {
   }
 }
 
-class _MultiTouchQuestionnaire extends StatefulWidget {
-  const _MultiTouchQuestionnaire({required this.questions, this.onSubmit});
-  final List<DiagnosisQuestionOption> questions;
-  final void Function(String combinedAnswers)? onSubmit;
+/// بخش «ادامهٔ گفتگو» — انتهای هر کارت تشخیص.
+/// کاربر را دعوت می‌کند سؤال بعدی را بپرسد و با یک لمس، پیشنهاد آماده را
+/// در کادر ورودی می‌گذارد (بدون ارسال خودکار).
+class _ContinueChatSection extends StatelessWidget {
+  const _ContinueChatSection({this.onSuggestionTap, this.onShare});
 
-  @override
-  State<_MultiTouchQuestionnaire> createState() => _MultiTouchQuestionnaireState();
-}
+  final ValueChanged<String>? onSuggestionTap;
 
-class _MultiTouchQuestionnaireState extends State<_MultiTouchQuestionnaire> {
-  final Map<int, String> _answers = {};
-  bool _submitted = false;
-
-  bool get _allAnswered =>
-      widget.questions.isNotEmpty && _answers.length == widget.questions.length;
-
-  void _select(int index, String option) {
-    if (_submitted) return;
-    setState(() => _answers[index] = option);
-  }
-
-  void _submit() {
-    if (!_allAnswered || _submitted || widget.onSubmit == null) return;
-    setState(() => _submitted = true);
-    final lines = <String>[];
-    for (var i = 0; i < widget.questions.length; i++) {
-      final q = widget.questions[i];
-      final a = _answers[i];
-      if (a != null) lines.add('${q.question}: $a');
-    }
-    widget.onSubmit!(lines.join('\n'));
-  }
+  /// اشتراک‌گذاری نتیجه (رشد از طریق دعوت دوستان).
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
-    if (widget.questions.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < widget.questions.length; i++) ...[
-          if (i > 0) const SizedBox(height: 14),
-          Text(
-            widget.questions[i].question,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.chat_bubble_outline_rounded,
+                  size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  DiagnosisPolicy.encouragementText,
+                  style: const TextStyle(fontSize: 12.5, height: 1.6, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 7,
             runSpacing: 7,
-            children: widget.questions[i].options.map((option) {
-              final selected = _answers[i] == option;
-              return ChoiceChip(
-                label: Text(option, style: const TextStyle(fontSize: 12)),
-                selected: selected,
-                onSelected: _submitted ? null : (_) => _select(i, option),
-              );
-            }).toList(),
+            children: DiagnosisPolicy.followUpSuggestions
+                .map(
+                  (suggestion) => ActionChip(
+                    label: Text(suggestion, style: const TextStyle(fontSize: 11.5)),
+                    avatar: Icon(Icons.arrow_forward_rounded,
+                        size: 13, color: theme.colorScheme.primary),
+                    backgroundColor: theme.colorScheme.surface,
+                    side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.35)),
+                    onPressed: onSuggestionTap == null ? null : () => onSuggestionTap!(suggestion),
+                  ),
+                )
+                .toList(),
           ),
+          if (onShare != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onShare,
+                icon: const Icon(Icons.share_rounded, size: 16),
+                label: const Text(
+                  'اشتراک‌گذاری این نتیجه',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.primary,
+                  side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.35)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
         ],
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: (_allAnswered && !_submitted) ? _submit : null,
-            icon: Icon(
-              _submitted ? Icons.check_rounded : Icons.auto_awesome_rounded,
-              size: 18,
-            ),
-            label: Text(
-              _submitted ? 'در حال به‌روزرسانی…' : 'به‌روزرسانی تشخیص',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-            ),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ),
-        if (!_allAnswered && !_submitted) ...[
-          const SizedBox(height: 8),
+      ),
+    );
+  }
+}
+
+/// راهنمای اختیاری — فقط وقتی بک‌اندِ قدیمی هنوز سؤال برگردانده باشد
+/// ظاهر می‌شود؛ صرفاً اطلاع‌رسانی است و هیچ ورودی اجباری نمی‌خواهد.
+class _OptionalHintsSection extends StatelessWidget {
+  const _OptionalHintsSection({required this.hints});
+
+  final List<String> hints;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            'همه گزینه‌ها را انتخاب کن، سپس دکمه بالا را بزن.',
-            style: TextStyle(fontSize: 11.5, color: theme.hintColor),
+            'اگر این جزئیات را هم بگویی، پاسخ بعدی دقیق‌تر می‌شود (اختیاری):',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
+          const SizedBox(height: 6),
+          ...hints.asMap().entries.map(
+                (e) => _NumberedLine(index: e.key + 1, text: e.value),
+              ),
         ],
-      ],
+      ),
     );
   }
 }
