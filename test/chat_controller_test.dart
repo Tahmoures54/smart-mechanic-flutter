@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:smart_mechanic/controllers/chat_controller.dart';
 import 'package:smart_mechanic/models/chat_message.dart';
+import 'package:smart_mechanic/models/diagnosis_result.dart';
 import 'package:smart_mechanic/providers/auth_provider.dart';
 import 'package:smart_mechanic/services/api_service.dart';
 
@@ -21,10 +22,37 @@ void main() {
 
   tearDown(() => controller.dispose());
 
-  test('accepts a follow-up answer while a question card is visible', () async {
+  test('a legacy questions-mode payload is coerced into a full diagnosis card', () async {
     controller.seedInitial(
-      userMessage: 'صدای غیرعادی دارم',
-      initialResultText: 'برای تشخیص دقیق‌تر پاسخ بده.',
+      userMessage: 'عقب ماشینم صدا می‌دهد',
+      initialResultText: 'بررسی شد.',
+      initialResultJson: {
+        'responseMode': 'questions',
+        'followUpRound': 1,
+        'questionOptions': [
+          {
+            'question': 'صدا در حالت سرد شنیده می‌شود؟',
+            'options': ['بله', 'خیر'],
+          },
+        ],
+      },
+    );
+
+    // سیاست «پاسخ مستقیم»: حتی اگر بک‌اندِ قدیمی حالت questions بفرستد،
+    // کلاینت آن را به کارت تشخیص کامل تبدیل می‌کند تا کاربر وارد دور
+    // سؤال پی‌درپی نشود و اعتبارش هدر نرود.
+    final last = controller.messages.last;
+    expect(last.structured, isNotNull);
+    expect(last.structured!.responseMode, ResponseMode.diagnosis);
+    expect(last.structured!.followUpRound, 0);
+    expect(last.structured!.optionalHints, isNotEmpty);
+    expect(last.structured!.optionalHints.first, contains('حالت سرد'));
+  });
+
+  test('the user can keep chatting freely while a legacy question card is on screen', () async {
+    controller.seedInitial(
+      userMessage: 'عقب ماشینم صدا می‌دهد',
+      initialResultText: 'بررسی شد.',
       initialResultJson: {
         'responseMode': 'questions',
         'questionOptions': [
@@ -36,18 +64,15 @@ void main() {
       },
     );
 
-    expect(controller.isAwaitingChoices, isTrue);
-
-    // No token is intentional: the request ends in a handled 401, but the
-    // important invariant is that the user's answer is appended and the chat
-    // leaves the questionnaire state instead of silently ignoring the tap.
-    await controller.sendUserMessage('صدا در حالت سرد شنیده می‌شود؟: بله');
+    // هیچ قفل «منتظر انتخاب گزینه‌ها» وجود ندارد؛ پیام کاربر همیشه
+    // پذیرفته و ارسال می‌شود (در تست بدون توکن، با ۴۰۱ مدیریت‌شده تمام می‌شود).
+    await controller.sendUserMessage('صدا بیشتر در پیچ‌ها شنیده می‌شود');
 
     expect(
       controller.messages.any(
         (message) =>
             message.role == MessageRole.user &&
-            message.text.contains('بله'),
+            message.text.contains('پیچ'),
       ),
       isTrue,
     );
