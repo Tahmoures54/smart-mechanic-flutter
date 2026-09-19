@@ -1869,6 +1869,38 @@ def extras() -> list[dict]:
         ("7530", "دامپتراک معدن", False, []),
     ])
 
+    # ── Priority catalog pack: high-demand cars + site equipment ─────────────
+    # Keep aliases broad so Persian/English user searches resolve reliably.
+    add("تویوتا", "کرولا", "1.6L / 1.8L", "sedan", "gasoline", "automatic", True, ["Corolla", "کرولا"], "import", country="ژاپن", region="وارداتی")
+    add("تویوتا", "کمری", "2.5L", "sedan", "gasoline", "automatic", True, ["Camry", "کمری"], "import", country="ژاپن", region="وارداتی")
+    add("تویوتا", "لندکروزر", "4.0L / 4.6L", "suv", "gasoline", "automatic", True, ["Land Cruiser", "LandCruiser", "لندکروزر"], "import", country="ژاپن", region="وارداتی")
+    add("تویوتا", "پرادو", "2.7L / 4.0L", "suv", "gasoline", "automatic", True, ["Prado", "Land Cruiser Prado", "پرادو"], "import", country="ژاپن", region="وارداتی")
+    add("تویوتا", "هایلوکس", "2.4L / 2.7L", "pickup", "gasoline", "automatic", True, ["Hilux", "هایلوکس"], "pickup", country="ژاپن", region="وارداتی")
+    add("هوندا", "CR-V", "1.5T / 2.0L", "suv", "gasoline", "automatic", True, ["Honda CRV", "CRV", "سی آر وی"], "import", country="ژاپن", region="وارداتی")
+    add("هوندا", "Civic", "1.5T / 2.0L", "sedan", "gasoline", "automatic", False, ["سیویک"], "import", country="ژاپن", region="وارداتی")
+    add("نیسان", "پاترول", "4.0L / 5.6L", "suv", "gasoline", "automatic", True, ["Patrol", "Nissan Patrol", "پاترول"], "import", country="ژاپن", region="وارداتی")
+    add("نیسان", "X-Trail", "2.5L", "suv", "gasoline", "automatic", True, ["XTrail", "اکس تریل", "ایکس تریل"], "import", country="ژاپن", region="وارداتی")
+    add("نیسان", "ناوارا", "2.3D / 2.5L", "pickup", "diesel", "automatic", True, ["Navara", "Nissan Navara", "ناوارا"], "pickup", country="ژاپن", region="وارداتی")
+    add("ایسوزو", "NPR", "3.0L دیزل", "truck", "diesel", "manual", True, ["NPR", "ایسوزو NPR", "NPR75"], "diesel_truck", country="ژاپن", region="وارداتی")
+    add("ایسوزو", "NQR", "5.2L دیزل", "truck", "diesel", "manual", True, ["NQR", "ایسوزو NQR"], "diesel_truck", country="ژاپن", region="وارداتی")
+    add("هینو", "300", "4.0L دیزل", "truck", "diesel", "manual", True, ["Hino 300", "هینو 300"], "diesel_truck", country="ژاپن", region="وارداتی")
+    add("هینو", "500", "7.7L دیزل", "truck", "diesel", "manual", True, ["Hino 500", "هینو 500"], "diesel_truck", country="ژاپن", region="وارداتی")
+    add("مرسدس بنز", "Actros", "12.8L / 15.6L دیزل", "truck", "diesel", "automatic", True, ["آکتروس", "اکتروس", "Mercedes Actros"], "diesel_truck", country="آلمان", region="وارداتی")
+    add("ولوو", "FH", "12.8L / 16.1L دیزل", "truck", "diesel", "automatic", True, ["Volvo FH", "اف اچ", "ولوو FH"], "diesel_truck", country="سوئد", region="وارداتی")
+    add("تادانو", "GR-250N", "جرثقیل ۲۵ تن", "heavy", "diesel", "automatic", True, ["Tadano GR-250N", "تادانو GR-250N", "جرثقیل تادانو ۲۵ تن", "تادانو 25 تن", "Tadano 25 ton"], "heavy", country="ژاپن", region="وارداتی")
+    add("تادانو", "TR-250M", "جرثقیل ۲۵ تن", "heavy", "diesel", "automatic", True, ["Tadano TR-250M", "تادانو TR-250M", "جرثقیل تادانو ۲۵ تن"], "heavy", country="ژاپن", region="وارداتی")
+    add("کاترپیلار", "320", "بیل مکانیکی", "heavy", "diesel", "automatic", True, ["CAT 320", "Caterpillar 320", "کاترپیلار 320", "بیل کاترپیلار"], "heavy", country="آمریکا", region="وارداتی")
+    add("کاترپیلار", "950M", "لودر", "heavy", "diesel", "automatic", True, ["CAT 950M", "Caterpillar 950M", "لودر کاترپیلار"], "heavy", country="آمریکا", region="وارداتی")
+    add("کوماتسو", "PC210", "بیل مکانیکی", "heavy", "diesel", "automatic", True, ["Komatsu PC210", "کوماتسو PC210", "بیل کوماتسو"], "heavy", country="ژاپن", region="وارداتی")
+    add("کوماتسو", "WA380", "لودر", "heavy", "diesel", "automatic", True, ["Komatsu WA380", "کوماتسو WA380", "لودر کوماتسو"], "heavy", country="ژاپن", region="وارداتی")
+    add("ولوو ماشین‌آلات", "EC210", "بیل مکانیکی", "heavy", "diesel", "automatic", True, ["Volvo EC210", "ولوو EC210", "بیل ولوو"], "heavy", country="سوئد", region="وارداتی")
+    add("ولوو ماشین‌آلات", "L120", "لودر", "heavy", "diesel", "automatic", True, ["Volvo L120", "لودر ولوو"], "heavy", country="سوئد", region="وارداتی")
+    add("دوسان", "DX225LC", "بیل مکانیکی", "heavy", "diesel", "automatic", True, ["Doosan DX225", "دوسان DX225", "بیل دوسان"], "heavy", country="کره جنوبی", region="وارداتی")
+    add("لیبهر", "LTM 1025", "جرثقیل ۲۵ تن", "heavy", "diesel", "automatic", True, ["Liebherr LTM 1025", "لیبهر ۲۵ تن", "جرثقیل لیبهر ۲۵ تن"], "heavy", country="آلمان", region="وارداتی")
+    add("تویوتا", "یاریس", "1.3L / 1.5L", "hatchback", "gasoline", "automatic", False, ["Yaris", "یاریس"], "import", country="ژاپن", region="وارداتی")
+    add("کیا", "اسپورتیج", "2.0L / 2.4L", "suv", "gasoline", "automatic", True, ["Sportage", "اسپورتیج"], "import", country="کره جنوبی", region="وارداتی")
+    add("هیوندای", "توسان", "2.0L / 1.6T", "suv", "gasoline", "automatic", True, ["Tucson", "توسان"], "import", country="کره جنوبی", region="وارداتی")
+
     # unique-ify ids if collision
     seen_ids: dict[str, int] = {}
     for r in rows:
