@@ -49,24 +49,24 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
 
   List<_PromoSlide> _slides() => [
         _PromoSlide(
-          eyebrow: 'گنجینه اطلاعات فنی',
-          title: 'دانش فنی خودرو، همیشه همراه شما',
-          body: 'از علائم و قطعات تا نکات نگهداری و راهنمایی‌های کاربردی؛ قبل از هر تصمیم، اطلاعات بیشتری داشته باش.',
-          cta: 'کشف دانش فنی',
-          icon: Icons.menu_book_rounded,
+          eyebrow: 'شروع سریع و رایگان',
+          title: 'مشکل ماشینت را بگو؛ از همین‌جا شروع کن',
+          body: 'خودرو را انتخاب کن، علامت‌ها را بنویس و یک بررسی اولیه با کمک هوش مصنوعی بگیر.',
+          cta: 'شروع عیب‌یابی رایگان',
+          icon: Icons.auto_awesome_rounded,
           action: widget.onDiagnose,
         ),
         _PromoSlide(
-          eyebrow: 'فقط مخصوص خودروهای سواری نیست',
-          title: 'سواری، کامیون، مینی‌بوس، جرثقیل و بیشتر',
+          eyebrow: 'برای خودرو و ماشین‌آلات',
+          title: 'از سواری تا کامیون و جرثقیل',
           body: 'مکانیک هوشمند برای طیف گسترده‌ای از خودروها و ماشین‌آلات طراحی شده؛ نوع وسیله را بگو و بررسی را شروع کن.',
           cta: 'انتخاب و بررسی',
           icon: Icons.local_shipping_rounded,
           action: widget.onDiagnose,
         ),
         _PromoSlide(
-          eyebrow: 'ارزش واقعی نرم‌افزار',
-          title: 'قبل از خرج کردن، بهتر تصمیم بگیر',
+          eyebrow: 'قبل از تعمیرگاه',
+          title: 'اول بفهم، بعد برای تعمیر تصمیم بگیر',
           body: 'کمک می‌کنیم علائم را بهتر بفهمی، سؤال‌های درست‌تری از تعمیرکار بپرسی و از هزینه‌های غیرضروری دور بمانی.',
           cta: 'بررسی مشکل',
           icon: Icons.account_balance_wallet_rounded,
