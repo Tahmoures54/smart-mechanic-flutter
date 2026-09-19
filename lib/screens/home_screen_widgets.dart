@@ -468,6 +468,9 @@ class _SupportCard extends StatelessWidget {
 
   Future<void> _openSupportSheet(BuildContext context) async {
     final theme = Theme.of(context);
+    // کد معرف کاربر — برای اینکه پیام‌های دعوت، اعتبار معرف را برای
+    // دعوت‌کننده محفوظ نگه دارند.
+    final referralCode = context.read<AuthProvider>().referralCode;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -511,7 +514,7 @@ class _SupportCard extends StatelessWidget {
                 onTap: () => _runSupportAction(
                   context,
                   sheetContext,
-                  () => ShareService.shareApp(),
+                  () => ShareService.shareApp(referralCode: referralCode),
                 ),
               ),
               _SupportActionTile(
@@ -521,7 +524,8 @@ class _SupportCard extends StatelessWidget {
                 onTap: () => _runSupportAction(
                   context,
                   sheetContext,
-                  () => ShareService.shareToWhatsApp(ShareService.supportInvite()),
+                  () => ShareService.shareToWhatsApp(
+                      ShareService.supportInvite(referralCode: referralCode)),
                 ),
               ),
               _SupportActionTile(
@@ -531,7 +535,8 @@ class _SupportCard extends StatelessWidget {
                 onTap: () => _runSupportAction(
                   context,
                   sheetContext,
-                  () => ShareService.copy(ShareService.supportInvite()),
+                  () => ShareService.copy(
+                      ShareService.supportInvite(referralCode: referralCode)),
                   successMessage: 'پیام معرفی کپی شد.',
                 ),
               ),
