@@ -647,37 +647,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildDescriptionField(ThemeData theme, Color secondary) {
     return KeyedSubtree(
       key: _descFieldKey,
-      child: TextField(
-        controller: _descController,
-        maxLines: 4,
-        maxLength: 300,
-        textInputAction: TextInputAction.done,
-        textCapitalization: TextCapitalization.sentences,
-        onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),
-        style: const TextStyle(height: 1.5),
-        decoration: InputDecoration(
-          hintText: 'مثال: صبح‌ها که هوا سرد است، موقع استارت ریپ می‌زند و صدای تق‌تق می‌آید...',
-          hintStyle: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
-          errorText: _descError,
-          filled: true,
-          fillColor: theme.cardColor,
-          contentPadding: const EdgeInsets.all(16),
-          counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _descController,
+            maxLines: 4,
+            maxLength: 300,
+            textInputAction: TextInputAction.done,
+            textCapitalization: TextCapitalization.sentences,
+            onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),
+            style: const TextStyle(height: 1.5),
+            decoration: InputDecoration(
+              hintText: 'مثال: صبح‌ها که هوا سرد است، موقع استارت ریپ می‌زند و صدای تق‌تق می‌آید...',
+              hintStyle: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
+              errorText: _descError,
+              filled: true,
+              fillColor: theme.cardColor,
+              contentPadding: const EdgeInsets.all(16),
+              counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: theme.dividerColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: secondary, width: 1.5),
+              ),
+            ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: theme.dividerColor),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, size: 15, color: secondary),
+              const SizedBox(width: 5),
+              Text(
+                'برای شروع سریع، یکی را انتخاب کن',
+                style: TextStyle(fontSize: 11.5, color: theme.hintColor, fontWeight: FontWeight.w600),
+              ),
+            ],
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: secondary, width: 1.5),
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (final symptom in const [
+                'روشن نمی‌شود',
+                'صدای غیرعادی',
+                'لرزش خودرو',
+                'چراغ چک روشن است',
+                'افت شتاب',
+              ])
+                ActionChip(
+                  label: Text(symptom, style: const TextStyle(fontSize: 11.5)),
+                  avatar: Icon(Icons.add_rounded, size: 15, color: secondary),
+                  onPressed: () => _appendSymptom(symptom),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(color: secondary.withOpacity(0.24)),
+                ),
+            ],
           ),
-        ),
+        ],
       ),
     );
+  }
+
+  void _appendSymptom(String symptom) {
+    final current = _descController.text.trim();
+    final next = current.isEmpty ? symptom : '$current، $symptom';
+    if (next.length > Constants.maxDescriptionLength) {
+      _snack('متن شرح مشکل به حداکثر ${Constants.maxDescriptionLength} کاراکتر رسیده است.');
+      return;
+    }
+    _descController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    _focusNodeAfterSuggestion();
+  }
+
+  void _focusNodeAfterSuggestion() {
+    // بعد از انتخاب نشانه، صفحه‌کلید باز نمی‌شود؛ فقط مکان‌نما در پایان متن
+    // قرار می‌گیرد تا کاربر بتواند جزئیات را ادامه دهد.
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   void _onCarSelected(Car car) {
