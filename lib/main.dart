@@ -84,11 +84,11 @@ void main() async {
 void _setupErrorWidget() {
   ErrorWidget.builder = (details) {
     debugPrint('[ErrorBoundary] ${details.exception}');
-    return Material(
+    return const Material(
       color: BrandColors.darkBackground,
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: const [

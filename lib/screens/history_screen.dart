@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -90,7 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         _isLoading = false;
       });
 
-      _listAnimCtrl.forward(from: 0);
+      unawaited(_listAnimCtrl.forward(from: 0));
     } catch (e) {
       debugPrint('Error fetching history: $e');
       if (!mounted) return;
@@ -281,7 +283,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildItemCard(Diagnostic item, int index, ThemeData theme) {
-    final isGolden = item.isGolden ?? false;
+    final isGolden = item.isGolden;
     final carLabel = item.carName ?? item.carId;
     final formattedDate = _formatDate(item.createdAt);
 

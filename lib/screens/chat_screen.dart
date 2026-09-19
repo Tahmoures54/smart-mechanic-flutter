@@ -134,9 +134,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       }
       if (!mounted) return;
       try {
-        HapticFeedback.mediumImpact();
+        unawaited(HapticFeedback.mediumImpact());
       } catch (_) {}
-      _shakeCtrl.forward(from: 0);
+      unawaited(_shakeCtrl.forward(from: 0));
     });
   }
 
@@ -167,7 +167,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   Future<void> _goToStore() async {
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ShopScreen()),
+      MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
     );
   }
 
