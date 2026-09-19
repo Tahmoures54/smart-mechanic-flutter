@@ -442,6 +442,78 @@ class _BenefitRow extends StatelessWidget {
   }
 }
 
+class _GrowthShareBanner extends StatelessWidget {
+  const _GrowthShareBanner();
+
+  Future<void> _share(BuildContext context) async {
+    try {
+      final code = context.read<AuthProvider>().referralCode;
+      await ShareService.shareApp(referralCode: code);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اشتراک‌گذاری انجام نشد. دوباره تلاش کنید.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final code = context.watch<AuthProvider>().referralCode;
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(Icons.share_rounded, color: theme.colorScheme.secondary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'یک دوست صاحب خودرو را هم دعوت کن',
+                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    code?.isNotEmpty == true
+                        ? 'با کد معرفت دعوت کن و اگر دوستت ثبت‌نام کرد، پاداش معرفی طبق شرایط حساب می‌شود.'
+                        : 'اگر این ابزار به کارت آمد، لینک آن را برای یک دوست بفرست.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: theme.hintColor, fontSize: 11.5, height: 1.45),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'اشتراک‌گذاری',
+              onPressed: () => _share(context),
+              icon: Icon(Icons.ios_share_rounded, color: theme.colorScheme.secondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SupportCard extends StatelessWidget {
   const _SupportCard();
 
