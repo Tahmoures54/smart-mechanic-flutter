@@ -9,7 +9,7 @@ class CreditBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (auth.isGolden) {
+    if (auth.isGoldenActive) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(color: Colors.amber.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
@@ -22,7 +22,7 @@ class CreditBadge extends StatelessWidget {
         color: theme.colorScheme.secondary.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text('اعتبار: ${auth.credits ?? '—'}',
+      child: Text('اعتبار: ${auth.credits}',
           style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary)),
     );
   }
