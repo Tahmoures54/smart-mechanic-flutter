@@ -7,7 +7,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.24+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![Android](https://img.shields.io/badge/Android-API_24+-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
-[![Version](https://img.shields.io/badge/Version-1.3.0-blue?style=for-the-badge)](RELEASE.md)
+[![Version](https://img.shields.io/badge/Version-1.3.1-blue?style=for-the-badge)](RELEASE.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 **عیب‌یابی اولیه خودرو با کمک هوش مصنوعی، بررسی صدای موتور و نقشه تعمیرگاه‌های نزدیک**
@@ -35,7 +35,7 @@
 | 🎤 بررسی صدای موتور | استخراج ویژگی‌های صوتی مانند RMS، فرکانس غالب و طیف فرکانسی برای بررسی اولیه |
 | 📍 تعمیرگاه نزدیک | نقشه تعمیرگاه‌ها از دیتابیس خود اپ |
 | 🔐 ورود OTP | احراز هویت با شماره موبایل |
-| 💳 اعتبار و اشتراک | بسته‌های اعتباری + اشتراک طلایی |
+| 💳 اعتبار و اشتراک | بسته‌های اعتباری با تخفیف پلکانی + اشتراک طلایی با سقف مصرف منصفانه |
 | 👥 سیستم معرفی | کد معرف، پاداش و برداشت |
 | 📋 تاریخچه | ذخیره و مرور عیب‌یابی‌های قبلی |
 | 🌙 تم تاریک/روشن | طراحی مدرن با فونت وزیرمتن |

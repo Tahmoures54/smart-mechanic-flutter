@@ -1,4 +1,16 @@
-/// مدل بسته فروشگاهی — شناسه‌ها باید با PRODUCTS بک‌اند یکی باشند
+/// مدل بسته فروشگاهی — شناسه‌ها باید با PRODUCTS بک‌اند یکی باشند.
+///
+/// ⚠️ همگام‌سازی با بک‌اند: مقدار اعتبارِ واریزی و سقف‌های مصرف اشتراک
+/// طلایی سمت سرور اعمال می‌شوند. جدول دقیق PRODUCTS در فایل PRICING.md
+/// (ریشهٔ ریپو) نگه‌داری می‌شود؛ هر تغییری اینجا، آنجا هم باید اعمال شود.
+///
+/// ─── سیاست قیمت‌گذاری (نسخهٔ 1.3.0) ───
+/// • قیمت مبنا: حدود ۱٫۹۹۹ تومان برای هر عیب‌یابی.
+/// • بسته‌های بزرگ‌تر، به‌ازای هر عیب‌یابی ارزان‌تر می‌شوند (تخفیف پلکانی) —
+///   واحد قیمت بین بسته‌ها هرگز صعودی نیست.
+/// • هیچ بسته‌ای «نامحدود واقعی» نیست؛ اشتراک‌های طلایی سقف مصرف منصفانه
+///   دارند ([dailyCap] و [periodCap]) تا هزینهٔ سرور کنترل‌شده بماند و
+///   کیفیت سرویس برای همه حفظ شود.
 class ShopPackage {
   final String id;
   final String title;
@@ -7,6 +19,13 @@ class ShopPackage {
   final int? compareAtPriceToman;
   final int? credits;
   final int? days;
+
+  /// سقف مصرف منصفانهٔ اشتراک: حداکثر عیب‌یابی در روز (فقط بسته‌های طلایی).
+  final int? dailyCap;
+
+  /// سقف مصرف منصفانهٔ اشتراک: حداکثر کل عیب‌یابی در طول دوره.
+  final int? periodCap;
+
   final bool isGold;
   final bool isPopular;
   final bool isBestValue;
@@ -20,6 +39,8 @@ class ShopPackage {
     this.compareAtPriceToman,
     this.credits,
     this.days,
+    this.dailyCap,
+    this.periodCap,
     this.isGold = false,
     this.isPopular = false,
     this.isBestValue = false,
@@ -35,63 +56,96 @@ class ShopPackage {
     }
     return null;
   }
+
+  /// «اگر سقف مصرف منصفانه کاملاً استفاده شود، هر عیب‌یابی چند در می‌آید؟»
+  /// برای اشتراک‌های طلایی — عددی برای مقایسهٔ منصفانه با بسته‌های اعتباری.
+  int? get bestCaseUnitPrice {
+    if (periodCap == null || periodCap! <= 0) return null;
+    return (priceToman / periodCap!).round();
+  }
 }
 
 /// لیست بسته‌ها — هم‌تراز با smart-mec-backend PRODUCTS
+/// (تغییر هر ردیف = به‌روزرسانی PRICING.md و PRODUCTS سمت سرور).
 const shopPackages = <ShopPackage>[
-  ShopPackage(
-    id: 'credit_5',
-    title: '۵ عیب‌یابی',
-    subtitle: 'شروع سریع',
-    priceToman: 49000,
-    compareAtPriceToman: 65000,
-    credits: 5,
-    benefits: [
-      '۵ بار عیب‌یابی هوشمند',
-      'مناسب تست اولیه',
-      'بدون تاریخ انقضا',
-    ],
-  ),
+
+  // ── بسته‌های اعتباری (قیمت مبنا: ۱٫۹۹۹ تومان برای هر عیب‌یابی) ──
   ShopPackage(
     id: 'credit_10',
     title: '۱۰ عیب‌یابی',
-    subtitle: 'انتخاب اکثر کاربران',
-    priceToman: 89000,
-    compareAtPriceToman: 120000,
+    subtitle: 'شروع مطمئن',
+    priceToman: 19990,
+    compareAtPriceToman: 26000,
     credits: 10,
-    isPopular: true,
     benefits: [
-      '۱۰ بار عیب‌یابی هوشمند',
-      'حدود ۲۰٪ به‌صرفه‌تر',
+      '۱۰ بار عیب‌یابی هوشمند — هر کدام ۱٫۹۹۹ تومان',
+      'مناسب اولین تجربه و مشکلات گاه‌به‌گاه',
       'بدون تاریخ انقضا',
     ],
   ),
   ShopPackage(
+    id: 'credit_35',
+    title: '۳۵ عیب‌یابی',
+    subtitle: 'انتخاب اکثر کاربران',
+    priceToman: 59000,
+    compareAtPriceToman: 69000,
+    credits: 35,
+    isPopular: true,
+    benefits: [
+      '۳۵ بار عیب‌یابی — هر کدام حدود ۱٫۶۸۶ تومان',
+      'حدود ۱۶٪ به‌صرفه‌تر از قیمت مبنا',
+      'بدون تاریخ انقضا',
+    ],
+  ),
+  ShopPackage(
+    id: 'credit_90',
+    title: '۹۰ عیب‌یابی',
+    subtitle: 'پرطرفدارترین؛ حداکثر صرفه',
+    priceToman: 129000,
+    compareAtPriceToman: 179000,
+    credits: 90,
+    isBestValue: true,
+    benefits: [
+      '۹۰ بار عیب‌یابی — هر کدام حدود ۱٫۴۳۳ تومان',
+      'حدود ۲۸٪ به‌صرفه‌تر از قیمت مبنا',
+      'مناسب خودروهای چند‌گانه و خانواده',
+      'بدون تاریخ انقضا',
+    ],
+  ),
+
+  // ── اشتراک‌های طلایی («نامحدود» با سقف مصرف منصفانه) ──
+  ShopPackage(
     id: 'gold_monthly',
     title: 'طلایی ۳۰ روزه',
-    subtitle: 'عیب‌یابی نامحدود',
-    priceToman: 179000,
+    subtitle: 'اشتراک با سقف مصرف منصفانه',
+    priceToman: 149000,
     compareAtPriceToman: 199000,
     days: 30,
+    dailyCap: 10,
+    periodCap: 150,
     isGold: true,
     benefits: [
-      'عیب‌یابی نامحدود ۳۰ روز',
+      '۳۰ روز عیب‌یابی بدون نیاز به شارژ مکرر',
+      'تا ۱۰ عیب‌یابی در روز — سقف دوره ۱۵۰ عیب‌یابی',
+      'اگر سقف را کامل استفاده کنید، هر عیب‌یابی حدود ۹۹۳ تومان می‌شود',
       'اولویت پشتیبانی',
-      'مناسب استفاده روزانه',
     ],
   ),
   ShopPackage(
     id: 'gold_quarterly',
     title: 'طلایی ۹۰ روزه',
     subtitle: 'به‌صرفه‌ترین اشتراک',
-    priceToman: 449000,
+    priceToman: 399000,
     compareAtPriceToman: 537000,
     days: 90,
+    dailyCap: 15,
+    periodCap: 500,
     isGold: true,
-    isBestValue: true,
     benefits: [
-      'عیب‌یابی نامحدود ۹۰ روز',
-      'حدود ۱۶٪ تخفیف نسبت به ماهانه',
+      '۹۰ روز عیب‌یابی بدون نیاز به شارژ مکرر',
+      'تا ۱۵ عیب‌یابی در روز — سقف دوره ۵۰۰ عیب‌یابی',
+      'اگر سقف را کامل استفاده کنید، هر عیب‌یابی حدود ۷۹۸ تومان می‌شود',
+      'معادل حدود ۱۳۳ هزار تومان در ماه — حدود ۱۱٪ ارزان‌تر از ماهانه',
       'بهترین انتخاب تعمیرکاران',
     ],
   ),
