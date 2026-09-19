@@ -29,16 +29,6 @@ class _ShopScreenState extends State<ShopScreen> {
   List<ShopPackage> _products = shopPackages;
   bool _productsLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<AuthProvider>().fetchProfile();
-      _loadProducts();
-    });
-  }
-
   Future<void> _loadProducts() async {
     try {
       final products = await context.read<ApiService>().getProducts();
@@ -49,6 +39,17 @@ class _ShopScreenState extends State<ShopScreen> {
       if (mounted) setState(() => _productsLoading = false);
     }
   }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthProvider>().fetchProfile();
+      _loadProducts();
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // کمکی‌ها
   // ---------------------------------------------------------------------------
@@ -365,7 +366,7 @@ class _ShopScreenState extends State<ShopScreen> {
         centerTitle: true,
       ),
       body: RefreshIndicator(
-        onRefresh: () async { await auth.fetchProfile(force: true); await _loadProducts(); },
+        onRefresh: () => auth.fetchProfile(force: true),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: [
@@ -389,8 +390,24 @@ class _ShopScreenState extends State<ShopScreen> {
               style: TextStyle(color: theme.hintColor, fontSize: 13),
             ),
             const SizedBox(height: 14),
-            if (_productsLoading && _products.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
             ..._products.map((p) => _buildPackageCard(p, theme)),
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 14, color: theme.hintColor),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'اشتراک‌های طلایی «مصرف منصفانه» دارند: سقف روزانه و دوره‌ای '
+                    'روی کارت هر بسته مشخص است. قیمت مبنا هر عیب‌یابی حدود '
+                    '۱٫۹۹۹ تومان است و بسته‌های بزرگ‌تر به‌صرفه‌ترند.',
+                    style: TextStyle(color: theme.hintColor, fontSize: 11, height: 1.6),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             _buildTrustFooter(theme),
           ],
@@ -476,8 +493,10 @@ class _ShopScreenState extends State<ShopScreen> {
             children: [
               Expanded(
                 child: _walletStat(
+                  // «نامحدود» گمراه‌کننده است؛ اشتراک طلایی سقف مصرف
+                  // منصفانه دارد (روی کارت بسته مشخص است).
                   label: 'اعتبار باقی‌مانده',
-                  value: isGold ? 'فعال' : '${auth.credits}',
+                  value: isGold ? 'اشتراک فعال' : '${auth.credits}',
                   icon: Icons.bolt_rounded,
                 ),
               ),
@@ -897,6 +916,17 @@ class _ShopScreenState extends State<ShopScreen> {
                                 fontSize: 11,
                               ),
                             ),
+                          if (pkg.bestCaseUnitPrice != null)
+                            Text(
+                              'با استفاده کامل از سقف دوره: حدود '
+                              '${_formatToman(pkg.bestCaseUnitPrice!)} هر عیب‌یابی',
+                              style: TextStyle(
+                                color: theme.colorScheme.secondary
+                                    .withOpacity(0.85),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -954,7 +984,7 @@ class _ShopScreenState extends State<ShopScreen> {
                             ),
                           )
                         : Text(
-                            isGold ? 'فعال‌سازی' : 'خرید',
+                            isGold ? 'فعال‌سازی اشتراک' : 'خرید بسته',
                             style:
                                 const TextStyle(fontWeight: FontWeight.bold),
                           ),
