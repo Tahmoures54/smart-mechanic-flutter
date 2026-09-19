@@ -70,6 +70,11 @@ jobs:
           chmod +x android/gradlew || true
           test -f android/gradle/wrapper/gradle-wrapper.properties
 
+      - name: Analyze and test
+        run: |
+          flutter analyze
+          flutter test
+
       - name: Generate orange mechanical branding + launcher icons
         run: |
           pip3 install --quiet pillow
@@ -99,7 +104,11 @@ jobs:
           MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           if [ -z "$MAPS_KEY" ]; then
-            echo "GOOGLE_MAPS_API_KEY not set — skipping"
+            if [ "$GITHUB_REF_TYPE" = "tag" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "A real release build requires GOOGLE_MAPS_API_KEY"
+              exit 1
+            fi
+            echo "GOOGLE_MAPS_API_KEY not set — keeping local placeholder for CI validation"
             exit 0
           fi
           python3 -c '
@@ -109,15 +118,13 @@ jobs:
           text = open(path, encoding="utf-8").read()
           pattern = r"(android:name=\"com\.google\.android\.geo\.API_KEY\"\s+android:value=\")[^\"]*(\")"
           text2, n = re.subn(pattern, rf"\g<1>{key}\2", text)
-          if n == 0:
-              needle = "<application"
-              insert = f"<application\n        <meta-data android:name=\"com.google.android.geo.API_KEY\" android:value=\"{key}\" />"
-              text2 = text.replace(needle, insert, 1)
+          if n != 1:
+              raise SystemExit(f"Expected exactly one Google Maps API key placeholder, found {n}")
           open(path, "w", encoding="utf-8").write(text2)
           print("Maps API key injected")
           '
 
-      - name: Setup release signing (optional)
+      - name: Setup release signing (required for tags/manual releases)
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -125,7 +132,11 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
-            echo "No release keystore — using debug signing"
+            if [ "$GITHUB_REF_TYPE" = "tag" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "A real release build requires RELEASE_KEYSTORE_* secrets"
+              exit 1
+            fi
+            echo "No release keystore — using debug signing for CI validation"
             exit 0
           fi
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks

@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ================================================
-echo Smart Mechanic - Release Build 1.2.0+3
+echo Smart Mechanic - Release Build 1.2.2+5
 echo ================================================
 
 where flutter >nul 2>&1
@@ -30,6 +30,12 @@ if exist "%~dp0assets\branding\app_icon.png" (
 flutter analyze
 if errorlevel 1 (
   echo ERROR: Dart analyzer found problems.
+  exit /b 1
+)
+
+flutter test
+if errorlevel 1 (
+  echo ERROR: Tests failed.
   exit /b 1
 )
 

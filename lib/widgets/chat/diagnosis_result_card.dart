@@ -105,10 +105,14 @@ class _TouchQuestionnaire extends StatefulWidget {
 
 class _TouchQuestionnaireState extends State<_TouchQuestionnaire> {
   bool _submitting = false;
+  String? _selectedAnswer;
 
-  Future<void> _select(DiagnosisQuestionOption question, String answer) async {
+  void _select(DiagnosisQuestionOption question, String answer) {
     if (_submitting || widget.onAnswer == null) return;
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _selectedAnswer = answer;
+    });
     widget.onAnswer!(question.question, answer);
   }
 
@@ -127,14 +131,14 @@ class _TouchQuestionnaireState extends State<_TouchQuestionnaire> {
           children: q.options.map((option) {
             return ChoiceChip(
               label: Text(option, style: const TextStyle(fontSize: 12)),
-              selected: false,
+              selected: _selectedAnswer == option,
               onSelected: _submitting ? null : (_) => _select(q, option),
             );
           }).toList(),
         ),
         const SizedBox(height: 8),
         Text(
-          'با انتخاب یک گزینه، سؤال بعدی خودکار می‌آید.',
+          'پس از انتخاب گزینه، متن پاسخ در کادر پایین قرار می‌گیرد؛ برای ادامه دکمه ارسال را بزن.',
           style: TextStyle(fontSize: 11.5, color: Theme.of(context).hintColor),
         ),
       ],

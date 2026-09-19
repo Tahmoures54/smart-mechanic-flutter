@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -142,9 +143,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _onSend() {
     final text = _inputCtrl.text.trim();
     if (text.isEmpty || _chat.isTyping) return;
+
+    // Do not clear the guided-answer state before sending. The controller
+    // consumes it after accepting the message; clearing it here used to make
+    // `sendUserMessage` reject the answer as if no option had been selected.
     _inputCtrl.clear();
-    _chat.clearGuidedAnswer();
-    _chat.sendUserMessage(text);
+    unawaited(_chat.sendUserMessage(text));
   }
 
   void _onGuidedAnswerSelected(String question, String answer) {
@@ -304,7 +308,7 @@ class _ChoicePromptBar extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'گزینه‌های بالا را انتخاب کن؛ نیازی به تایپ نیست.',
+                  'یک گزینه را انتخاب کن یا پاسخ را بنویس؛ سپس دکمه ارسال را بزن.',
                   style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),

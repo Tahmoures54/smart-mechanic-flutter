@@ -91,7 +91,18 @@ class ChatController extends ChangeNotifier {
 
   Future<void> sendUserMessage(String text) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _isTyping || isAwaitingChoices) return;
+    if (trimmed.isEmpty || _isTyping) return;
+
+    // A follow-up question is still a normal chat message. The previous
+    // implementation rejected it while `isAwaitingChoices` was true. The
+    // screen cleared `_guidedAnswerReady` immediately before calling this
+    // method, so every answer to a structured question was silently dropped
+    // and the user was left on the same card with no loading state.
+    //
+    // Keep the choice chips as a helpful shortcut, but also accept typed
+    // answers. This makes the conversation resilient when the API returns a
+    // question without options or when the user prefers to type.
+    _guidedAnswerReady = false;
     _append(ChatMessage.user(trimmed));
     await fetchDiagnosis(trimmed);
   }

@@ -15,7 +15,7 @@
 
 ## پیش‌نیازها
 
-### ۱. کلید انتشار Play و بازار (یک‌بار)
+### ۱. کلید انتشار Play و بازار (یک‌بار — برای انتشار الزامی)
 
 همین کلید را برای **هر دو فروشگاه** استفاده کنید. اگر گم شود، به‌روزرسانی اپ ممکن نیست.
 
@@ -62,9 +62,14 @@ chmod +x scripts/generate_release_keystore.sh
 ## مراحل انتشار
 
 ### نسخه فعلی
-- **Version name:** `1.2.0`
-- **Version code:** `3`
+- **Version name:** `1.2.2`
+- **Version code:** `5`
 - **Package:** `ir.smartmec.app`
+
+### تغییرات این نسخه
+- رفع باگ توقف چت بعد از پاسخ به سؤال‌های مرحله‌ای؛ پاسخ متنی و گزینه‌ای هر دو ارسال می‌شوند.
+- نمایش واضح وضعیت انتخاب پاسخ و راهنمای ارسال آن در کادر چت.
+- همسان‌سازی نسخهٔ اپ، build number و فرایند انتشار.
 
 ### بیلد از طریق GitHub Actions
 
@@ -89,6 +94,7 @@ flutter build appbundle --release --target-platform android-arm64 --obfuscate --
 
 ## چک‌لیست قبل از انتشار
 
+- [ ] `flutter analyze` و `flutter test` بدون خطا اجرا شده‌اند
 - [ ] نسخه در `pubspec.yaml` و `Constants` یکسان است
 - [ ] `enableLogging` در production خاموش است
 - [ ] keystore واقعی (نه تست) در Secrets است

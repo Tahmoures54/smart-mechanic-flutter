@@ -15,6 +15,12 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
 
+        <!-- CI replaces this placeholder with GOOGLE_MAPS_API_KEY. Keeping a
+             valid value here also allows local builds without a secret. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="YOUR_GOOGLE_MAPS_API_KEY" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
