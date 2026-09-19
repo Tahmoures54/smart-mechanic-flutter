@@ -70,6 +70,9 @@ class ChatController extends ChangeNotifier {
     if (initialResultText != null && initialResultText.trim().isNotEmpty) {
       _lastDiagnosticId = initialDiagnosticId;
       _appendDiagnosisResult(initialResultText, initialResultJson);
+      // عیب‌یابی اولیه (مثلاً تحلیل صوتی) سهمیه را سمت سرور کم کرده است؛
+      // نشان اعتبار در AppBar نباید کهنه بماند.
+      unawaited(authProvider.fetchProfile());
     } else {
       unawaited(fetchDiagnosis(userMessage));
     }

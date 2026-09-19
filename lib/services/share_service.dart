@@ -60,10 +60,16 @@ class ShareService {
   }
 
   /// دعوت کوتاه و طبیعی برای فرستادن به یک دوست یا همکار.
-  static String supportInvite() {
+  /// اگر کد معرف کاربر موجود باشد، به پیام اضافه می‌شود تا اعتبار معرف
+  /// به حساب دعوت‌کننده واریز شود.
+  static String supportInvite({String? referralCode}) {
+    final referral = (referralCode != null && referralCode.isNotEmpty)
+        ? '\n\nبا کد معرف من ثبت‌نام کن و اعتبار هدیه بگیر:\n🎁 $referralCode'
+        : '';
     return 'این ابزار را برای قبل از رفتن به تعمیرگاه امتحان کن 🔧\n'
         'با چند سؤال، علت احتمالی مشکل ماشین را بهتر می‌فهمی و آماده‌تر تصمیم می‌گیری.\n\n'
-        '$websiteUrl';
+        '$websiteUrl'
+        '$referral';
   }
 
   static Future<void> contactSupport() async {

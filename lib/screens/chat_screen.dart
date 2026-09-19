@@ -257,6 +257,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 result: m.structured!,
                 supplementalText: m.text,
                 onSuggestionTap: _onSuggestionTap,
+                carName: widget.carName,
+                year: widget.year,
               ),
             );
           } else {

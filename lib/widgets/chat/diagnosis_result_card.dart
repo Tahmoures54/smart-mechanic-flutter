@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
 
 import '../../constants.dart';
 import '../../models/diagnosis_result.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/share_service.dart';
 import 'urgency_and_chips.dart';
 
 /// نمایش غنی نتیجهٔ تشخیص — همیشه به‌صورت «مقالهٔ کامل».
@@ -12,13 +16,16 @@ import 'urgency_and_chips.dart';
 /// سؤال + دکمهٔ به‌روزرسانی تشخیص) ندارد. اگر بک‌اندِ قدیمی هنوز سؤال
 /// بفرستد، آن سؤال‌ها صرفاً به‌صورت «راهنمای اختیاری» و بدون هیچ قفلی
 /// نمایش داده می‌شوند. در پایان هر کارت هم بخش «ادامهٔ گفتگو» با
-/// پیشنهادهای آماده، کاربر را به ادامهٔ مکالمه تشویق می‌کند.
+/// پیشنهادهای آماده، کاربر را به ادامهٔ مکالمه تشویق می‌کند و امکان
+/// اشتراک‌گذاری نتیجه (با کد معرف کاربر) فراهم است.
 class DiagnosisResultCard extends StatelessWidget {
   const DiagnosisResultCard({
     super.key,
     required this.result,
     this.supplementalText,
     this.onSuggestionTap,
+    this.carName,
+    this.year,
   });
 
   final DiagnosisResult result;
@@ -27,6 +34,10 @@ class DiagnosisResultCard extends StatelessWidget {
   /// لمس یکی از پیشنهادهای «ادامهٔ گفتگو» — کادر ورودی چت را پر می‌کند.
   final ValueChanged<String>? onSuggestionTap;
 
+  /// برای متن اشتراک‌گذاری نتیجه.
+  final String? carName;
+  final String? year;
+
   String? get _garagePromoText {
     final text = supplementalText;
     if (text == null) return null;
@@ -34,6 +45,38 @@ class DiagnosisResultCard extends StatelessWidget {
     final start = text.indexOf(marker);
     if (start < 0) return null;
     return text.substring(start).trim();
+  }
+
+  /// متن اصلی نتیجه بدون بخش تبلیغ تعمیرگاه‌ها — برای اشتراک‌گذاری.
+  String get _shareableText {
+    final raw = supplementalText ?? '';
+    const marker = '## 🔧 تعمیرگاه‌های پیشنهادی';
+    final cut = raw.indexOf(marker);
+    var body = (cut >= 0 ? raw.substring(0, cut) : raw).trim();
+    body = DiagnosisPolicy.stripDirective(body);
+    if (body.isEmpty) {
+      body = [
+        if (result.statusSummary.isNotEmpty) result.statusSummary,
+        ...result.causes.take(3).map((c) => '• ${c.title}'),
+        if (result.nextStep.isNotEmpty) result.nextStep,
+      ].join('\n');
+    }
+    if (body.length > 1200) body = '${body.substring(0, 1200)}…';
+    return body;
+  }
+
+  Future<void> _shareResult(BuildContext context) async {
+    try {
+      final auth = context.read<AuthProvider>();
+      await ShareService.shareDiagnosis(
+        result: _shareableText,
+        carName: carName,
+        year: year,
+        referralCode: auth.referralCode,
+      );
+    } catch (e) {
+      debugPrint('[DiagnosisResultCard] share failed: $e');
+    }
   }
 
   @override
@@ -99,6 +142,7 @@ class DiagnosisResultCard extends StatelessWidget {
           const SizedBox(height: 12),
           _ContinueChatSection(
             onSuggestionTap: onSuggestionTap,
+            onShare: () => _shareResult(context),
           ),
           if (result.footer.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -139,9 +183,12 @@ class DiagnosisResultCard extends StatelessWidget {
 /// کاربر را دعوت می‌کند سؤال بعدی را بپرسد و با یک لمس، پیشنهاد آماده را
 /// در کادر ورودی می‌گذارد (بدون ارسال خودکار).
 class _ContinueChatSection extends StatelessWidget {
-  const _ContinueChatSection({this.onSuggestionTap});
+  const _ContinueChatSection({this.onSuggestionTap, this.onShare});
 
   final ValueChanged<String>? onSuggestionTap;
+
+  /// اشتراک‌گذاری نتیجه (رشد از طریق دعوت دوستان).
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +235,26 @@ class _ContinueChatSection extends StatelessWidget {
                 )
                 .toList(),
           ),
+          if (onShare != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onShare,
+                icon: const Icon(Icons.share_rounded, size: 16),
+                label: const Text(
+                  'اشتراک‌گذاری این نتیجه',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.primary,
+                  side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.35)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
