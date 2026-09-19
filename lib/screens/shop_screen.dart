@@ -26,6 +26,19 @@ class _ShopScreenState extends State<ShopScreen> {
 
   String? _loadingProductId;
   bool _withdrawLoading = false;
+  List<ShopPackage> _products = shopPackages;
+  bool _productsLoading = true;
+
+  Future<void> _loadProducts() async {
+    try {
+      final products = await context.read<ApiService>().getProducts();
+      if (mounted && products.isNotEmpty) setState(() => _products = products);
+    } catch (e) {
+      debugPrint('[ShopScreen] product catalog fallback: $e');
+    } finally {
+      if (mounted) setState(() => _productsLoading = false);
+    }
+  }
 
   @override
   void initState() {
@@ -33,6 +46,7 @@ class _ShopScreenState extends State<ShopScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<AuthProvider>().fetchProfile();
+      _loadProducts();
     });
   }
 
@@ -376,7 +390,7 @@ class _ShopScreenState extends State<ShopScreen> {
               style: TextStyle(color: theme.hintColor, fontSize: 13),
             ),
             const SizedBox(height: 14),
-            ...shopPackages.map((p) => _buildPackageCard(p, theme)),
+            ..._products.map((p) => _buildPackageCard(p, theme)),
             const SizedBox(height: 4),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
