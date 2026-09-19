@@ -378,22 +378,29 @@ class _WhyItWorksSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('چرا مکانیک هوشمند؟', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            const Text('چرا مکانیک هوشمند؟', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text('قبل از اینکه پولی برای تعمیر خرج کنی، کمک می‌کنیم بهتر بفهمی چه چیزی ممکن است مشکل داشته باشد.', style: TextStyle(fontSize: 13, height: 1.55, color: Theme.of(context).hintColor)),
             const SizedBox(height: 12),
             _BenefitRow(
-              icon: Icons.psychology_alt_rounded,
-              title: 'شروع سریع',
-              text: 'شرح مشکل یا صدای موتور را بفرست و مسیر بررسی را روشن‌تر کن.',
+              icon: Icons.favorite_border_rounded,
+              title: 'قبل از خرج کردن، اول بفهم',
+              text: 'گاهی یک مشکل ساده با یک تصمیم عجولانه تبدیل به هزینه‌ای غیرضروری می‌شود. مکانیک هوشمند کمک می‌کند قبل از مراجعه، تصویر روشن‌تری از نشانه‌ها و علت‌های احتمالی داشته باشی.',
             ),
             _BenefitRow(
               icon: Icons.payments_outlined,
-              title: 'کنترل هزینه',
-              text: 'قبل از مراجعه، سؤال‌های فنی بهتری برای تعمیرگاه آماده کن.',
+              title: 'برای هزینه‌های الکی آماده نیستی',
+              text: 'کمک می‌کنیم بی‌دلیل قطعه عوض نکنی یا برای کاری که لازم نیست هزینه ندهی. سؤال‌های درست‌تر بپرس و با آگاهی بیشتری درباره تعمیر تصمیم بگیر.',
             ),
             _BenefitRow(
-              icon: Icons.location_on_outlined,
-              title: 'تکمیل مسیر',
-              text: 'در کنار عیب‌یابی، امکان پیدا کردن تعمیرگاه‌های نزدیک را هم داری.',
+              icon: Icons.support_agent_rounded,
+              title: 'یک همراه دلسوز قبل از تعمیرگاه',
+              text: 'مکانیک هوشمند جای مکانیک متخصص را نمی‌گیرد؛ قبل از مراجعه کنارت است تا کمتر سردرگم شوی و با اطمینان بیشتری صحبت کنی.',
+            ),
+            _BenefitRow(
+              icon: Icons.savings_rounded,
+              title: 'هزینه ناچیز، خیال راحت‌تر',
+              text: 'اگر همین راهنمایی قبل از تعمیر جلوی یک خرج اشتباه را بگیرد، هزینه ناچیز یک بررسی هوشمند ارزش خودش را پیدا می‌کند. هدف ما کمک به توست، نه بیشتر خرج کردنت.',
             ),
           ],
         ),
