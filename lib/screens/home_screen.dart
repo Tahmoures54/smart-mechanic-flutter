@@ -571,8 +571,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _DiagnoseCtaButton(onPressed: () => unawaited(_diagnose())),
               const SizedBox(height: 12),
               _AudioCtaButton(onPressed: () => unawaited(_recordAudio())),
-              const SizedBox(height: 18),
-              const _MechanicAllyCard(),
               const SizedBox(height: 22),
 
               const _WhyItWorksSection(),
@@ -603,7 +601,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   PreferredSizeWidget _buildAppBar(AuthProvider auth, Color secondary) {
     return AppBar(
       title: const BrandAppBarTitle(),
-      centerTitle: true,
+      centerTitle: false,
       elevation: 0,
       backgroundColor: Colors.transparent,
       actions: [
@@ -682,7 +680,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               hintStyle: TextStyle(color: theme.hintColor, fontSize: 13, height: 1.4),
               errorText: _descError,
               filled: true,
-              fillColor: theme.cardColor,
+              fillColor: theme.brightness == Brightness.dark
+                  ? const Color(0xFF3A251A)
+                  : const Color(0xFFFFFCF8),
               contentPadding: const EdgeInsets.all(16),
               counterStyle: TextStyle(color: theme.hintColor, fontSize: 11),
               border: OutlineInputBorder(
@@ -699,39 +699,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-          const SizedBox(height: 9),
-          Row(
-            children: [
-              Icon(Icons.auto_awesome_rounded, size: 15, color: secondary),
-              const SizedBox(width: 5),
-              Text(
-                'برای شروع سریع، یکی را انتخاب کن',
-                style: TextStyle(fontSize: 11.5, color: theme.hintColor, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: [
-              for (final symptom in const [
-                'روشن نمی‌شود',
-                'صدای غیرعادی',
-                'لرزش خودرو',
-                'چراغ چک روشن است',
-                'افت شتاب',
-              ])
-                ActionChip(
-                  label: Text(symptom, style: const TextStyle(fontSize: 11.5)),
-                  avatar: Icon(Icons.add_rounded, size: 15, color: secondary),
-                  onPressed: () => _appendSymptom(symptom),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  visualDensity: VisualDensity.compact,
-                  side: BorderSide(color: secondary.withOpacity(0.24)),
-                ),
-            ],
-          ),
+          const SizedBox(height: 4),
         ],
       ),
     );
