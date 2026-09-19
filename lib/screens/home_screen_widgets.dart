@@ -231,42 +231,6 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _StatusBanner extends StatelessWidget {
-  final AuthProvider auth;
-  const _StatusBanner({required this.auth});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (!auth.isAuthenticated) {
-      return Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: const ListTile(
-          leading: Icon(Icons.person_outline),
-          title: Text('وارد نشده‌اید'),
-          subtitle: Text('برای عیب‌یابی با شماره موبایل وارد شوید'),
-        ),
-      );
-    }
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: ListTile(
-        leading: Icon(auth.isGoldenActive ? Icons.workspace_premium : Icons.account_circle),
-        title: Text(
-          _orDash(auth.displayName),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          auth.isGoldenActive
-              ? 'اشتراک طلایی فعال'
-              : 'اعتبار: ${_orDash(auth.credits)} · رایگان ماهانه: ${_orDash(auth.remainingFree)}',
-        ),
-      ),
-    );
-  }
-}
-
 class _CarCard extends StatelessWidget {
   final bool isCustom;
   final List<Car> cars;
@@ -345,6 +309,39 @@ class _CarCard extends StatelessWidget {
               child: Text(isCustom ? 'انتخاب از لیست خودروها' : 'خودروی من در لیست نیست'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GarageRegistrationBanner extends StatelessWidget {
+  const _GarageRegistrationBanner();
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.findAncestorStateOfType<_HomeScreenState>()?._openGarageRegistration(),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(width: 50, height: 50,
+              decoration: BoxDecoration(color: theme.colorScheme.secondary.withOpacity(0.12), borderRadius: BorderRadius.circular(15)),
+              child: Icon(Icons.handyman_rounded, color: theme.colorScheme.secondary, size: 27)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('تعمیرگاه داری؟', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text('تعمیرگاهت را ثبت کن تا آن را به کاربران نمایش دهیم.',
+                style: TextStyle(color: theme.hintColor, fontSize: 12.5, height: 1.45)),
+            ])),
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_back_ios_rounded, size: 15, color: theme.colorScheme.secondary),
+          ]),
         ),
       ),
     );
