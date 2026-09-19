@@ -75,7 +75,7 @@ class _HomePromoCarouselState extends State<HomePromoCarousel> {
         _PromoSlide(
           eyebrow: 'عیب‌یابی با صدا',
           title: 'صدای موتور را هم جدی بگیر',
-          body: 'صدای خودرو را ثبت کن تا نشانه‌های صوتی هم در بررسی اولیه وارد شوند و تصویر کامل‌تری از مشکل داشته باشی.',
+          body: 'صدای موتور را ضبط کن و برای بررسی هوشمند بفرست؛ از صدای خودرو یک سرنخ اولیه برای ادامه بررسی بگیر.',
           cta: 'تحلیل صدا',
           icon: Icons.graphic_eq_rounded,
           action: widget.onAudio,
