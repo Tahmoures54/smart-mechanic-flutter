@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../models/car.dart';
 
 enum _CatalogFilter {
@@ -58,9 +60,101 @@ IconData _vehicleIconFor(CarCategory? category) {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── ویجت اصلی ──
-// ─────────────────────────────────────────────────────────────────────────────
+bool _isCommercial(CarCategory? category) {
+  return category == CarCategory.motorcycle ||
+      category == CarCategory.scooter ||
+      category == CarCategory.atv ||
+      category == CarCategory.truck ||
+      category == CarCategory.bus ||
+      category == CarCategory.minibus ||
+      category == CarCategory.tractor ||
+      category == CarCategory.heavy;
+}
+
+/// blobهای نرمال‌شده یک‌بار ساخته می‌شوند تا هر keystroke کل لیست را
+/// با normalizeSearch دوباره پردازش نکند.
+class _CarCatalogIndex {
+  final List<Car> cars;
+  final List<String> searchBlobs;
+  final List<int> popularIndices;
+  final Map<_CatalogFilter, List<int>> filterBuckets;
+
+  _CarCatalogIndex._({
+    required this.cars,
+    required this.searchBlobs,
+    required this.popularIndices,
+    required this.filterBuckets,
+  });
+
+  factory _CarCatalogIndex.build(List<Car> cars) {
+    final blobs = List<String>.generate(
+      cars.length,
+      (i) => Car.normalizeSearch(cars[i].searchBlob),
+      growable: false,
+    );
+
+    final popular = <int>[];
+    final buckets = <_CatalogFilter, List<int>>{
+      for (final f in _CatalogFilter.values) f: <int>[],
+    };
+
+    for (var i = 0; i < cars.length; i++) {
+      final car = cars[i];
+      buckets[_CatalogFilter.all]!.add(i);
+      if (car.isPopular) {
+        popular.add(i);
+        buckets[_CatalogFilter.popular]!.add(i);
+      }
+      if (car.region == 'ایران' && !_isCommercial(car.category)) {
+        buckets[_CatalogFilter.iran]!.add(i);
+      }
+      final cat = car.category;
+      if (cat == CarCategory.suv) buckets[_CatalogFilter.suv]!.add(i);
+      if (cat == CarCategory.pickup) buckets[_CatalogFilter.pickup]!.add(i);
+      if (cat == CarCategory.motorcycle ||
+          cat == CarCategory.scooter ||
+          cat == CarCategory.atv) {
+        buckets[_CatalogFilter.motorcycle]!.add(i);
+      }
+      if (cat == CarCategory.truck) buckets[_CatalogFilter.truck]!.add(i);
+      if (cat == CarCategory.bus || cat == CarCategory.minibus) {
+        buckets[_CatalogFilter.bus]!.add(i);
+      }
+      if (cat == CarCategory.tractor) buckets[_CatalogFilter.tractor]!.add(i);
+      if (cat == CarCategory.heavy) buckets[_CatalogFilter.heavy]!.add(i);
+    }
+
+    return _CarCatalogIndex._(
+      cars: cars,
+      searchBlobs: blobs,
+      popularIndices: popular,
+      filterBuckets: buckets,
+    );
+  }
+
+  List<Car> query({
+    required _CatalogFilter filter,
+    required String rawQuery,
+  }) {
+    final indices = filterBuckets[filter] ?? const <int>[];
+    final q = Car.normalizeSearch(rawQuery.trim());
+    if (q.isEmpty) {
+      return List<Car>.generate(indices.length, (i) => cars[indices[i]]);
+    }
+
+    final out = <Car>[];
+    for (final i in indices) {
+      if (searchBlobs[i].contains(q)) {
+        out.add(cars[i]);
+      }
+    }
+    return out;
+  }
+
+  List<Car> get popularCars =>
+      List<Car>.generate(popularIndices.length, (i) => cars[popularIndices[i]]);
+}
+
 class CarSelectorWidget extends StatelessWidget {
   final List<Car> cars;
   final Car? selectedCar;
@@ -99,7 +193,9 @@ class CarSelectorWidget extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (isLoading) return _ShimmerBox(theme: theme);
-    if (hasError && cars.isEmpty) return _ErrorBox(onRetry: onRetry, theme: theme);
+    if (hasError && cars.isEmpty) {
+      return _ErrorBox(onRetry: onRetry, theme: theme);
+    }
     if (cars.isEmpty) return _EmptyBox(theme: theme);
 
     final bool isSelected = selectedCar != null;
@@ -115,7 +211,9 @@ class CarSelectorWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: theme.cardColor,
             border: Border.all(
-              color: isSelected ? theme.colorScheme.secondary.withOpacity(0.6) : theme.dividerColor,
+              color: isSelected
+                  ? theme.colorScheme.secondary.withOpacity(0.6)
+                  : theme.dividerColor,
               width: isSelected ? 1.5 : 1.0,
             ),
             borderRadius: BorderRadius.circular(16),
@@ -126,12 +224,15 @@ class CarSelectorWidget extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected ? theme.colorScheme.secondary.withOpacity(0.12) : theme.dividerColor.withOpacity(0.3),
+                  color: isSelected
+                      ? theme.colorScheme.secondary.withOpacity(0.12)
+                      : theme.dividerColor.withOpacity(0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _vehicleIconFor(selectedCar?.category),
-                  color: isSelected ? theme.colorScheme.secondary : theme.hintColor,
+                  color:
+                      isSelected ? theme.colorScheme.secondary : theme.hintColor,
                   size: 20,
                 ),
               ),
@@ -141,11 +242,15 @@ class CarSelectorWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      selectedCar?.fullName ?? 'انتخاب خودرو، موتور یا ماشین‌آلات...',
+                      selectedCar?.fullName ??
+                          'انتخاب خودرو، موتور یا ماشین‌آلات...',
                       style: TextStyle(
-                        color: isSelected ? theme.textTheme.bodyLarge?.color : theme.hintColor,
+                        color: isSelected
+                            ? theme.textTheme.bodyLarge?.color
+                            : theme.hintColor,
                         fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     if (isSelected && selectedCar!.description.isNotEmpty) ...[
@@ -160,7 +265,8 @@ class CarSelectorWidget extends StatelessWidget {
                 ),
               ),
               if (isSelected)
-                Icon(Icons.check_circle_rounded, color: theme.colorScheme.secondary, size: 18)
+                Icon(Icons.check_circle_rounded,
+                    color: theme.colorScheme.secondary, size: 18)
               else
                 Icon(Icons.keyboard_arrow_down_rounded, color: theme.hintColor),
             ],
@@ -171,9 +277,6 @@ class CarSelectorWidget extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Bottom Sheet جستجو ──
-// ─────────────────────────────────────────────────────────────────────────────
 class _CarSearchSheet extends StatefulWidget {
   final List<Car> cars;
   final Car? selectedCar;
@@ -185,18 +288,30 @@ class _CarSearchSheet extends StatefulWidget {
 }
 
 class _CarSearchSheetState extends State<_CarSearchSheet> {
+  static const int _pageSize = 60;
+
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
   Timer? _debounce;
 
-  List<Car> _filtered = [];
+  late final _CarCatalogIndex _index;
+
+  List<Car> _filtered = const [];
+  List<dynamic> _visibleItems = const [];
+  int _visibleCarCount = 0;
+  bool _hasMore = false;
+
   String _query = '';
   _CatalogFilter _filter = _CatalogFilter.all;
 
   @override
   void initState() {
     super.initState();
-    _filtered = widget.cars;
+    _index = _CarCatalogIndex.build(widget.cars);
+    _filtered = _index.query(filter: _filter, rawQuery: '');
+    _rebuildVisible(reset: true);
     _searchCtrl.addListener(_onSearchChanged);
+    _scrollCtrl.addListener(_onScroll);
   }
 
   @override
@@ -204,59 +319,40 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     _debounce?.cancel();
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_hasMore || !_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 400) {
+      _loadMore();
+    }
+  }
+
   void _onSearchChanged() {
-    // ✅ آپدیت فوری برای نمایش/مخفی دکمه X و شمارش نتایج بدون دابل setState
     final newQuery = _searchCtrl.text;
     if (_query == newQuery) return;
 
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), () {
+    _debounce = Timer(const Duration(milliseconds: 200), () {
       _applyFilter(newQuery);
     });
+
+    if (mounted && (_query.isEmpty) != (newQuery.isEmpty)) {
+      setState(() => _query = newQuery);
+    }
   }
 
   void _applyFilter(String query) {
-    final q = query.trim();
+    final next = _index.query(filter: _filter, rawQuery: query);
     setState(() {
       _query = query;
-      _filtered = widget.cars.where((car) {
-        if (!_matchesFilter(car)) return false;
-        return q.isEmpty || car.matchesQuery(q);
-      }).toList();
+      _filtered = next;
+      _rebuildVisible(reset: true);
     });
-  }
-
-  bool _matchesFilter(Car car) {
-    return switch (_filter) {
-      _CatalogFilter.all => true,
-      _CatalogFilter.popular => car.isPopular,
-      _CatalogFilter.iran => car.region == 'ایران' && !_isCommercial(car.category),
-      _CatalogFilter.suv => car.category == CarCategory.suv,
-      _CatalogFilter.pickup => car.category == CarCategory.pickup,
-      _CatalogFilter.motorcycle =>
-        car.category == CarCategory.motorcycle ||
-            car.category == CarCategory.scooter ||
-            car.category == CarCategory.atv,
-      _CatalogFilter.truck => car.category == CarCategory.truck,
-      _CatalogFilter.bus =>
-        car.category == CarCategory.bus || car.category == CarCategory.minibus,
-      _CatalogFilter.tractor => car.category == CarCategory.tractor,
-      _CatalogFilter.heavy => car.category == CarCategory.heavy,
-    };
-  }
-
-  bool _isCommercial(CarCategory? category) {
-    return category == CarCategory.motorcycle ||
-        category == CarCategory.scooter ||
-        category == CarCategory.atv ||
-        category == CarCategory.truck ||
-        category == CarCategory.bus ||
-        category == CarCategory.minibus ||
-        category == CarCategory.tractor ||
-        category == CarCategory.heavy;
   }
 
   void _setFilter(_CatalogFilter filter) {
@@ -272,8 +368,93 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
 
   void _selectCar(Car car) => Navigator.pop(context, car);
 
-  List<Car> get _popularCars => _filtered.where((c) => c.isPopular).toList();
-  List<Car> get _regularCars => _filtered.where((c) => !c.isPopular).toList();
+  void _rebuildVisible({required bool reset}) {
+    if (reset) {
+      _visibleCarCount = 0;
+      _visibleItems = const [];
+    }
+
+    final qEmpty = _query.trim().isEmpty;
+    final List<Car> source;
+    final bool groupByBrand;
+
+    if (qEmpty && _filter == _CatalogFilter.all) {
+      groupByBrand = true;
+      source = _filtered.where((c) => !c.isPopular).toList(growable: false);
+    } else if (qEmpty) {
+      groupByBrand = true;
+      source = _filtered;
+    } else {
+      groupByBrand = false;
+      source = _filtered;
+    }
+
+    final totalCars = qEmpty && _filter == _CatalogFilter.all
+        ? source.length + _index.popularCars.length
+        : source.length;
+
+    final targetCars = (_visibleCarCount + _pageSize) < totalCars
+        ? _visibleCarCount + _pageSize
+        : totalCars;
+
+    final items = <dynamic>[];
+    var carsAdded = 0;
+
+    if (qEmpty && _filter == _CatalogFilter.all) {
+      final popular = _index.popularCars;
+      if (popular.isNotEmpty) {
+        items.add('⭐ محبوب‌ترین‌ها');
+        for (final car in popular) {
+          if (carsAdded >= targetCars) break;
+          items.add(car);
+          carsAdded++;
+        }
+        if (carsAdded < targetCars && source.isNotEmpty) {
+          items.add('divider');
+        }
+      }
+      if (carsAdded < targetCars) {
+        final remaining = targetCars - carsAdded;
+        final slice = source.take(remaining).toList(growable: false);
+        items.addAll(_brandGroupedItems(slice));
+        carsAdded += slice.length;
+      }
+      _hasMore = carsAdded < (popular.length + source.length);
+    } else if (groupByBrand) {
+      final slice = source.take(targetCars).toList(growable: false);
+      items.addAll(_brandGroupedItems(slice));
+      carsAdded = slice.length;
+      _hasMore = carsAdded < source.length;
+    } else {
+      final slice = source.take(targetCars).toList(growable: false);
+      items.addAll(slice);
+      carsAdded = slice.length;
+      _hasMore = carsAdded < source.length;
+    }
+
+    _visibleCarCount = carsAdded;
+    _visibleItems = items;
+  }
+
+  void _loadMore() {
+    if (!_hasMore) return;
+    setState(() => _rebuildVisible(reset: false));
+  }
+
+  List<dynamic> _brandGroupedItems(List<Car> cars) {
+    if (cars.isEmpty) return const [];
+    final grouped = <String, List<Car>>{};
+    for (final car in cars) {
+      grouped.putIfAbsent(car.brand, () => <Car>[]).add(car);
+    }
+    final brands = grouped.keys.toList()..sort();
+    final items = <dynamic>[];
+    for (final brand in brands) {
+      items.add(brand);
+      items.addAll(grouped[brand]!);
+    }
+    return items;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -305,7 +486,10 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         margin: const EdgeInsets.only(top: 10, bottom: 4),
         height: 4,
         width: 40,
-        decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
+        decoration: BoxDecoration(
+          color: theme.dividerColor,
+          borderRadius: BorderRadius.circular(2),
+        ),
       );
 
   Widget _buildHeader(ThemeData theme) {
@@ -313,11 +497,16 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
       padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
       child: Row(
         children: [
-          Icon(Icons.two_wheeler_rounded, color: theme.colorScheme.secondary, size: 22),
+          Icon(Icons.two_wheeler_rounded,
+              color: theme.colorScheme.secondary, size: 22),
           const SizedBox(width: 8),
-          Text('انتخاب وسیله نقلیه', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'انتخاب وسیله نقلیه',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const Spacer(),
-          if (_query.isNotEmpty)
+          if (_query.trim().isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -326,10 +515,17 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
               ),
               child: Text(
                 '${_filtered.length} نتیجه',
-                style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
+          IconButton(
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => Navigator.pop(context),
+          ),
         ],
       ),
     );
@@ -347,16 +543,26 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
           hintStyle: TextStyle(color: theme.hintColor, fontSize: 13),
           prefixIcon: Icon(Icons.search_rounded, color: theme.hintColor),
           suffixIcon: _query.isNotEmpty
-              ? IconButton(icon: const Icon(Icons.close_rounded, size: 20), onPressed: _clearSearch)
+              ? IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: _clearSearch,
+                )
               : null,
           filled: true,
           fillColor: theme.cardColor,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: theme.colorScheme.secondary, width: 1.5),
+            borderSide:
+                BorderSide(color: theme.colorScheme.secondary, width: 1.5),
           ),
         ),
       ),
@@ -386,7 +592,9 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
             label: Text(filter.label, style: const TextStyle(fontSize: 12)),
             selectedColor: theme.colorScheme.secondary,
             labelStyle: TextStyle(
-              color: selected ? theme.colorScheme.onSecondary : theme.textTheme.bodyMedium?.color,
+              color: selected
+                  ? theme.colorScheme.onSecondary
+                  : theme.textTheme.bodyMedium?.color,
               fontWeight: selected ? FontWeight.bold : FontWeight.normal,
             ),
             onSelected: (_) => _setFilter(filter),
@@ -396,65 +604,60 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     );
   }
 
-  // ✅ استفاده از ListView.builder برای پرفورمنس بهتر
   Widget _buildList(ThemeData theme) {
     if (_filtered.isEmpty) return _buildNoResult(theme);
 
-    final items = <dynamic>[];
-    if (_query.trim().isEmpty && _filter == _CatalogFilter.all) {
-      final popular = _popularCars;
-      if (popular.isNotEmpty) {
-        items.add('⭐ محبوب‌ترین‌ها');
-        items.addAll(popular);
-        items.add('divider');
-      }
-      items.addAll(_brandGroupedItems(_regularCars));
-    } else if (_query.trim().isEmpty) {
-      items.addAll(_brandGroupedItems(_filtered));
-    } else {
-      items.addAll(_filtered);
-    }
+    final extra = _hasMore ? 1 : 0;
 
     return ListView.builder(
+      controller: _scrollCtrl,
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: items.length,
+      itemCount: _visibleItems.length + extra,
       itemBuilder: (context, index) {
-        final item = items[index];
+        if (index >= _visibleItems.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final item = _visibleItems[index];
         if (item is String) {
           if (item == 'divider') return const Divider(height: 8);
           return _buildSectionHeader(item, theme);
-        } else if (item is Car) {
-          return _buildCarTile(item, theme);
         }
+        if (item is Car) return _buildCarTile(item, theme);
         return const SizedBox.shrink();
       },
     );
   }
 
-  List<dynamic> _brandGroupedItems(List<Car> cars) {
-    final grouped = <String, List<Car>>{};
-    for (final car in cars) {
-      grouped.putIfAbsent(car.brand, () => <Car>[]).add(car);
-    }
-    final brands = grouped.keys.toList()..sort();
-    final items = <dynamic>[];
-    for (final brand in brands) {
-      items.add(brand);
-      items.addAll(grouped[brand]!);
-    }
-    return items;
-  }
-
   Widget _buildSectionHeader(String title, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.hintColor)),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: theme.hintColor,
+        ),
+      ),
     );
   }
 
   Widget _buildCarTile(Car car, ThemeData theme) {
     final isSelected = widget.selectedCar?.id == car.id;
-    final query = _query.trim().toLowerCase();
+    final query = _query.trim();
 
     return Material(
       color: Colors.transparent,
@@ -465,21 +668,30 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? theme.colorScheme.secondary.withOpacity(0.1) : Colors.transparent,
+            color: isSelected
+                ? theme.colorScheme.secondary.withOpacity(0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            border: isSelected ? Border.all(color: theme.colorScheme.secondary.withOpacity(0.3)) : null,
+            border: isSelected
+                ? Border.all(
+                    color: theme.colorScheme.secondary.withOpacity(0.3))
+                : null,
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected ? theme.colorScheme.secondary.withOpacity(0.15) : theme.cardColor,
+                  color: isSelected
+                      ? theme.colorScheme.secondary.withOpacity(0.15)
+                      : theme.cardColor,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _vehicleIconFor(car.category),
-                  color: isSelected ? theme.colorScheme.secondary : theme.hintColor,
+                  color: isSelected
+                      ? theme.colorScheme.secondary
+                      : theme.hintColor,
                   size: 18,
                 ),
               ),
@@ -488,7 +700,12 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHighlightedText(car.fullName, query, theme, isSelected: isSelected),
+                    _buildHighlightedText(
+                      car.fullName,
+                      query,
+                      theme,
+                      isSelected: isSelected,
+                    ),
                     if (car.description.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -500,20 +717,30 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
                   ],
                 ),
               ),
-              if (car.isPopular && _query.isNotEmpty)
+              if (car.isPopular && query.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(left: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.amber.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('⭐', style: TextStyle(fontSize: 10)),
+                  child: const Text(
+                    'محبوب',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.amber,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               if (isSelected)
-                Icon(Icons.check_circle_rounded, color: theme.colorScheme.secondary, size: 20)
-              else
-                Icon(Icons.chevron_left_rounded, color: theme.hintColor.withOpacity(0.4), size: 20),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: theme.colorScheme.secondary,
+                  size: 18,
+                ),
             ],
           ),
         ),
@@ -521,14 +748,21 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
     );
   }
 
-  Widget _buildHighlightedText(String text, String query, ThemeData theme, {bool isSelected = false}) {
+  Widget _buildHighlightedText(
+    String text,
+    String query,
+    ThemeData theme, {
+    bool isSelected = false,
+  }) {
     if (query.isEmpty) {
       return Text(
         text,
         style: TextStyle(
           fontSize: 14,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? theme.colorScheme.secondary : theme.textTheme.bodyLarge?.color,
+          color: isSelected
+              ? theme.colorScheme.secondary
+              : theme.textTheme.bodyLarge?.color,
         ),
       );
     }
@@ -542,25 +776,28 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         style: TextStyle(
           fontSize: 14,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? theme.colorScheme.secondary : theme.textTheme.bodyLarge?.color,
+          color: isSelected
+              ? theme.colorScheme.secondary
+              : theme.textTheme.bodyLarge?.color,
         ),
       );
     }
 
+    final matchLen = nQuery.length;
     return RichText(
       text: TextSpan(
         style: TextStyle(fontSize: 14, color: theme.textTheme.bodyLarge?.color),
         children: [
           TextSpan(text: text.substring(0, idx)),
           TextSpan(
-            text: text.substring(idx, idx + query.length),
+            text: text.substring(idx, idx + matchLen),
             style: TextStyle(
               backgroundColor: theme.colorScheme.secondary.withOpacity(0.25),
               color: theme.colorScheme.secondary,
               fontWeight: FontWeight.bold,
             ),
           ),
-          TextSpan(text: text.substring(idx + query.length)),
+          TextSpan(text: text.substring(idx + matchLen)),
         ],
       ),
     );
@@ -573,7 +810,11 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_rounded, size: 56, color: theme.hintColor.withOpacity(0.3)),
+            Icon(
+              Icons.search_off_rounded,
+              size: 56,
+              color: theme.hintColor.withOpacity(0.3),
+            ),
             const SizedBox(height: 12),
             Text(
               'وسیله‌ای با نام "$_query" یافت نشد.',
@@ -584,7 +825,10 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
             Text(
               'برند، مدل، موتورسیکلت یا ماشین‌آلات را با نام دیگری جستجو کنید.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: theme.hintColor.withOpacity(0.6), fontSize: 12),
+              style: TextStyle(
+                color: theme.hintColor.withOpacity(0.6),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -593,9 +837,6 @@ class _CarSearchSheetState extends State<_CarSearchSheet> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ─ـ ویجت‌های کمکی ──
-// ─────────────────────────────────────────────────────────────────────────────
 class _ShimmerBox extends StatefulWidget {
   final ThemeData theme;
   const _ShimmerBox({required this.theme});
@@ -604,15 +845,17 @@ class _ShimmerBox extends StatefulWidget {
   State<_ShimmerBox> createState() => _ShimmerBoxState();
 }
 
-class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
-  late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -624,12 +867,19 @@ class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderState
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) {
-        final color = Color.lerp(widget.theme.cardColor, widget.theme.dividerColor, _anim.value)!;
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _ctrl.value;
         return Container(
           height: 56,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+            color: Color.lerp(
+              widget.theme.cardColor,
+              widget.theme.dividerColor.withOpacity(0.4),
+              t,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
         );
       },
     );
@@ -654,7 +904,12 @@ class _ErrorBox extends StatelessWidget {
         children: [
           const Icon(Icons.wifi_off_rounded, color: Colors.redAccent, size: 20),
           const SizedBox(width: 10),
-          const Expanded(child: Text('خطا در بارگذاری لیست وسایل نقلیه', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
+          const Expanded(
+            child: Text(
+              'خطا در بارگذاری لیست وسایل نقلیه',
+              style: TextStyle(color: Colors.redAccent, fontSize: 13),
+            ),
+          ),
           TextButton.icon(
             icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('تلاش مجدد'),
@@ -678,7 +933,10 @@ class _EmptyBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
           Icon(Icons.info_outline_rounded, color: theme.hintColor, size: 18),
