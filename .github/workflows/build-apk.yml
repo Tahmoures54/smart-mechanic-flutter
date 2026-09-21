@@ -160,20 +160,48 @@ jobs:
             > android/key.properties
           echo "Release signing configured"
 
-      # ✅ اصلاح شد: استفاده از env.HAS_KEYSTORE به جای secrets در if
-      - name: Export public certificate (.bin) for Cafe Bazaar
+      # گواهی و اثرانگشت برای کافه‌بازار (همراه APK و AAB)
+      - name: Export public certificate for Cafe Bazaar
         if: ${{ env.HAS_KEYSTORE == 'true' }}
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
-          keytool -export -rfc \
+          set -euo pipefail
+          mkdir -p android/app/bazaar-cert
+
+          # DER باینری (بدون -rfc)
+          keytool -exportcert \
             -keystore android/app/upload-keystore.jks \
             -alias "$RELEASE_KEY_ALIAS" \
-            -file android/app/upload-certificate.bin \
+            -file android/app/bazaar-cert/upload-certificate.bin \
             -storepass "$RELEASE_KEYSTORE_PASSWORD"
-          ls -lh android/app/upload-certificate.bin
-          echo "Certificate exported for Cafe Bazaar"
+
+          # PEM متنی
+          keytool -exportcert -rfc \
+            -keystore android/app/upload-keystore.jks \
+            -alias "$RELEASE_KEY_ALIAS" \
+            -file android/app/bazaar-cert/upload-certificate.pem \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD"
+
+          keytool -list -v \
+            -keystore android/app/upload-keystore.jks \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" > android/app/bazaar-cert/certificate-full.txt
+
+          {
+            echo "# Certificate fingerprints for Cafe Bazaar / Google Play"
+            echo "# Alias: $RELEASE_KEY_ALIAS"
+            echo ""
+            grep -E 'SHA1:|SHA256:|Owner:|Valid' android/app/bazaar-cert/certificate-full.txt || true
+            echo ""
+            echo "# Cafe Bazaar: upload app-release.apk signed with this same key."
+            echo "# Never generate a new keystore after first publish."
+          } > android/app/bazaar-cert/fingerprints.txt
+
+          ls -lh android/app/bazaar-cert/
+          echo "----- fingerprints.txt -----"
+          cat android/app/bazaar-cert/fingerprints.txt
 
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses >/dev/null 2>&1 || true
@@ -186,15 +214,19 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
         run: flutter build appbundle --release --target-platform android-arm64 --obfuscate --split-debug-info=build/symbols
 
-      - name: Upload APK
+      # APK + گواهی بازار در یک artifact
+      - name: Upload APK + Bazaar certificate
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            android/app/bazaar-cert/
           if-no-files-found: error
           retention-days: 30
 
+      # AAB + گواهی (برای Play و در صورت نیاز bundle-signer بازار)
       - name: Upload App Bundle + certificate
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
         uses: actions/upload-artifact@v4
@@ -202,6 +234,6 @@ jobs:
           name: app-release-aab
           path: |
             build/app/outputs/bundle/release/*.aab
-            android/app/upload-certificate.bin
+            android/app/bazaar-cert/
           if-no-files-found: error
           retention-days: 30
