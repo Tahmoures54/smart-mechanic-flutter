@@ -113,7 +113,7 @@ class DiagnosisResultCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               result.statusSummary,
-              style: const TextStyle(fontSize: 14, height: 1.55, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 16, height: 1.65, fontWeight: FontWeight.w600),
             ),
           ],
           if (result.warnings.isNotEmpty) ...[
@@ -122,7 +122,7 @@ class DiagnosisResultCard extends StatelessWidget {
           ],
           if (result.causes.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Text('علت‌های محتمل:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text('علت‌های محتمل:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             ...result.causes.map((c) => _CauseTile(cause: c)),
           ],
@@ -146,7 +146,7 @@ class DiagnosisResultCard extends StatelessWidget {
           ),
           if (result.footer.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(result.footer, style: TextStyle(fontSize: 11.5, color: theme.hintColor)),
+            Text(result.footer, style: TextStyle(fontSize: 13, color: theme.hintColor)),
           ],
           if (_garagePromoText != null) ...[
             const SizedBox(height: 12),
@@ -162,7 +162,7 @@ class DiagnosisResultCard extends StatelessWidget {
                 data: _garagePromoText!,
                 shrinkWrap: true,
                 styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                  p: const TextStyle(fontSize: 12.5, height: 1.55),
+                  p: const TextStyle(fontSize: 14, height: 1.65),
                   h2: TextStyle(
                     fontSize: 14,
                     height: 1.5,
@@ -213,7 +213,7 @@ class _ContinueChatSection extends StatelessWidget {
               Expanded(
                 child: Text(
                   DiagnosisPolicy.encouragementText,
-                  style: const TextStyle(fontSize: 12.5, height: 1.6, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 14, height: 1.7, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -389,7 +389,7 @@ class _CauseTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(cause.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
               const SizedBox(width: 6),
               ProbabilityChip(level: cause.probability),
@@ -408,14 +408,14 @@ class _CauseTile extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(cause.diyCheck!,
-                      style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                      style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
                 ),
               ],
             ),
           ],
           if (cause.costEstimate != null) ...[
             const SizedBox(height: 4),
-            Text(cause.costEstimate!, style: const TextStyle(fontSize: 11.5, color: Colors.orange)),
+            Text(cause.costEstimate!, style: const TextStyle(fontSize: 12.5, color: Colors.orange)),
           ],
         ],
       ),
