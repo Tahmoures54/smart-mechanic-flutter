@@ -76,8 +76,6 @@ jobs:
           flutter analyze --no-fatal-infos > analyze.log 2>&1
           code=$?
           cat analyze.log
-          # The project currently has non-blocking lint/info findings. Do not
-          # hide compiler/analyzer errors, which must fail the release check.
           if grep -Eq '(^|[[:space:]])error •|(^|[[:space:]])Error:' analyze.log; then
             exit 1
           fi
@@ -159,6 +157,21 @@ jobs:
             > android/key.properties
           echo "Release signing configured"
 
+      # ✅ مرحله جدید: استخراج گواهی عمومی امضا برای کافه‌بازار
+      - name: Export public certificate (.bin) for Cafe Bazaar
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          keytool -export -rfc \
+            -keystore android/app/upload-keystore.jks \
+            -alias "$RELEASE_KEY_ALIAS" \
+            -file android/app/upload-certificate.bin \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD"
+          ls -lh android/app/upload-certificate.bin
+          echo "Certificate exported for Cafe Bazaar"
+
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses >/dev/null 2>&1 || true
 
@@ -179,11 +192,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload App Bundle
+      # ✅ حالا AAB + فایل .bin با هم آپلود می‌شوند
+      - name: Upload App Bundle + certificate
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
-          path: build/app/outputs/bundle/release/*.aab
+          path: |
+            build/app/outputs/bundle/release/*.aab
+            android/app/upload-certificate.bin
           if-no-files-found: error
           retention-days: 30
