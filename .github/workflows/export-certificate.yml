@@ -1,0 +1,58 @@
+name: Export Certificate (.bin) for Cafe Bazaar
+
+on: workflow_dispatch
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets exist
+        env:
+          KS: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KS" ]; then
+            echo "❌ RELEASE_KEYSTORE_BASE64 secret is empty!"
+            echo "Go to Settings → Secrets and variables → Actions and add it."
+            exit 1
+          fi
+          echo "✅ Keystore secret found (length: ${#KS} chars)"
+
+      - name: Decode keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > upload-keystore.jks
+          ls -lh upload-keystore.jks
+
+      - name: Show certificate info (for verification)
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          keytool -list -v \
+            -keystore upload-keystore.jks \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS"
+
+      - name: Export public certificate (.bin)
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+        run: |
+          keytool -export -rfc \
+            -keystore upload-keystore.jks \
+            -alias "$RELEASE_KEY_ALIAS" \
+            -file upload-certificate.bin \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD"
+          ls -lh upload-certificate.bin
+          echo "----- محتوای فایل .bin -----"
+          cat upload-certificate.bin
+          echo "----------------------------"
+
+      - name: Upload certificate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-bazaar-certificate
+          path: upload-certificate.bin
+          if-no-files-found: error
+          retention-days: 30
