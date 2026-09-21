@@ -39,9 +39,10 @@ class ShareService {
 
     final referral = (referralCode != null && referralCode.isNotEmpty)
         ? '\n\nبا کد معرف $referralCode در $appName ثبت‌نام کن و اعتبار هدیه بگیر.'
-        : '\n\nاپ $appName — عیب‌یابی خودرو با کمک AI\n$websiteUrl';
+        : '';
+    final website = '\n\n🌐 وب‌سایت: $websiteUrl';
 
-    return '$header$result$referral';
+    return '$header$result$referral$website';
   }
 
   /// متن آماده برای وضعیت ۲۴ساعته واتساپ
