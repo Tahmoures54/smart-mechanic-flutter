@@ -1,25 +1,37 @@
 # 📦 راهنمای انتشار نهایی — مکانیک هوشمند
 
-## خروجی بیلد (یک APK برای گوشی‌های امروزی)
+## خروجی بیلد
 
-بیلد دیگر سه APK جدا (armeabi-v7a / arm64 / x86) نمی‌سازد.
-
-| فایل | مخاطب |
-|------|--------|
-| `app-release.apk` | گوشی‌های امروزی ARM 64-bit + آپلود در **کافه‌بازار** |
-| `app-release.aab` | **Google Play** (Play App Signing) |
+| فایل / Artifact | مخاطب |
+|-----------------|--------|
+| **`cafe-bazaar-release`** | بستهٔ آمادهٔ **کافه‌بازار** (APK + گواهی + اثرانگشت) |
+| `app-release.apk` | نصب مستقیم / بازار (داخل artifact بالا هم هست) |
+| `app-release.aab` | **Google Play** |
+| `cafe-bazaar-certificate` | فقط گواهی و SHA1/SHA256 |
 
 حداقل اندروید: API 24. فقط معماری `arm64-v8a`.
 
 ---
 
-## پیش‌نیازها
+## پیش‌نیازها (الزامی قبل از انتشار بازار)
 
-### ۱. کلید انتشار Play و بازار (یک‌بار — برای انتشار الزامی)
+### ۱. کلید انتشار Play و بازار (یک‌بار)
 
-همین کلید را برای **هر دو فروشگاه** استفاده کنید. اگر گم شود، به‌روزرسانی اپ ممکن نیست.
+همین کلید برای **هر دو فروشگاه** است. اگر گم شود، به‌روزرسانی ممکن نیست.
 
-**روش پیشنهادی:** workflow **Generate Play / Bazaar Upload Key** را **فقط یک‌بار** از تب Actions اجرا کنید و artifact را دانلود کنید.
+1. Actions → **Generate Play / Bazaar Upload Key** → Run workflow (**فقط یک‌بار**)
+2. Artifact `play-bazaar-upload-key` را دانلود کنید
+3. در **Settings → Secrets and variables → Actions** این‌ها را بگذارید:
+
+| Secret | منبع |
+|--------|--------|
+| `RELEASE_KEYSTORE_BASE64` | کل محتوای `RELEASE_KEYSTORE.base64` |
+| `RELEASE_KEYSTORE_PASSWORD` | از `github-secrets.txt` |
+| `RELEASE_KEY_PASSWORD` | از `github-secrets.txt` |
+| `RELEASE_KEY_ALIAS` | معمولاً `upload` |
+| `GOOGLE_MAPS_API_KEY` | کلید Maps / Places |
+
+فایل `.jks` و رمز را آفلاین در جای امن نگه دارید. **کلید جدید بعد از انتشار اول نسازید.**
 
 یا محلی:
 
@@ -28,60 +40,51 @@ chmod +x scripts/generate_release_keystore.sh
 ./scripts/generate_release_keystore.sh secrets
 ```
 
-سپس در GitHub → Settings → Secrets and variables → Actions:
-
-| Secret | منبع |
-|--------|--------|
-| `RELEASE_KEYSTORE_BASE64` | محتویات `RELEASE_KEYSTORE.base64` |
-| `RELEASE_KEYSTORE_PASSWORD` | از `github-secrets.txt` |
-| `RELEASE_KEY_ALIAS` | معمولاً `upload` |
-| `RELEASE_KEY_PASSWORD` | از `github-secrets.txt` |
-| `GOOGLE_MAPS_API_KEY` | کلید Google Maps / Places |
-
-فایل‌های `.jks` و رمز را در گیت نگذارید. یک نسخه آفلاین در جای امن نگه دارید.
-
-> اگر قبلاً کلیدی ساخته‌اید، کلید جدید نسازید؛ فروشگاه‌ها فقط همان کلید اول را می‌پذیرند.
-
 ### ۲. کلید Google Maps
 
-1. در [Google Cloud Console](https://console.cloud.google.com) پروژه بسازید
-2. APIهای زیر را فعال کنید:
-   - Maps SDK for Android
-   - Places API
-3. کلید API بسازید و محدودیت package name روی `ir.smartmec.app` بگذارید
-4. کلید را در Secrets ذخیره کنید
+1. [Google Cloud Console](https://console.cloud.google.com)
+2. فعال‌سازی: Maps SDK for Android + Places API
+3. محدودیت package: `ir.smartmec.app`
+4. ذخیره در Secret `GOOGLE_MAPS_API_KEY`
 
 ### ۳. بک‌اند
 
-- آدرس production در `lib/constants.dart` بررسی شود
-- HTTPS و CORS صحیح باشد
-- OTP و پرداخت تست شوند
+- API production: `https://smart-mec.ir/api`
+- OTP و پرداخت روی دستگاه واقعی تست شود
 
 ---
 
-## مراحل انتشار
+## نسخه فعلی
 
-### نسخه فعلی
 - **Version name:** `1.3.2`
 - **Version code:** `8`
 - **Package:** `ir.smartmec.app`
 
 ### تغییرات این نسخه
-- پاسخ مستقیم‌تر عیب‌یابی بدون چرخه‌های اجباری سؤال و جواب.
-- بهبود عملکرد کاتالوگ خودرو و تحلیل صدای موتور.
-- افزودن کارت خرید پلن/اعتبار در صفحهٔ اصلی.
-- هماهنگی نسخهٔ اپ با `pubspec.yaml` و build number انتشار.
+- پاسخ مستقیم‌تر عیب‌یابی
+- بهبود کاتالوگ خودرو و تحلیل صدا
+- کارت خرید پلن/اعتبار در صفحه اصلی
+- هماهنگی نسخه با `pubspec.yaml`
 
-### بیلد از طریق GitHub Actions
+---
 
-1. به تب **Actions** بروید
-2. workflow **Build Flutter APK** را انتخاب کنید
-3. **Run workflow** → گزینه `both` (پیش‌فرض)
-4. آرتیفکت‌ها:
-   - `app-release-apk` → کافه‌بازار / نصب مستقیم
-   - `app-release-aab` → Google Play
+## بیلد برای کافه‌بازار (پیشنهادی)
 
-روی pull request فقط APK ساخته می‌شود تا CI سریع‌تر باشد.
+1. مطمئن شوید Secrets کلید ست شده (بخش پیش‌نیاز)
+2. Actions → **Build Flutter APK** → **Run workflow** → `both` یا `apk`
+3. بعد از موفقیت این artifacts را بگیرید:
+
+| Artifact | محتوا |
+|----------|--------|
+| **`cafe-bazaar-release`** | `app-release.apk` + `upload-certificate.bin` + `.pem` + `fingerprints.txt` |
+| `app-release-aab` | برای گوگل‌پلی |
+
+4. در پنل [کافه‌بازار توسعه‌دهندگان](https://developers.cafebazaar.ir):
+   - فایل **`app-release.apk`** را آپلود کنید
+   - `versionCode` باید از نسخه قبلی بیشتر باشد
+   - اگر پنل گواهی خواست: `upload-certificate.bin` یا مقادیر SHA از `fingerprints.txt`
+
+> ⚠️ بدون Secrets کلید، بیلد دستی (Run workflow) **خطا می‌دهد**. روی push معمولی بدون کلید فقط CI با امضای debug ساخته می‌شود و برای بازار قابل قبول نیست.
 
 ### بیلد محلی
 
@@ -93,39 +96,23 @@ flutter build appbundle --release --target-platform android-arm64 --obfuscate --
 
 ---
 
-## چک‌لیست قبل از انتشار
+## چک‌لیست قبل از انتشار بازار
 
-- [ ] `flutter analyze` و `flutter test` بدون خطا اجرا شده‌اند
-- [ ] نسخه در `pubspec.yaml` و `Constants` یکسان است
-- [ ] `enableLogging` در production خاموش است
-- [ ] keystore واقعی (نه تست) در Secrets است
-- [ ] کلید Google Maps محدود به package name است
-- [ ] DISCLAIMER در اپ قابل مشاهده است
-- [ ] OTP واقعی تست شده
-- [ ] پرداخت / درگاه تست شده
-- [ ] تحلیل صدا روی دستگاه واقعی تست شده
-- [ ] نقشه و تعمیرگاه‌های نزدیک کار می‌کنند
-- [ ] تم تاریک/روشن و RTL درست هستند
-- [ ] هیچ secretی در کد hardcode نشده
+- [ ] Secrets کلید (`RELEASE_KEYSTORE_*`) ست شده
+- [ ] Artifact **`cafe-bazaar-release`** ساخته شده (نه فقط debug APK)
+- [ ] `versionCode` از نسخه قبلی بازار بیشتر است
+- [ ] `flutter analyze` / `flutter test` بدون error
+- [ ] OTP، پرداخت، صدا، نقشه روی دستگاه واقعی تست شده
+- [ ] DISCLAIMER در اپ دیده می‌شود
+- [ ] هیچ secret در کد hardcode نیست
 
 ---
 
-## انتشار در فروشگاه‌ها
+## Google Play
 
-### Google Play
-1. ساخت / دانلود `app-release.aab`
-2. ساخت اپ در Google Play Console
-3. آپلود AAB + تصاویر + توضیحات + سیاست حریم خصوصی
-4. تکمیل پرسشنامه محتوا و رتبه‌بندی سنی
-5. در Play App Signing، کلید آپلود همین `upload` است
-
-### کافه‌بازار
-1. دانلود `app-release.apk` (arm64)
-2. آپلود در پنل بازار با **همان کلید امضا**
-3. نسخه و versionCode باید از نسخه قبلی بیشتر باشد
-
-### آپلود مستقیم
-فایل `app-release.apk` را می‌توانید مستقیم توزیع کنید (مثلاً سایت رسمی).
+1. دانلود `app-release.aab`
+2. آپلود در Play Console + تصاویر و حریم خصوصی
+3. Upload key = همان کلید `upload`
 
 ---
 
