@@ -1,4 +1,13 @@
-name: Export Certificate (.bin) for Cafe Bazaar
+name: Export Certificate for Cafe Bazaar
+
+# خروجی:
+#   - upload-certificate.bin  (DER باینری — فرمت استاندارد keytool بدون -rfc)
+#   - upload-certificate.pem  (PEM متنی)
+#   - fingerprints.txt       (SHA1 / SHA256 برای پنل بازار و Google)
+#
+# این فایل‌ها را یک‌بار در پنل کافه‌بازار نگه دارید.
+# برای آپلود معمولی APK فقط به APK امضاشده نیاز دارید؛
+# گواهی/اثرانگشت برای تأیید هویت توسعه‌دهنده یا App Bundle مفید است.
 
 on: workflow_dispatch
 
@@ -13,6 +22,7 @@ jobs:
           if [ -z "$KS" ]; then
             echo "❌ RELEASE_KEYSTORE_BASE64 secret is empty!"
             echo "Go to Settings → Secrets and variables → Actions and add it."
+            echo "First run the workflow: Generate Play / Bazaar Upload Key"
             exit 1
           fi
           echo "✅ Keystore secret found (length: ${#KS} chars)"
@@ -34,25 +44,54 @@ jobs:
             -storepass "$RELEASE_KEYSTORE_PASSWORD" \
             -alias "$RELEASE_KEY_ALIAS"
 
-      - name: Export public certificate (.bin)
+      - name: Export public certificate (DER .bin + PEM) and fingerprints
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
         run: |
-          keytool -export -rfc \
+          set -euo pipefail
+          mkdir -p out
+
+          # DER باینری (بدون -rfc) — نام .bin برای سازگاری با مستندات بازار
+          keytool -exportcert \
             -keystore upload-keystore.jks \
             -alias "$RELEASE_KEY_ALIAS" \
-            -file upload-certificate.bin \
+            -file out/upload-certificate.bin \
             -storepass "$RELEASE_KEYSTORE_PASSWORD"
-          ls -lh upload-certificate.bin
-          echo "----- محتوای فایل .bin -----"
-          cat upload-certificate.bin
-          echo "----------------------------"
 
-      - name: Upload certificate artifact
+          # PEM متنی (با -rfc)
+          keytool -exportcert -rfc \
+            -keystore upload-keystore.jks \
+            -alias "$RELEASE_KEY_ALIAS" \
+            -file out/upload-certificate.pem \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD"
+
+          # اثرانگشت‌ها برای پنل بازار / پلی / Firebase
+          keytool -list -v \
+            -keystore upload-keystore.jks \
+            -storepass "$RELEASE_KEYSTORE_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" > out/certificate-full.txt
+
+          {
+            echo "# Certificate fingerprints for Cafe Bazaar / Google Play / Maps"
+            echo "# Alias: $RELEASE_KEY_ALIAS"
+            echo ""
+            grep -E 'SHA1:|SHA256:|Owner:|Valid' out/certificate-full.txt || true
+            echo ""
+            echo "# How to use on Cafe Bazaar:"
+            echo "# 1) Upload the signed APK (app-release.apk) from Build Flutter APK workflow"
+            echo "# 2) Keep the same keystore forever — Bazaar rejects updates with a different sign"
+            echo "# 3) If the panel asks for certificate, upload upload-certificate.bin or .pem"
+          } > out/fingerprints.txt
+
+          ls -lh out/
+          echo "----- fingerprints.txt -----"
+          cat out/fingerprints.txt
+
+      - name: Upload Bazaar certificate kit
         uses: actions/upload-artifact@v4
         with:
           name: cafe-bazaar-certificate
-          path: upload-certificate.bin
+          path: out/
           if-no-files-found: error
           retention-days: 30
