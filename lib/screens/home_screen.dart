@@ -15,6 +15,7 @@ import '../widgets/brand_logo.dart';
 import '../widgets/car_selector_widget.dart';
 import '../widgets/enamad_badge.dart';
 import '../widgets/home_promo_carousel.dart';
+import '../widgets/home_plan_purchase_card.dart';
 import 'chat_screen.dart';
 import 'history_screen.dart';
 import 'login_screen.dart';
@@ -538,7 +539,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              HomePlanPurchaseCard(
+                credits: auth.credits,
+                isGoldenActive: auth.isGoldenActive,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(builder: (_) => const ShopScreen()),
+                ),
+              ),
+              const SizedBox(height: 20),
 
               _SectionLabel(number: '۱', title: 'وسیله نقلیه را انتخاب کنید'),
               const SizedBox(height: 10),
