@@ -41,7 +41,7 @@ class ChatBubble extends StatelessWidget {
         children: [
           SelectableText(
             message.text,
-            style: TextStyle(height: 1.55, fontSize: 14, color: isSystem ? Colors.redAccent.shade100 : null),
+            style: TextStyle(height: 1.55, fontSize: 15, color: isSystem ? Colors.redAccent.shade100 : null),
           ),
           if (isSystem && onRetry != null) ...[
             const SizedBox(height: 6),
