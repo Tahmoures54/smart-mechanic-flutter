@@ -27,6 +27,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # چون در if: نمی‌توان مستقیم از secrets استفاده کرد، اینجا به boolean تبدیل می‌کنیم
+      HAS_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
 
     steps:
       - name: Checkout repository
@@ -157,9 +160,9 @@ jobs:
             > android/key.properties
           echo "Release signing configured"
 
-      # ✅ مرحله جدید: استخراج گواهی عمومی امضا برای کافه‌بازار
+      # ✅ اصلاح شد: استفاده از env.HAS_KEYSTORE به جای secrets در if
       - name: Export public certificate (.bin) for Cafe Bazaar
-        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -192,7 +195,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ✅ حالا AAB + فایل .bin با هم آپلود می‌شوند
       - name: Upload App Bundle + certificate
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
         uses: actions/upload-artifact@v4
