@@ -85,7 +85,7 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Generate orange mechanical branding + launcher icons
+      - name: Generate branding + launcher icons
         run: |
           pip3 install --quiet pillow
           python3 tool/generate_branding.py
@@ -108,16 +108,13 @@ jobs:
           test -f android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
           test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
-      - name: Inject Google Maps API Key
+      # تعمیرگاه‌ها از دیتابیس خود اپ می‌آیند — کلید Google Maps الزامی نیست
+      - name: Optional Google Maps key (not required)
         env:
           MAPS_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           if [ -z "$MAPS_KEY" ]; then
-            if [ "$GITHUB_REF_TYPE" = "tag" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-              echo "::error::انتشار واقعی به GOOGLE_MAPS_API_KEY در Secrets نیاز دارد"
-              exit 1
-            fi
-            echo "GOOGLE_MAPS_API_KEY not set — placeholder for CI only"
+            echo "بدون GOOGLE_MAPS_API_KEY — تعمیرگاه‌ها از API خودمان بارگذاری می‌شوند."
             exit 0
           fi
           python3 -c '
@@ -128,9 +125,9 @@ jobs:
           pattern = r"(android:name=\"com\.google\.android\.geo\.API_KEY\"\s+android:value=\")[^\"]*(\")"
           text2, n = re.subn(pattern, rf"\g<1>{key}\2", text)
           if n != 1:
-              raise SystemExit(f"Expected exactly one Google Maps API key placeholder, found {n}")
+              raise SystemExit(f"Expected exactly one Maps API key placeholder, found {n}")
           open(path, "w", encoding="utf-8").write(text2)
-          print("Maps API key injected")
+          print("Optional Maps API key injected")
           '
 
       - name: Setup release signing
@@ -142,12 +139,11 @@ jobs:
         run: |
           if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
             if [ "$GITHUB_REF_TYPE" = "tag" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-              echo "::error::برای انتشار در کافه‌بازار / پلی باید Secrets کلید را ست کنید:"
-              echo "  1) Actions → Generate Play / Bazaar Upload Key (یک‌بار)"
-              echo "  2) Settings → Secrets: RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_PASSWORD, RELEASE_KEY_ALIAS"
+              echo "::error::برای انتشار بازار باید ۴ تا Secret کلید را ست کنید (بدون Google Maps)."
+              echo "Actions → Generate Play / Bazaar Upload Key → بعد Secrets را پر کنید."
               exit 1
             fi
-            echo "::warning::بدون keystore — امضای debug (فقط برای CI). برای بازار مناسب نیست."
+            echo "::warning::بدون keystore — امضای debug (فقط CI). برای بازار مناسب نیست."
             exit 0
           fi
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
@@ -157,7 +153,7 @@ jobs:
             "keyAlias=${RELEASE_KEY_ALIAS}" \
             "storeFile=upload-keystore.jks" \
             > android/key.properties
-          echo "✅ Release signing configured (Play + Cafe Bazaar)"
+          echo "✅ Release signing configured"
 
       - name: Export Cafe Bazaar certificate kit
         if: ${{ env.HAS_KEYSTORE == 'true' }}
@@ -186,19 +182,16 @@ jobs:
             -alias "$RELEASE_KEY_ALIAS" > bazaar-release/certificate-full.txt
 
           {
-            echo "# اثرانگشت گواهی — کافه‌بازار / گوگل‌پلی"
+            echo "# اثرانگشت گواهی — کافه‌بازار"
             echo "# Alias: $RELEASE_KEY_ALIAS"
             echo ""
             grep -E 'SHA1:|SHA256:|Owner:|Valid' bazaar-release/certificate-full.txt || true
             echo ""
-            echo "# نحوه استفاده در کافه‌بازار:"
-            echo "# 1) فایل app-release.apk را در پنل بازار آپلود کنید"
-            echo "# 2) versionCode باید از نسخه قبلی بیشتر باشد"
-            echo "# 3) همیشه با همین keystore امضا کنید — کلید جدید = عدم امکان آپدیت"
-            echo "# 4) در صورت نیاز به گواهی: upload-certificate.bin یا .pem"
+            echo "# 1) app-release.apk را در پنل بازار آپلود کنید"
+            echo "# 2) versionCode از نسخه قبلی بیشتر باشد"
+            echo "# 3) همین keystore را همیشه نگه دارید"
           } > bazaar-release/fingerprints.txt
 
-          echo "----- fingerprints -----"
           cat bazaar-release/fingerprints.txt
 
       - name: Accept Android licenses
@@ -221,16 +214,13 @@ jobs:
           APK="build/app/outputs/flutter-apk/app-release.apk"
           test -f "$APK"
           ls -lh "$APK"
-
-          echo "===== Certificate of built APK ====="
           keytool -printcert -jarfile "$APK" || true
 
           if [ "$HAS_KS" = "true" ]; then
             cp "$APK" bazaar-release/app-release.apk
-            # تأیید که APK با همان کلید release امضا شده
-            echo "✅ Signed APK copied to bazaar-release/ for Cafe Bazaar upload"
+            echo "✅ Signed APK ready for Cafe Bazaar"
           else
-            echo "::warning::APK با امضای debug ساخته شد — برای آپلود در کافه‌بازار مناسب نیست. Secrets کلید را ست کنید."
+            echo "::warning::APK با debug امضا شده — برای بازار مناسب نیست."
           fi
 
       - name: Upload APK artifact
@@ -242,7 +232,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # بسته آماده کافه‌بازار: APK + گواهی + اثرانگشت (فقط وقتی کلید واقعی هست)
       - name: Upload Cafe Bazaar release package
         if: ${{ env.HAS_KEYSTORE == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'appbundle') }}
         uses: actions/upload-artifact@v4
@@ -261,7 +250,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload certificate kit (with AAB builds too)
+      - name: Upload certificate kit
         if: ${{ env.HAS_KEYSTORE == 'true' && github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.build_type != 'apk') }}
         uses: actions/upload-artifact@v4
         with:
@@ -274,33 +263,22 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Job summary (Bazaar / Play)
+      - name: Job summary
         if: always()
         run: |
           {
             echo "## خروجی بیلد"
             echo ""
             if [ "${{ env.HAS_KEYSTORE }}" = "true" ]; then
-              echo "✅ **امضای release** فعال بود."
+              echo "✅ امضای release فعال بود."
               echo ""
               echo "### کافه‌بازار"
-              echo "1. Artifact **\`cafe-bazaar-release\`** را دانلود کنید"
-              echo "2. فایل **\`app-release.apk\`** را در پنل بازار آپلود کنید"
-              echo "3. در صورت نیاز: \`upload-certificate.bin\` / \`fingerprints.txt\`"
-              echo "4. version فعلی از pubspec: ببینید versionCode از نسخه قبلی بیشتر باشد"
+              echo "1. Artifact **cafe-bazaar-release** را دانلود کنید"
+              echo "2. فایل **app-release.apk** را در پنل بازار آپلود کنید"
             else
-              echo "⚠️ **بدون keystore** — APK با debug امضا شده و برای بازار قابل قبول نیست."
-              echo ""
-              echo "### کارهای لازم قبل از انتشار بازار"
-              echo "1. Actions → **Generate Play / Bazaar Upload Key** (فقط یک‌بار)"
-              echo "2. Settings → Secrets and variables → Actions:"
-              echo "   - \`RELEASE_KEYSTORE_BASE64\`"
-              echo "   - \`RELEASE_KEYSTORE_PASSWORD\`"
-              echo "   - \`RELEASE_KEY_PASSWORD\`"
-              echo "   - \`RELEASE_KEY_ALIAS\` (= upload)"
-              echo "3. دوباره **Build Flutter APK** را با Run workflow بزنید"
+              echo "⚠️ بدون keystore — برای بازار باید کلید بسازید:"
+              echo "1. Actions → Generate Play / Bazaar Upload Key"
+              echo "2. Settings → Secrets: چهار مقدار RELEASE_KEYSTORE_* و RELEASE_KEY_ALIAS"
+              echo "3. دوباره Build Flutter APK → Run workflow"
             fi
-            echo ""
-            echo "### Google Play"
-            echo "Artifact **\`app-release-aab\`** را در Play Console آپلود کنید."
           } >> "$GITHUB_STEP_SUMMARY"
