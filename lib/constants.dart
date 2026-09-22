@@ -140,7 +140,8 @@ class Constants {
       'https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
 
   static const Duration defaultTimeout = Duration(seconds: 20);
-  static const Duration diagnoseTimeout = Duration(seconds: 60);
+  /// هم‌تراز با maxDuration بک‌اند (۹۰s) تا کلاینت زودتر از سرور قطع نکند.
+  static const Duration diagnoseTimeout = Duration(seconds: 90);
   static const Duration uploadTimeout = Duration(seconds: 90);
   static const Duration longPollTimeout = Duration(minutes: 2);
 
