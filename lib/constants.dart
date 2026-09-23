@@ -152,8 +152,8 @@ class Constants {
   static const String appName = 'مکانیک هوشمند';
   static const String appNameEn = 'Smart Mechanic';
   static const String appTagline = 'بزرگترین بانک اطلاعات فنی خودرویی کشور';
-  static const String appVersion = '1.3.2';
-  static const int appBuildNumber = 8;
+  static const String appVersion = '1.3.3';
+  static const int appBuildNumber = 9;
   static const String packageName = 'ir.smartmec.app';
   static const String supportEmail = 'support@smart-mec.ir';
 
