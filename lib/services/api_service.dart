@@ -80,7 +80,7 @@ class ApiService {
   ApiService({
     http.Client? httpClient,
     Duration defaultTimeout = const Duration(seconds: 20),
-    Duration diagnoseTimeout = const Duration(seconds: 60),
+    Duration diagnoseTimeout = const Duration(seconds: 45),
     Duration uploadTimeout = const Duration(seconds: 90),
   })  : _httpClient = httpClient ?? http.Client(),
         _defaultTimeout = defaultTimeout,
