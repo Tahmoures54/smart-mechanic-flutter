@@ -52,6 +52,10 @@ class ChatController extends ChangeNotifier {
 
   String? _lastDiagnosticId;
   bool _disposed = false;
+  static int _requestSequence = 0;
+
+  String _newRequestId() =>
+      'diag_${DateTime.now().microsecondsSinceEpoch}_${_requestSequence++}';
 
   void _safeNotify() {
     if (!_disposed) notifyListeners();
@@ -86,19 +90,22 @@ class ChatController extends ChangeNotifier {
     if (trimmed.isEmpty || _isTyping) return;
 
     _append(ChatMessage.user(trimmed));
-    await fetchDiagnosis(trimmed);
+    await fetchDiagnosis(trimmed, requestId: _newRequestId());
   }
 
   /// تلاش دوباره روی یک پیام خطا؛ پیام خطا از لیست حذف می‌شود و درخواست
   /// با همان متن اصلی کاربر دوباره ارسال می‌شود.
   Future<void> retry(ChatMessage errorMessage) async {
-    if (errorMessage.retryText == null) return;
+    if (errorMessage.retryText == null || _isTyping) return;
     _messages.remove(errorMessage);
     _safeNotify();
-    await fetchDiagnosis(errorMessage.retryText!);
+    await fetchDiagnosis(
+      errorMessage.retryText!,
+      requestId: errorMessage.retryRequestId ?? _newRequestId(),
+    );
   }
 
-  Future<void> fetchDiagnosis(String description) async {
+  Future<void> fetchDiagnosis(String description, {required String requestId}) async {
     _isTyping = true;
     _safeNotify();
 
@@ -115,6 +122,7 @@ class ChatController extends ChangeNotifier {
         year: year,
         carName: isCustomCar ? carName : null,
         previousDiagnosticId: _lastDiagnosticId,
+        requestId: requestId,
         lat: latitude,
         lng: longitude,
       );
@@ -134,11 +142,16 @@ class ChatController extends ChangeNotifier {
       _append(ChatMessage.error(
         _messageForApiError(e),
         retryText: e.statusCode == 402 ? null : description,
+        retryRequestId: e.statusCode == 402 ? null : requestId,
         errorType: _errorTypeFor(e),
       ));
     } catch (_) {
       if (_disposed) return;
-      _append(ChatMessage.error('خطا در عیب‌یابی. لطفاً دوباره تلاش کنید.', retryText: description));
+      _append(ChatMessage.error(
+        'خطا در عیب‌یابی. لطفاً دوباره تلاش کنید.',
+        retryText: description,
+        retryRequestId: requestId,
+      ));
     } finally {
       if (!_disposed) {
         _isTyping = false;
