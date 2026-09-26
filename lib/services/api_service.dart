@@ -335,6 +335,7 @@ class ApiService {
     required String year,
     String? carName,
     String? previousDiagnosticId,
+    String? requestId,
     double? lat,
     double? lng,
     String? city,
@@ -348,6 +349,7 @@ class ApiService {
       if (carName != null && carName.trim().isNotEmpty) 'carName': carName.trim(),
       if (previousDiagnosticId != null && previousDiagnosticId.trim().isNotEmpty)
         'previousDiagnosticId': int.tryParse(previousDiagnosticId.trim()) ?? previousDiagnosticId.trim(),
+      if (requestId != null && requestId.trim().isNotEmpty) 'requestId': requestId.trim(),
       if (lat != null && lng != null && lat.isFinite && lng.isFinite) ...{
         'lat': lat,
         'lng': lng,
