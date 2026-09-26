@@ -13,6 +13,8 @@ import 'package:timezone/timezone.dart' as tz;
 enum AppNotificationType {
   lowCredits(1001),
   goldenExpiring(1002),
+  goldenExpiringThreeDays(10021),
+  goldenExpiringOneDay(10022),
   checkupReminder(1003),
   referralMilestone(1004),
   welcome(1005),
@@ -50,6 +52,13 @@ class NotificationService {
 
   bool _initialized = false;
   SharedPreferences? _prefs;
+
+  int? _pendingCredits;
+  bool? _pendingGoldenActive;
+  DateTime? _pendingGoldenExpiry;
+  int _pendingEarnings = 0;
+  int _pendingMinWithdrawal = 50000;
+  bool _hasPendingProfileSync = false;
 
   static const _channelId = 'smart_mec_main';
   static const _channelName = 'اعلان‌های مکانیک هوشمند';
@@ -107,6 +116,15 @@ class NotificationService {
 
     _initialized = true;
     debugPrint('[NotificationService] initialized');
+    if (_hasPendingProfileSync && notificationsEnabled) {
+      final credits = _pendingCredits ?? 0;
+      final goldenActive = _pendingGoldenActive ?? false;
+      final goldenExpiry = _pendingGoldenExpiry;
+      final earnings = _pendingEarnings;
+      final minWithdrawal = _pendingMinWithdrawal;
+      _hasPendingProfileSync = false;
+      await syncFromProfile(credits: credits, isGoldenActive: goldenActive, goldenExpiry: goldenExpiry, earnings: earnings, minWithdrawal: minWithdrawal);
+    }
   }
 
   void _onTap(NotificationResponse response) {
@@ -168,6 +186,17 @@ class NotificationService {
   Future<void> setTypeEnabled(String key, bool value) async {
     await init();
     await _prefs?.setBool(key, value);
+    if (!value) {
+      if (key == NotificationPrefs.lowCredits) {
+        await cancel(AppNotificationType.lowCredits);
+      } else if (key == NotificationPrefs.golden) {
+        await _cancelGoldenExpiry();
+      } else if (key == NotificationPrefs.checkup) {
+        await cancel(AppNotificationType.checkupReminder);
+      } else if (key == NotificationPrefs.referral) {
+        await cancel(AppNotificationType.referralMilestone);
+      }
+    }
   }
 
   // ─── اعلان فوری ─────────────────────────────────────────────────────────
@@ -181,7 +210,7 @@ class NotificationService {
     if (!_initialized || !notificationsEnabled) return;
 
     await _plugin.show(
-      type.id,
+      notificationId ?? type.id,
       title,
       body,
       NotificationDetails(
@@ -208,6 +237,7 @@ class NotificationService {
 
   Future<void> schedule({
     required AppNotificationType type,
+    int? notificationId,
     required String title,
     required String body,
     required DateTime when,
@@ -253,6 +283,12 @@ class NotificationService {
     await _plugin.cancel(type.id);
   }
 
+  Future<void> _cancelGoldenExpiry() async {
+    await _plugin.cancel(AppNotificationType.goldenExpiringThreeDays.id);
+    await _plugin.cancel(AppNotificationType.goldenExpiringOneDay.id);
+    await _plugin.cancel(AppNotificationType.goldenExpiring.id);
+  }
+
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
   }
@@ -285,7 +321,7 @@ class NotificationService {
 
   /// انقضای اشتراک طلایی — ۳ روز و ۱ روز قبل
   Future<void> scheduleGoldenExpiry(DateTime? expiry) async {
-    await cancel(AppNotificationType.goldenExpiring);
+    await _cancelGoldenExpiry();
     if (expiry == null || !isTypeEnabled(NotificationPrefs.golden)) return;
 
     final now = DateTime.now();
@@ -294,15 +330,18 @@ class NotificationService {
 
     if (threeDays.isAfter(now)) {
       await schedule(
-        type: AppNotificationType.goldenExpiring,
+        type: AppNotificationType.goldenExpiringThreeDays,
+        notificationId: AppNotificationType.goldenExpiringThreeDays.id,
         title: 'اشتراک طلایی',
         body: '۳ روز تا پایان اشتراک طلایی باقی مانده.',
         when: threeDays,
         payload: 'shop',
       );
-    } else if (oneDay.isAfter(now)) {
+    }
+    if (oneDay.isAfter(now)) {
       await schedule(
-        type: AppNotificationType.goldenExpiring,
+        type: AppNotificationType.goldenExpiringOneDay,
+        notificationId: AppNotificationType.goldenExpiringOneDay.id,
         title: 'اشتراک طلایی',
         body: 'فردا اشتراک طلایی به پایان می‌رسد. در صورت نیاز تمدید کن.',
         when: oneDay,
@@ -402,8 +441,16 @@ class NotificationService {
     int earnings = 0,
     int minWithdrawal = 50000,
   }) async {
-    // Startup-safe: profile sync may run before deferred native initialization.
-    if (!_initialized || !notificationsEnabled) return;
+    if (!_initialized) {
+      _pendingCredits = credits;
+      _pendingGoldenActive = isGoldenActive;
+      _pendingGoldenExpiry = goldenExpiry;
+      _pendingEarnings = earnings;
+      _pendingMinWithdrawal = minWithdrawal;
+      _hasPendingProfileSync = true;
+      return;
+    }
+    if (!notificationsEnabled) return;
 
     if (!isGoldenActive) {
       await notifyLowCredits(credits);
