@@ -321,8 +321,10 @@ class AuthProvider with ChangeNotifier {
     _credits = 0;
     _isGolden = false;
     _goldenExpiry = null;
-    _remainingFree = 2;
-    _monthlyFreeLimit = 2;
+    // Do not expose guest/default quota after logout. The server is the
+    // source of truth and a new session must load its own profile first.
+    _remainingFree = 0;
+    _monthlyFreeLimit = 0;
     _usedFree = 0;
     _referralCode = null;
     _earnings = 0;
