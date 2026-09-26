@@ -210,7 +210,7 @@ class NotificationService {
     if (!_initialized || !notificationsEnabled) return;
 
     await _plugin.show(
-      notificationId ?? type.id,
+      type.id,
       title,
       body,
       NotificationDetails(
