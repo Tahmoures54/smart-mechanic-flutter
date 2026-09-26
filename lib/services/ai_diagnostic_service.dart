@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../constants.dart';
 import '../models/audio_features.dart';
 import 'api_service.dart';
 
@@ -229,7 +230,7 @@ class AIDiagnosticService {
         final response = await _apiService
             .diagnose(token, carId, prompt, year: year, carName: carName)
             .timeout(
-              const Duration(seconds: 45),
+              Constants.diagnoseTimeout,
               onTimeout: () => throw DiagnosticException(
                 'زمان پاسخ سرور تمام شد. لطفاً دوباره تلاش کنید.',
               ),
