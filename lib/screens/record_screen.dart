@@ -54,7 +54,7 @@ class _MissingTokenException implements Exception {
 }
 
 class _RecordScreenState extends State<RecordScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isRecording = false;
   bool _isProcessing = false;
   int _secondsElapsed = 0;
@@ -72,6 +72,7 @@ class _RecordScreenState extends State<RecordScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -89,7 +90,24 @@ class _RecordScreenState extends State<RecordScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if ((state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.detached) && _isRecording) {
+      final audio = _audioService;
+      _timer?.cancel();
+      _timer = null;
+      _isRecording = false;
+      if (audio != null) {
+        unawaited(audio.cancelRecording().catchError((Object e) {
+          debugPrint('[RecordScreen] lifecycle cancel failed: $e');
+        }));
+      }
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _timer = null;
     _animController.dispose();
@@ -210,7 +228,7 @@ class _RecordScreenState extends State<RecordScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _toggleRecording() async {
-    if (_isProcessing) return;
+    if (_isProcessing || !mounted) return;
 
     // همه Providerها را قبل از await می‌گیریم.
     final audioService = _audioService ?? context.read<AudioService>();
