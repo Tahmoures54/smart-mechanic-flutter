@@ -16,8 +16,17 @@ void main() {
     });
 
     test('متن خیلی بلند بدون دستور ارسال می‌شود (احترام به بودجهٔ طول)', () {
-      final long = 'ک' * 800;
-      expect(DiagnosisPolicy.withDirective(long), long);
+      // سقف فعلی maxOutboundLength=2000 (هم‌تراز بک‌اند).
+      // وقتی متن + دستور از سقف رد شود، فقط متن کاربر برمی‌گردد (کوتاه نمی‌شود).
+      final directiveLen = DiagnosisPolicy.requestDirective.length;
+      final longLen =
+          DiagnosisPolicy.maxOutboundLength - directiveLen; // جا برای دستور نیست
+      final long = 'ک' * (longLen + 10);
+      final out = DiagnosisPolicy.withDirective(long);
+
+      expect(out, isNot(contains('دستور اپلیکیشن')));
+      expect(out, long);
+      expect(out.length, lessThanOrEqualTo(DiagnosisPolicy.maxOutboundLength));
     });
 
     test('stripDirective دستور را برای نمایش حذف می‌کند', () {
