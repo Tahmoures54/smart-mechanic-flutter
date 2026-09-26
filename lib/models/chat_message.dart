@@ -14,6 +14,9 @@ class ChatMessage {
   /// تا دکمهٔ «تلاش دوباره» بتواند همان درخواست را از نو بفرستد.
   final String? retryText;
 
+  /// شناسهٔ همان درخواست تشخیص برای retry امن پس از timeout/network error.
+  final String? retryRequestId;
+
   /// نوع خطا برای تعیین رفتار UI (مثلاً باز کردن فروشگاه برای 402).
   final ChatErrorType? errorType;
 
@@ -25,6 +28,7 @@ class ChatMessage {
     this.isDiagnosisResult = false,
     this.structured,
     this.retryText,
+    this.retryRequestId,
     this.errorType,
   }) : timestamp = timestamp ?? DateTime.now();
 
@@ -53,12 +57,14 @@ class ChatMessage {
   factory ChatMessage.error(
     String text, {
     String? retryText,
+    String? retryRequestId,
     ChatErrorType? errorType,
   }) => ChatMessage(
         id: _nextId('e'),
         text: text,
         role: MessageRole.system,
         retryText: retryText,
+        retryRequestId: retryRequestId,
         errorType: errorType,
       );
 }
