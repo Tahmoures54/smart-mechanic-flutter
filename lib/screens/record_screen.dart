@@ -57,6 +57,7 @@ class _RecordScreenState extends State<RecordScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isRecording = false;
   bool _isProcessing = false;
+  bool _actionInProgress = false;
   int _secondsElapsed = 0;
   Timer? _timer;
   late final AnimationController _animController;
@@ -72,6 +73,7 @@ class _RecordScreenState extends State<RecordScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addObserver(this);
     _animController = AnimationController(
       vsync: this,
@@ -228,27 +230,31 @@ class _RecordScreenState extends State<RecordScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _toggleRecording() async {
-    if (_isProcessing || !mounted) return;
+    if (_isProcessing || _actionInProgress) return;
+    _actionInProgress = true;
 
-    // همه Providerها را قبل از await می‌گیریم.
-    final audioService = _audioService ?? context.read<AudioService>();
-    _audioService = audioService;
-    final soundAnalyzer = context.read<SoundAnalyzer>();
-    final authProvider = context.read<AuthProvider>();
-    final apiService = context.read<ApiService>();
+    try {
+      // همه Providerها را قبل از await می‌گیریم.
+      final audioService = _audioService ?? context.read<AudioService>();
+      _audioService = audioService;
+      final soundAnalyzer = context.read<SoundAnalyzer>();
+      final authProvider = context.read<AuthProvider>();
+      final apiService = context.read<ApiService>();
 
-    if (_isRecording) {
-      await _stopAndProcess(
-        audioService: audioService,
-        soundAnalyzer: soundAnalyzer,
-        authProvider: authProvider,
-        apiService: apiService,
-      );
-    } else {
-      await _startRecording(audioService);
+      if (_isRecording) {
+        await _stopAndProcess(
+          audioService: audioService,
+          soundAnalyzer: soundAnalyzer,
+          authProvider: authProvider,
+          apiService: apiService,
+        );
+      } else {
+        await _startRecording(audioService);
+      }
+    } finally {
+      _actionInProgress = false;
     }
   }
-
   Future<void> _startRecording(AudioService audioService) async {
     final hasPermission = await _requestMicPermission();
     if (!hasPermission || !mounted) return;
