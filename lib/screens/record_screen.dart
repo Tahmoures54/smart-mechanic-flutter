@@ -356,6 +356,13 @@ SNR: ${features.snr.toStringAsFixed(1)} dB
         _isProcessing = false;
         _secondsElapsed = 0;
       });
+    } finally {
+      // The uploaded WAV is temporary; remove it after processing.
+      try {
+        await audioService.deleteRecordedFile();
+      } catch (e) {
+        debugPrint('[RecordScreen] temporary audio cleanup failed: $e');
+      }
     }
   }
 
