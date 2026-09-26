@@ -48,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final FocusNode _focusNode = FocusNode();
-  final Map<int, GlobalKey> _bubbleKeys = {};
+  final Map<String, GlobalKey> _bubbleKeys = {};
 
   late final ChatController _chat;
   late final AnimationController _shakeCtrl;
@@ -135,7 +135,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _focusResultAndShake(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      final ctx = _bubbleKeys[index]?.currentContext;
+      final messages = _chat.messages;
+      final message = index >= 0 && index < messages.length ? messages[index] : null;
+      final ctx = message == null ? null : _bubbleKeys[message.id]?.currentContext;
       if (ctx != null) {
         await Scrollable.ensureVisible(
           ctx,
@@ -245,8 +247,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         itemCount: messages.length,
         itemBuilder: (context, i) {
-          final key = _bubbleKeys.putIfAbsent(i, () => GlobalKey());
           final m = messages[i];
+          final key = _bubbleKeys.putIfAbsent(m.id, () => GlobalKey());
           final highlighted = m.isDiagnosisResult && i == lastResultIndex;
 
           Widget child;
