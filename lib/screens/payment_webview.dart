@@ -248,7 +248,7 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       setState(() => _showResultOverlay = false);
       navigator.pop(true);
 
-      messenger.showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'پرداخت انجام شد اما بروزرسانی با تأخیر مواجه شد. '
