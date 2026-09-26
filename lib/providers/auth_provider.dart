@@ -37,6 +37,7 @@ class AuthProvider with ChangeNotifier {
   DateTime? _profileLastFetched;
   static const _profileCacheDuration = Duration(seconds: 30);
   bool _isFetchingProfile = false;
+  int _authGeneration = 0;
 
   bool get isAuthenticated => _token != null;
   bool get isLoading => _isLoading;
@@ -172,15 +173,24 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> fetchProfile({bool force = false}) async {
-    if (_token == null) return;
+    final requestToken = _token;
+    if (requestToken == null) return;
     if (!force && _isFetchingProfile) return;
     if (!force && _profileLastFetched != null) {
       final elapsed = DateTime.now().difference(_profileLastFetched!);
       if (elapsed < _profileCacheDuration) return;
     }
+
+    final requestGeneration = _authGeneration;
     _isFetchingProfile = true;
     try {
-      final response = await apiService.getProfile(_token!);
+      final response = await apiService.getProfile(requestToken);
+
+      if (_token != requestToken || _authGeneration != requestGeneration) {
+        debugPrint('[AuthProvider] ignoring stale profile response');
+        return;
+      }
+
       if (response['success'] == true && response['data'] != null) {
         _updateProfileFromData(response['data'] as Map<String, dynamic>);
         _profileLastFetched = DateTime.now();
@@ -189,15 +199,20 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
       }
     } on ApiException catch (e) {
+      if (_token != requestToken || _authGeneration != requestGeneration) return;
       if (e.statusCode == 401) {
         await logout();
       } else {
-        debugPrint('خطای API در دریافت پروفایل: ${e.message}');
+        debugPrint('خطای API در دریافت پروفایل: ' + e.message);
       }
     } catch (e) {
-      debugPrint('خطا در دریافت پروفایل: $e');
+      if (_token == requestToken && _authGeneration == requestGeneration) {
+        debugPrint('خطا در دریافت پروفایل: ' + e.toString());
+      }
     } finally {
-      _isFetchingProfile = false;
+      if (_token == requestToken && _authGeneration == requestGeneration) {
+        _isFetchingProfile = false;
+      }
     }
   }
 
@@ -234,6 +249,7 @@ class AuthProvider with ChangeNotifier {
     final res =
         await apiService.verifyOtp(phone, code, referralCode: referralCode);
     if (res['success'] == true) {
+      _authGeneration++;
       _token = res['token'] as String?;
       if (_token == null) {
         throw Exception('توکن دریافت نشد. لطفاً دوباره تلاش کنید.');
@@ -297,6 +313,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _authGeneration++;
     _token = null;
     _userId = null;
     _userName = null;
