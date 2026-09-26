@@ -23,9 +23,9 @@ class ChatBubble extends StatelessWidget {
     final isSystem = message.role == MessageRole.system;
 
     final bubble = Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.88),
       decoration: BoxDecoration(
         color: isSystem
             ? Colors.red.withOpacity(0.12)
@@ -41,10 +41,15 @@ class ChatBubble extends StatelessWidget {
         children: [
           SelectableText(
             message.text,
-            style: TextStyle(height: 1.55, fontSize: 15, color: isSystem ? Colors.redAccent.shade100 : null),
+            style: TextStyle(
+              height: 1.7,
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+              color: isSystem ? Colors.redAccent.shade100 : null,
+            ),
           ),
           if (isSystem && onRetry != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             InkWell(
               onTap: onRetry,
               borderRadius: BorderRadius.circular(8),
@@ -53,10 +58,16 @@ class ChatBubble extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh_rounded, size: 14, color: Colors.redAccent),
-                    SizedBox(width: 4),
-                    Text('تلاش دوباره',
-                        style: TextStyle(fontSize: 12.5, color: Colors.redAccent, fontWeight: FontWeight.w700)),
+                    Icon(Icons.refresh_rounded, size: 16, color: Colors.redAccent),
+                    SizedBox(width: 6),
+                    Text(
+                      'تلاش دوباره',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -140,9 +140,9 @@ class Constants {
       'https://trustseal.enamad.ir/?id=7731207&Code=Q14UpKWtFFDXzZarnOhA5dzChbURT0br';
 
   static const Duration defaultTimeout = Duration(seconds: 20);
-  /// هم‌تراز با maxDuration بک‌اند (۹۰s) تا کلاینت زودتر از سرور قطع نکند.
-  static const Duration diagnoseTimeout = Duration(seconds: 90);
-  static const Duration uploadTimeout = Duration(seconds: 90);
+  /// هم‌تراز با maxDuration / AI_TIMEOUT_MS بک‌اند (thinking).
+  static const Duration diagnoseTimeout = Duration(seconds: 100);
+  static const Duration uploadTimeout = Duration(seconds: 100);
   static const Duration longPollTimeout = Duration(minutes: 2);
 
   static const Duration carsCacheDuration = Duration(hours: 6);
@@ -152,8 +152,8 @@ class Constants {
   static const String appName = 'مکانیک هوشمند';
   static const String appNameEn = 'Smart Mechanic';
   static const String appTagline = 'بزرگترین بانک اطلاعات فنی خودرویی کشور';
-  static const String appVersion = '1.3.3';
-  static const int appBuildNumber = 9;
+  static const String appVersion = '1.3.4';
+  static const int appBuildNumber = 10;
   static const String packageName = 'ir.smartmec.app';
   static const String supportEmail = 'support@smart-mec.ir';
 
@@ -168,7 +168,8 @@ class Constants {
   static const String boxHistory = 'history';
   static const String boxUserProfile = 'user_profile';
 
-  static const int maxDescriptionLength = 300;
+  /// هم‌تراز با سقف بک‌اند (validateDescription ≤ 2000) — متن کاربر کوتاه نشود.
+  static const int maxDescriptionLength = 2000;
   static const int minDescriptionLength = 5;
   static const int maxRecordingSeconds = 30;
   static const int minRecordingSeconds = 3;
@@ -198,36 +199,21 @@ class Constants {
 }
 
 /// ─── سیاست «پاسخ مستقیم» (حذف دورهای پرسش‌وپاسخ) ─────────────────────
-///
-/// تجربهٔ محصول این است که هوش مصنوعی هیچ‌وقت کاربر را با سؤال‌های
-/// پی‌درپی (حالت «questions» اسکیمای بک‌اند) معطل نکند؛ چون هر دور سؤال
-/// یعنی یک درخواست جدید و مصرف اعتبار (توکن) کاربر، و در نهایت هم
-/// ممکن است کاربر بدون جواب بماند.
-///
-/// در عوض، همان پاسخِ اول باید یک مقالهٔ تشخیصی کامل با چند احتمال باشد
-/// و در پایان هم کاربر به ادامهٔ گفتگو تشویق شود.
 class DiagnosisPolicy {
   DiagnosisPolicy._();
 
-  /// سقف طول کل description ارسالی؛ اگر کاربر متن خیلی بلندی نوشته باشد
-  /// برای احترام به محدودیت احتمالی طول در بک‌اند، دستور اضافه نمی‌شود.
-  static const int maxOutboundLength = 700;
+  /// سقف خروجی به بک‌اند — برابر validateDescription بک‌اند؛ متن کوتاه نشود.
+  static const int maxOutboundLength = 2000;
 
-  /// دستور سیاست پاسخ که همراهِ شرح مشکل به بک‌اند ارسال می‌شود تا مدل
-  /// سمت سرور همیشه در حالت «diagnosis» (مقالهٔ چند‌احتمالی) جواب بدهد
-  /// و وارد دور سؤال نشود.
   static const String requestDirective =
       '[دستور اپلیکیشن: هیچ سؤالی نپرس؛ همین حالا یک پاسخ تشخیصی کامل به سبک '
       'مقاله بده: ۲ تا ۴ علت احتمالی را با توضیح کوتاه و نحوهٔ بررسی فهرست کن، '
       'ابهام‌ها را با سناریوی «اگر…» پوشش بده و در پایان با یک جملهٔ کوتاه '
       'کاربر را به ادامهٔ گفتگو تشویق کن.]';
 
-  /// جملهٔ تشویقی پیش‌فرض انتهای کارت تشخیص (اگر خود مدل تشویق ننوشته باشد
-  /// هم، این بخش همیشه دیده می‌شود).
   static const String encouragementText =
       'هنوز سؤال یا جزئیاتی برایت مبهم مانده؟ همان‌طور که هست بنویس تا دقیق‌تر بررسی کنیم.';
 
-  /// پیشنهادهای آمادهٔ «ادامهٔ گفتگو» — با یک لمس، کادر ورودی چت را پر می‌کنند.
   static const List<String> followUpSuggestions = [
     'هزینهٔ تعمیرش تقریباً چقدر در می‌آید؟',
     'خودم چطور می‌توانم این مشکل را بررسی کنم؟',
@@ -237,17 +223,20 @@ class DiagnosisPolicy {
   static final RegExp _directivePattern =
       RegExp(r'\[دستور اپلیکیشن:[^\]]*\]');
 
-  /// افزودن دستور سیاست پاسخ به متن خروجی (شرح مشکل یا نتایج آنالیز صدا).
+  /// افزودن دستور سیاست؛ اگر جا نبود، متن کاربر کامل می‌ماند (کوتاه نمی‌شود).
   static String withDirective(String text) {
     final trimmed = text.trim();
     final combined =
         trimmed.isEmpty ? requestDirective : '$trimmed\n\n$requestDirective';
-    if (combined.length > maxOutboundLength) return trimmed;
+    if (combined.length > maxOutboundLength) {
+      // Prefer full user text over the directive — never truncate the problem description.
+      return trimmed.length > maxOutboundLength
+          ? trimmed.substring(0, maxOutboundLength)
+          : trimmed;
+    }
     return combined;
   }
 
-  /// حذف دستور سیاست از متن‌هایی که از بک‌اند برمی‌گردند (مثلاً توضیح
-  /// ذخیره‌شده در تاریخچه) تا متن داخلی هرگز به کاربر نشان داده نشود.
   static String stripDirective(String text) =>
       text.replaceFirst(_directivePattern, '').trim();
 }

@@ -10,14 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/share_service.dart';
 import 'urgency_and_chips.dart';
 
-/// نمایش غنی نتیجهٔ تشخیص — همیشه به‌صورت «مقالهٔ کامل».
-///
-/// سیاست «پاسخ مستقیم»: کارت دیگر هیچ فرم پرسش‌وپاسخ اجباری (چیپ‌های
-/// سؤال + دکمهٔ به‌روزرسانی تشخیص) ندارد. اگر بک‌اندِ قدیمی هنوز سؤال
-/// بفرستد، آن سؤال‌ها صرفاً به‌صورت «راهنمای اختیاری» و بدون هیچ قفلی
-/// نمایش داده می‌شوند. در پایان هر کارت هم بخش «ادامهٔ گفتگو» با
-/// پیشنهادهای آماده، کاربر را به ادامهٔ مکالمه تشویق می‌کند و امکان
-/// اشتراک‌گذاری نتیجه (با کد معرف کاربر) فراهم است.
+/// نمایش غنی نتیجهٔ تشخیص — متن کامل، فونت بزرگ و خوانا.
 class DiagnosisResultCard extends StatelessWidget {
   const DiagnosisResultCard({
     super.key,
@@ -30,11 +23,7 @@ class DiagnosisResultCard extends StatelessWidget {
 
   final DiagnosisResult result;
   final String? supplementalText;
-
-  /// لمس یکی از پیشنهادهای «ادامهٔ گفتگو» — کادر ورودی چت را پر می‌کند.
   final ValueChanged<String>? onSuggestionTap;
-
-  /// برای متن اشتراک‌گذاری نتیجه.
   final String? carName;
   final String? year;
 
@@ -47,7 +36,7 @@ class DiagnosisResultCard extends StatelessWidget {
     return text.substring(start).trim();
   }
 
-  /// متن اصلی نتیجه بدون بخش تبلیغ تعمیرگاه‌ها — برای اشتراک‌گذاری.
+  /// متن کامل نتیجه برای اشتراک — کوتاه نمی‌شود.
   String get _shareableText {
     final raw = supplementalText ?? '';
     const marker = '## 🔧 تعمیرگاه‌های پیشنهادی';
@@ -57,11 +46,10 @@ class DiagnosisResultCard extends StatelessWidget {
     if (body.isEmpty) {
       body = [
         if (result.statusSummary.isNotEmpty) result.statusSummary,
-        ...result.causes.take(3).map((c) => '• ${c.title}'),
+        ...result.causes.map((c) => '• ${c.title}${c.why.isNotEmpty ? ': ${c.why}' : ''}'),
         if (result.nextStep.isNotEmpty) result.nextStep,
       ].join('\n');
     }
-    if (body.length > 1200) body = '${body.substring(0, 1200)}…';
     return body;
   }
 
@@ -85,9 +73,9 @@ class DiagnosisResultCard extends StatelessWidget {
     final hints = result.optionalHints;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.86),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.92),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
         borderRadius: BorderRadius.circular(18),
@@ -106,53 +94,62 @@ class DiagnosisResultCard extends StatelessWidget {
             ],
           ),
           if (result.safeToDrive == false) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _SafetyBanner(text: 'توصیه می‌شود با این وضعیت رانندگی نکنید.'),
           ],
           if (result.statusSummary.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
+            const SizedBox(height: 12),
+            SelectableText(
               result.statusSummary,
-              style: const TextStyle(fontSize: 16, height: 1.65, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 18,
+                height: 1.75,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
           if (result.warnings.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             ...result.warnings.map((w) => _WarningLine(text: w)),
           ],
           if (result.causes.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text('علت‌های محتمل:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
+            const Text(
+              'علت‌های محتمل:',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
             ...result.causes.map((c) => _CauseTile(cause: c)),
           ],
           if (hints.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _OptionalHintsSection(hints: hints),
           ],
           if (result.mechanicQuestions.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             _MechanicChecklist(items: result.mechanicQuestions),
           ],
           if (result.nextStep.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             _NextStepBox(text: result.nextStep),
           ],
-          // ── تشویق به ادامهٔ مکالمه (همیشه نمایش داده می‌شود) ──
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _ContinueChatSection(
             onSuggestionTap: onSuggestionTap,
             onShare: () => _shareResult(context),
           ),
           if (result.footer.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(result.footer, style: TextStyle(fontSize: 13, color: theme.hintColor)),
+            const SizedBox(height: 12),
+            SelectableText(
+              result.footer,
+              style: TextStyle(fontSize: 15, height: 1.65, color: theme.hintColor),
+            ),
           ],
           if (_garagePromoText != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primaryContainer.withOpacity(0.35),
                 borderRadius: BorderRadius.circular(12),
@@ -162,13 +159,14 @@ class DiagnosisResultCard extends StatelessWidget {
                 data: _garagePromoText!,
                 shrinkWrap: true,
                 styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                  p: const TextStyle(fontSize: 14, height: 1.65),
+                  p: const TextStyle(fontSize: 16, height: 1.7),
                   h2: TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
+                    fontSize: 17,
+                    height: 1.55,
                     fontWeight: FontWeight.w800,
                     color: theme.colorScheme.primary,
                   ),
+                  listBullet: const TextStyle(fontSize: 16),
                 ),
               ),
             ),
@@ -179,15 +177,10 @@ class DiagnosisResultCard extends StatelessWidget {
   }
 }
 
-/// بخش «ادامهٔ گفتگو» — انتهای هر کارت تشخیص.
-/// کاربر را دعوت می‌کند سؤال بعدی را بپرسد و با یک لمس، پیشنهاد آماده را
-/// در کادر ورودی می‌گذارد (بدون ارسال خودکار).
 class _ContinueChatSection extends StatelessWidget {
   const _ContinueChatSection({this.onSuggestionTap, this.onShare});
 
   final ValueChanged<String>? onSuggestionTap;
-
-  /// اشتراک‌گذاری نتیجه (رشد از طریق دعوت دوستان).
   final VoidCallback? onShare;
 
   @override
@@ -195,7 +188,7 @@ class _ContinueChatSection extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withOpacity(0.07),
         borderRadius: BorderRadius.circular(12),
@@ -208,26 +201,33 @@ class _ContinueChatSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.chat_bubble_outline_rounded,
-                  size: 16, color: theme.colorScheme.primary),
-              const SizedBox(width: 6),
+                  size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   DiagnosisPolicy.encouragementText,
-                  style: const TextStyle(fontSize: 14, height: 1.7, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.75,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 7,
-            runSpacing: 7,
+            spacing: 8,
+            runSpacing: 8,
             children: DiagnosisPolicy.followUpSuggestions
                 .map(
                   (suggestion) => ActionChip(
-                    label: Text(suggestion, style: const TextStyle(fontSize: 11.5)),
+                    label: Text(
+                      suggestion,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
                     avatar: Icon(Icons.arrow_forward_rounded,
-                        size: 13, color: theme.colorScheme.primary),
+                        size: 15, color: theme.colorScheme.primary),
                     backgroundColor: theme.colorScheme.surface,
                     side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.35)),
                     onPressed: onSuggestionTap == null ? null : () => onSuggestionTap!(suggestion),
@@ -236,20 +236,20 @@ class _ContinueChatSection extends StatelessWidget {
                 .toList(),
           ),
           if (onShare != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onShare,
-                icon: const Icon(Icons.share_rounded, size: 16),
+                icon: const Icon(Icons.share_rounded, size: 18),
                 label: const Text(
                   'اشتراک‌گذاری این نتیجه',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: theme.colorScheme.primary,
                   side: BorderSide(color: theme.colorScheme.primary.withOpacity(0.35)),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -261,8 +261,6 @@ class _ContinueChatSection extends StatelessWidget {
   }
 }
 
-/// راهنمای اختیاری — فقط وقتی بک‌اندِ قدیمی هنوز سؤال برگردانده باشد
-/// ظاهر می‌شود؛ صرفاً اطلاع‌رسانی است و هیچ ورودی اجباری نمی‌خواهد.
 class _OptionalHintsSection extends StatelessWidget {
   const _OptionalHintsSection({required this.hints});
 
@@ -273,7 +271,7 @@ class _OptionalHintsSection extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.blueGrey.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
@@ -284,12 +282,12 @@ class _OptionalHintsSection extends StatelessWidget {
           Text(
             'اگر این جزئیات را هم بگویی، پاسخ بعدی دقیق‌تر می‌شود (اختیاری):',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           ...hints.asMap().entries.map(
                 (e) => _NumberedLine(index: e.key + 1, text: e.value),
               ),
@@ -307,7 +305,7 @@ class _SafetyBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.red.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
@@ -315,11 +313,18 @@ class _SafetyBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.dangerous_rounded, color: Colors.red, size: 18),
-          const SizedBox(width: 8),
+          const Icon(Icons.dangerous_rounded, color: Colors.red, size: 22),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text(text,
-                style: const TextStyle(fontSize: 13, color: Colors.red, fontWeight: FontWeight.w700)),
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.55,
+                color: Colors.red,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -334,13 +339,18 @@ class _WarningLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, size: 14, color: Colors.amber),
-          const SizedBox(width: 6),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, height: 1.5))),
+          const Icon(Icons.info_outline_rounded, size: 18, color: Colors.amber),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(
+              text,
+              style: const TextStyle(fontSize: 15.5, height: 1.65),
+            ),
+          ),
         ],
       ),
     );
@@ -355,13 +365,15 @@ class _NumberedLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$index.', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(width: 6),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, height: 1.5))),
+          Text('$index.', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(text, style: const TextStyle(fontSize: 16, height: 1.6)),
+          ),
         ],
       ),
     );
@@ -375,8 +387,8 @@ class _CauseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.035),
         borderRadius: BorderRadius.circular(12),
@@ -388,34 +400,49 @@ class _CauseTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(cause.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                child: SelectableText(
+                  cause.title,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, height: 1.45),
+                ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               ProbabilityChip(level: cause.probability),
             ],
           ),
           if (cause.why.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(cause.why, style: const TextStyle(fontSize: 12.5, height: 1.5)),
+            const SizedBox(height: 6),
+            SelectableText(
+              cause.why,
+              style: const TextStyle(fontSize: 15.5, height: 1.7),
+            ),
           ],
           if (cause.diyCheck != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.build_circle_outlined, size: 14, color: Colors.blueGrey),
-                const SizedBox(width: 4),
+                const Icon(Icons.build_circle_outlined, size: 18, color: Colors.blueGrey),
+                const SizedBox(width: 6),
                 Expanded(
-                  child: Text(cause.diyCheck!,
-                      style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
+                  child: SelectableText(
+                    cause.diyCheck!,
+                    style: const TextStyle(fontSize: 15.5, height: 1.65, color: Colors.blueGrey),
+                  ),
                 ),
               ],
             ),
           ],
           if (cause.costEstimate != null) ...[
-            const SizedBox(height: 4),
-            Text(cause.costEstimate!, style: const TextStyle(fontSize: 12.5, color: Colors.orange)),
+            const SizedBox(height: 6),
+            SelectableText(
+              cause.costEstimate!,
+              style: const TextStyle(
+                fontSize: 15.5,
+                height: 1.55,
+                color: Colors.orange,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ],
       ),
@@ -430,7 +457,7 @@ class _MechanicChecklist extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.blueGrey.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
@@ -441,12 +468,14 @@ class _MechanicChecklist extends StatelessWidget {
           Row(
             children: [
               const Expanded(
-                child: Text('چک‌لیست برای تعمیرگاه',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                child: Text(
+                  'چک‌لیست برای تعمیرگاه',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.copy_rounded, size: 16),
+                icon: const Icon(Icons.copy_rounded, size: 18),
                 tooltip: 'کپی چک‌لیست',
                 onPressed: () {
                   final text = items.map((e) => '- $e').join('\n');
@@ -459,12 +488,17 @@ class _MechanicChecklist extends StatelessWidget {
           ),
           ...items.map(
             (e) => Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: 4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('•  ', style: TextStyle(fontSize: 13)),
-                  Expanded(child: Text(e, style: const TextStyle(fontSize: 12.5, height: 1.5))),
+                  const Text('•  ', style: TextStyle(fontSize: 16)),
+                  Expanded(
+                    child: SelectableText(
+                      e,
+                      style: const TextStyle(fontSize: 15.5, height: 1.65),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -483,7 +517,7 @@ class _NextStepBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.orange.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
@@ -491,11 +525,17 @@ class _NextStepBox extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.arrow_left_rounded, color: Colors.orange, size: 20),
-          const SizedBox(width: 4),
+          const Icon(Icons.arrow_left_rounded, color: Colors.orange, size: 24),
+          const SizedBox(width: 6),
           Expanded(
-            child: Text(text,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.5)),
+            child: SelectableText(
+              text,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                height: 1.7,
+              ),
+            ),
           ),
         ],
       ),

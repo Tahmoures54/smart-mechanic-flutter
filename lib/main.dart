@@ -142,11 +142,13 @@ class _AppServices {
 
 Future<_AppServices> _initServices() async {
   final httpClient = http.Client();
-  final api = ApiService(httpClient: httpClient);
+  final api = ApiService(
+    httpClient: httpClient,
+    defaultTimeout: Constants.defaultTimeout,
+    diagnoseTimeout: Constants.diagnoseTimeout,
+    uploadTimeout: Constants.uploadTimeout,
+  );
   // IMPORTANT: do not initialize native audio plugins during application startup.
-  // Some Android devices/ROMs can crash the process when the recorder is opened
-  // before the first Flutter frame. AudioService now initializes lazily when the
-  // user actually opens the recording screen.
   final audio = AudioService();
   return _AppServices(api: api, audio: audio);
 }
