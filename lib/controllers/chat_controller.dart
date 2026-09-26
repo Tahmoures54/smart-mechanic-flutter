@@ -78,7 +78,7 @@ class ChatController extends ChangeNotifier {
       // نشان اعتبار در AppBar نباید کهنه بماند.
       unawaited(authProvider.fetchProfile());
     } else {
-      unawaited(fetchDiagnosis(userMessage));
+      unawaited(fetchDiagnosis(userMessage, requestId: _newRequestId()));
     }
   }
 
