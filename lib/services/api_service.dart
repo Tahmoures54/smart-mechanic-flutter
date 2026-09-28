@@ -602,4 +602,46 @@ class ApiService {
       .toList(growable: false);
   }
 
+  Future<BazaarPurchaseVerification> verifyBazaarPurchase(
+    String token, {
+    required String productId,
+    required String purchaseToken,
+    required String orderId,
+    required String packageName,
+    String? payload,
+    String? garageId,
+  }) async {
+    final body = <String, dynamic>{
+      'productId': productId,
+      'purchaseToken': purchaseToken,
+      'orderId': orderId,
+      'packageName': packageName,
+      if (payload != null && payload.trim().isNotEmpty) 'payload': payload,
+      if (garageId != null && garageId.trim().isNotEmpty)
+        'garageId': int.tryParse(garageId.trim()) ?? garageId.trim(),
+    };
+
+    final response = await _safeCall(
+      () => _httpClient.post(
+        Uri.parse('$baseUrl/purchase/bazaar/verify'),
+        headers: _getHeaders(token),
+        body: jsonEncode(body),
+      ),
+      rateLimitKey: 'verifyBazaarPurchase',
+    );
+    final data = _parseAndEnsure(
+      response,
+      defaultError: 'تأیید خرید کافه‌بازار ناموفق بود',
+    );
+    final raw = data['data'] is Map ? Map<String, dynamic>.from(data['data']) : data;
+    final verifiedProductId = raw['productId']?.toString() ?? productId;
+    final verifiedOrderId = raw['orderId']?.toString() ?? orderId;
+    final verifiedToken = raw['purchaseToken']?.toString() ?? purchaseToken;
+    return BazaarPurchaseVerification(
+      productId: verifiedProductId,
+      orderId: verifiedOrderId,
+      purchaseToken: verifiedToken,
+    );
+  }
+
 }
