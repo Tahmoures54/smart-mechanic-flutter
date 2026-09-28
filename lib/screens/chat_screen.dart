@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/chat_controller.dart';
@@ -77,11 +76,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       onMessageAppended: _handleMessageAppended,
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final position = await _lastKnownPosition();
-      if (!mounted) return;
-      _chat.setLocation(lat: position?.latitude, lng: position?.longitude);
+      _chat.setLocation(lat: null, lng: null);
       _chat.seedInitial(
         userMessage: widget.initialUserMessage,
         initialResultText: widget.initialDiagnosisResult,
@@ -89,18 +86,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         initialDiagnosticId: widget.initialDiagnosticId,
       );
     });
-  }
-
-  Future<Position?> _lastKnownPosition() async {
-    try {
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        return null;
-      }
-      return await Geolocator.getLastKnownPosition();
-    } catch (_) {
-      return null;
-    }
   }
 
   @override
