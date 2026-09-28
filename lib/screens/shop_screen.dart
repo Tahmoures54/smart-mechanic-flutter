@@ -7,6 +7,8 @@ import '../models/shop_package.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'payment_webview.dart';
+import '../services/bazaar_billing_service.dart';
+import '../services/store_config.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ── صفحه فروشگاه ──
@@ -97,10 +99,22 @@ class _ShopScreenState extends State<ShopScreen> {
     setState(() => _loadingProductId = productId);
 
     try {
-      final url = await api.getPaymentUrl(token, productId);
-      if (!mounted) return;
-
-      await _openPayment(url);
+      if (StoreConfig.isBazaar) {
+        final payload = 'sm-' + productId + '-' + DateTime.now().millisecondsSinceEpoch.toString();
+        await BazaarBillingService.instance.purchase(
+          productId: productId,
+          payload: payload,
+          api: api,
+          authToken: token,
+        );
+        if (!mounted) return;
+        await auth.fetchProfile(force: true);
+        _showSnack('خرید با موفقیت تأیید و اعتبار حساب شد ✅');
+      } else {
+        final url = await api.getPaymentUrl(token, productId);
+        if (!mounted) return;
+        await _openPayment(url);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       _showSnack(e.message, color: Colors.redAccent);
