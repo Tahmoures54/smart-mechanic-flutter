@@ -8,8 +8,14 @@ enum AppStore {
 class StoreConfig {
   StoreConfig._();
 
+  static const String _compileTimeStore =
+      String.fromEnvironment('APP_STORE', defaultValue: 'direct');
+
   static AppStore get current {
-    final raw = _value('APP_STORE').toLowerCase();
+    final raw = (_compileTimeStore.isNotEmpty
+            ? _compileTimeStore
+            : _value('APP_STORE'))
+        .toLowerCase();
     return raw == 'bazaar' ? AppStore.bazaar : AppStore.direct;
   }
 
