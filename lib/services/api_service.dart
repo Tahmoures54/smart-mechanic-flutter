@@ -624,7 +624,7 @@ class ApiService {
 
     final response = await _safeCall(
       () => _httpClient.post(
-        Uri.parse('$baseUrl/purchase/bazaar/verify'),
+        Uri.parse('${Constants.baseUrl}/purchase/bazaar/verify'),
         headers: _getHeaders(token),
         body: jsonEncode(body),
       ),
@@ -634,7 +634,7 @@ class ApiService {
       response,
       defaultError: 'تأیید خرید کافه‌بازار ناموفق بود',
     );
-    final raw = data['data'] is Map ? Map<String, dynamic>.from(data['data']) : data;
+    final raw = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : data;
     final verifiedProductId = raw['productId']?.toString() ?? productId;
     final verifiedOrderId = raw['orderId']?.toString() ?? orderId;
     final verifiedToken = raw['purchaseToken']?.toString() ?? purchaseToken;
