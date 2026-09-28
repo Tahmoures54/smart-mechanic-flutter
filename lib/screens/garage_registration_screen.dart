@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -91,38 +90,6 @@ class _GarageRegistrationScreenState extends State<GarageRegistrationScreen> {
         _loading = false;
         _error = 'دریافت فهرست تعمیرگاه‌ها ناموفق بود.';
       });
-    }
-  }
-
-  Future<void> _useMyLocation() async {
-    setState(() {
-      _locating = true;
-      _error = null;
-    });
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        throw const _LocationException('اجازهٔ دسترسی به موقعیت مکانی داده نشد.');
-      }
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw const _LocationException('موقعیت مکانی دستگاه خاموش است.');
-      }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-      );
-      if (!mounted) return;
-      _latController.text = position.latitude.toStringAsFixed(6);
-      _lngController.text = position.longitude.toStringAsFixed(6);
-    } on _LocationException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _error = 'دریافت موقعیت مکانی ناموفق بود. مختصات را دستی وارد کنید.');
-    } finally {
-      if (mounted) setState(() => _locating = false);
     }
   }
 
@@ -284,14 +251,6 @@ class _GarageRegistrationScreenState extends State<GarageRegistrationScreen> {
                     ),
                   ),
                 ],
-              ),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton.icon(
-                  onPressed: _locating ? null : _useMyLocation,
-                  icon: const Icon(Icons.my_location_rounded, size: 18),
-                  label: Text(_locating ? 'در حال دریافت موقعیت…' : 'استفاده از موقعیت فعلی'),
-                ),
               ),
               _field(_specialtiesController, 'تخصص‌ها', hint: 'موتور، برق، جلوبندی'),
               const SizedBox(height: 10),
