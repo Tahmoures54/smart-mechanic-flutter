@@ -6,6 +6,8 @@ import '../constants.dart';
 import '../models/garage_registration.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/bazaar_billing_service.dart';
+import '../services/store_config.dart';
 import '../utils/persian_numbers.dart';
 
 /// ثبت تعمیرگاه و پیگیری چرخهٔ واقعی backend.
@@ -158,9 +160,24 @@ class _GarageRegistrationScreenState extends State<GarageRegistrationScreen> {
       _error = null;
     });
     try {
-      final url = await _api.getPaymentUrl(token, productId, garageId: garage.id);
-      final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      if (!opened && mounted) setState(() => _error = 'صفحهٔ پرداخت باز نشد.');
+      if (StoreConfig.isBazaar) {
+        final payload = 'garage-' + garage.id + '-' + productId + '-' + DateTime.now().millisecondsSinceEpoch.toString();
+        await BazaarBillingService.instance.purchase(
+          productId: productId,
+          payload: payload,
+          api: _api,
+          authToken: token,
+          garageId: garage.id,
+        );
+        if (mounted) {
+          setState(() => _message = 'خرید با موفقیت تأیید شد.');
+          await _loadGarages();
+        }
+      } else {
+        final url = await _api.getPaymentUrl(token, productId, garageId: garage.id);
+        final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        if (!opened && mounted) setState(() => _error = 'صفحهٔ پرداخت باز نشد.');
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
