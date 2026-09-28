@@ -9,6 +9,7 @@ import '../models/car.dart';
 import '../models/diagnostic.dart';
 import '../models/garage_registration.dart';
 import '../models/shop_package.dart';
+import 'bazaar_purchase_verification.dart';
 
 class ApiException implements Exception {
   final int statusCode;
