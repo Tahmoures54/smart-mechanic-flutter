@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -199,6 +198,159 @@ class _PaymentWebViewState extends State<PaymentWebView> {
           return '';
         })()''',
       );
+      final value = raw.toString().replaceAll(RegExp(r'^"|"
+    } catch (e) {
+      debugPrint('[PaymentWebView] scanPage error: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // نتیجه پرداخت
+  // ---------------------------------------------------------------------------
+
+  Future<void> _handlePaymentResult({
+    required bool isSuccess,
+    String? message,
+  }) async {
+    if (!mounted) return;
+
+    if (!isSuccess) {
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop(false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(message ?? 'پرداخت لغو شد یا ناموفق بود.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _showResultOverlay = true);
+
+    final navigator = Navigator.of(context);
+
+    try {
+      await context.read<AuthProvider>().fetchProfile(force: true);
+      if (!mounted) return;
+
+      setState(() => _showResultOverlay = false);
+      navigator.pop(true);
+ 
+    } catch (e) {
+      debugPrint('[PaymentWebView] fetchProfile failed: $e');
+      if (!mounted) return;
+
+      setState(() => _showResultOverlay = false);
+      navigator.pop(true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'پرداخت انجام شد اما بروزرسانی با تأخیر مواجه شد. '
+            'صفحه را بکشید تا تازه شود.',
+          ),
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        // اگر نتیجه پردازش شده یا خطا داریم، مستقیم ببند.
+        if (_isProcessed || _loadError != null) {
+          if (mounted) Navigator.of(context).pop();
+          return;
+        }
+        final canGoBack = await _controller.canGoBack();
+        if (!mounted) return;
+        if (canGoBack) {
+          await _controller.goBack();
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('درگاه پرداخت امن'),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+        ),
+        body: Stack(
+          children: [
+            if (_loadError != null)
+              _buildError()
+            else
+              WebViewWidget(controller: _controller),
+
+            if (_isPageLoading && _loadError == null)
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+
+            if (_showResultOverlay)
+              const Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black54,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.orange),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.redAccent,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _loadError ?? 'خطای نامشخص',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                setState(() {
+                  _loadError = null;
+                  _isPageLoading = true;
+                });
+                _loadInitialUrl();
+              },
+              child: const Text('تلاش دوباره'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+), '');
       if (value.isNotEmpty) {
         _maybeHandleDeepLink(value);
       }
