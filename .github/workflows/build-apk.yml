@@ -52,9 +52,16 @@ jobs:
           cat > .env << 'EOF'
           API_BASE_URL=https://smart-mec.ir/api
           API_VERSION=
+          APP_STORE=BAZAAR
+          BAZAAR_RSA_PUBLIC_KEY=\${{ secrets.BAZAAR_RSA_PUBLIC_KEY }}
           EOF
           echo "API_BASE_URL set to production smart-mec.ir"
-          cat .env
+          echo "APP_STORE=BAZAAR"
+          if [ -n "\${{ secrets.BAZAAR_RSA_PUBLIC_KEY }}" ]; then
+            echo "Cafe Bazaar RSA public key configured for local billing checks."
+          else
+            echo "Cafe Bazaar RSA public key not configured; server-side purchase validation remains enabled."
+          fi
 
       - name: Flutter pub get
         run: flutter pub get
