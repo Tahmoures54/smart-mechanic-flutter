@@ -352,15 +352,6 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       ),
     );
   }
-}
-), '');
-      if (value.isNotEmpty) {
-        _maybeHandleDeepLink(value);
-      }
-    } catch (e) {
-      debugPrint('[PaymentWebView] scanPage error: $e');
-    }
-  }
 
   // ---------------------------------------------------------------------------
   // نتیجه پرداخت
