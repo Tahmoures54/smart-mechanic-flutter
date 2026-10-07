@@ -48,21 +48,30 @@ jobs:
           cache: true
 
       - name: Ensure .env for assets (production API)
+        env:
+          BAZAAR_RSA_PUBLIC_KEY: ${{ secrets.BAZAAR_RSA_PUBLIC_KEY }}
         run: |
-          cat > .env << 'EOF'
-          API_BASE_URL=https://smart-mec.ir/api
-          API_VERSION=
-          APP_STORE=BAZAAR
-          BAZAAR_RSA_PUBLIC_KEY=\${{ secrets.BAZAAR_RSA_PUBLIC_KEY }}
-          EOF
-          echo "API_BASE_URL set to production smart-mec.ir"
-          echo "APP_STORE=BAZAAR"
-          if [ -n "\${{ secrets.BAZAAR_RSA_PUBLIC_KEY }}" ]; then
-            echo "Cafe Bazaar RSA public key configured for local billing checks."
-          else
-            echo "Cafe Bazaar RSA public key not configured; server-side purchase validation remains enabled."
-          fi
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
 
+          key = os.environ.get("BAZAAR_RSA_PUBLIC_KEY", "")
+          Path(".env").write_text(
+              "API_BASE_URL=https://smart-mec.ir/api\n"
+              "API_VERSION=\n"
+              "APP_STORE=BAZAAR\n"
+              f"BAZAAR_RSA_PUBLIC_KEY={key}\n",
+              encoding="utf-8",
+          )
+          print("API_BASE_URL set to production smart-mec.ir")
+          print("APP_STORE=BAZAAR")
+          print(
+              "Cafe Bazaar RSA public key configured."
+              if key
+              else "Cafe Bazaar RSA public key not configured; "
+                   "server-side purchase validation remains enabled."
+          )
+          PY
       - name: Flutter pub get
         run: flutter pub get
 
