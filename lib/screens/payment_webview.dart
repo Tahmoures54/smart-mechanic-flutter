@@ -198,7 +198,10 @@ class _PaymentWebViewState extends State<PaymentWebView> {
           return '';
         })()''',
       );
-      final value = raw.toString().replaceAll(RegExp(r'^"|"
+      final value = raw.toString().replaceAll(RegExp(r'^"|"$'), '');
+      if (value.isNotEmpty) {
+        _maybeHandleDeepLink(value);
+      }
     } catch (e) {
       debugPrint('[PaymentWebView] scanPage error: $e');
     }
