@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cafebazaar_billing/cafebazaar_billing.dart';
 import 'package:flutter/services.dart';
 
@@ -21,18 +23,57 @@ class BazaarBillingService {
   static final BazaarBillingService instance = BazaarBillingService._();
 
   bool _connected = false;
+  Future<void>? _connectionFuture;
 
-  Future<void> connect() async {
-    if (!StoreConfig.isBazaar || _connected) return;
+  Future<void> connect() {
+    if (!StoreConfig.isBazaar) {
+      throw const ApiException(
+        400,
+        'پرداخت بازار فقط در نسخه کافه‌بازار فعال است.',
+      );
+    }
+    if (_connected) return Future<void>.value();
+    return _connectionFuture ??= _connect();
+  }
 
-    await CafeBazaarBilling.connect(
-      StoreConfig.bazaarRsaPublicKey,
-      onSucceed: () => _connected = true,
-      onFailed: () => _connected = false,
-      onDisconnected: () => _connected = false,
-    );
+  Future<void> _connect() async {
+    final completer = Completer<void>();
 
-    _connected = true;
+    try {
+      await CafeBazaarBilling.connect(
+        StoreConfig.bazaarRsaPublicKey,
+        onSucceed: () {
+          _connected = true;
+          if (!completer.isCompleted) completer.complete();
+        },
+        onFailed: () {
+          _connected = false;
+          if (!completer.isCompleted) {
+            completer.completeError(
+              const ApiException(
+                503,
+                'اتصال به سرویس پرداخت کافه‌بازار برقرار نشد.',
+              ),
+            );
+          }
+        },
+        onDisconnected: () {
+          _connected = false;
+        },
+      );
+
+      // The plugin reports connection readiness through onSucceed. Do not mark
+      // the service connected merely because connect() returned.
+      await completer.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw const ApiException(
+          504,
+          'زمان اتصال به سرویس پرداخت کافه‌بازار تمام شد.',
+        ),
+      );
+    } finally {
+      _connectionFuture = null;
+    }
   }
 
   Future<BazaarPurchaseResult> purchase({
@@ -43,7 +84,10 @@ class BazaarBillingService {
     String? garageId,
   }) async {
     if (!StoreConfig.isBazaar) {
-      throw const ApiException(400, 'پرداخت بازار فقط در نسخه کافه‌بازار فعال است.');
+      throw const ApiException(
+        400,
+        'پرداخت بازار فقط در نسخه کافه‌بازار فعال است.',
+      );
     }
 
     await connect();
@@ -54,6 +98,9 @@ class BazaarBillingService {
         payload: payload,
       );
 
+      // The server is the source of truth. It validates the product, order,
+      // package name and purchase token against Cafe Bazaar before granting
+      // credits/access.
       final verified = await api.verifyBazaarPurchase(
         authToken,
         productId: info.productId,
@@ -64,6 +111,8 @@ class BazaarBillingService {
         garageId: garageId,
       );
 
+      // Consume only after the server has atomically granted the entitlement.
+      // This prevents a failed server request from losing a paid purchase.
       await CafeBazaarBilling.consume(info.purchaseToken);
 
       return BazaarPurchaseResult(
@@ -75,7 +124,10 @@ class BazaarBillingService {
       if (e.code == 'PURCHASE_CANCELLED') {
         throw const ApiException(499, 'پرداخت لغو شد.');
       }
-      throw ApiException(502, e.message ?? 'پرداخت کافه‌بازار ناموفق بود.');
+      throw ApiException(
+        502,
+        e.message ?? 'پرداخت کافه‌بازار ناموفق بود.',
+      );
     }
   }
 

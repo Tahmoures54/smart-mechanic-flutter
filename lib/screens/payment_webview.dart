@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -183,23 +182,23 @@ class _PaymentWebViewState extends State<PaymentWebView> {
     if (_isProcessed || !mounted) return;
     try {
       final raw = await _controller.runJavaScriptReturningResult(
-        "(function(){"
-        "try{"
-        "var loc=(window.location&&window.location.href)||'';"
-        "if(loc.indexOf('smartmec://')===0)return loc;"
-        "if(loc.indexOf('/purchase/verify')!==-1||"
-        "loc.indexOf('/api/purchase/verify')!==-1)return loc;"
-        "var a=document.querySelector('a[href^=\"smartmec\"]');"
-        "if(a&&a.href)return a.href;"
-        "var html=(document.documentElement&&"
-        "document.documentElement.innerHTML)||'';"
-        "var m=html.match(/smartmec:\\/\\/(success|failed|fail|cancel)/);"
-        "if(m)return 'smartmec://'+m[1];"
-        "}catch(e){}"
-        "return '';"
-        "})()",
+        r'''(function(){
+          try{
+            var loc=(window.location&&window.location.href)||'';
+            if(loc.indexOf('smartmec://')===0)return loc;
+            if(loc.indexOf('/purchase/verify')!==-1||
+               loc.indexOf('/api/purchase/verify')!==-1)return loc;
+            var a=document.querySelector('a[href^="smartmec"]');
+            if(a&&a.href)return a.href;
+            var html=(document.documentElement&&
+              document.documentElement.innerHTML)||'';
+            var m=html.match(/smartmec:\/\/(success|failed|fail|cancel)/);
+            if(m)return 'smartmec://'+m[1];
+          }catch(e){}
+          return '';
+        })()''',
       );
-      final value = raw.toString().replaceAll('"', '');
+      final value = raw.toString().replaceAll(RegExp(r'^"|"$'), '');
       if (value.isNotEmpty) {
         _maybeHandleDeepLink(value);
       }
@@ -274,9 +273,11 @@ class _PaymentWebViewState extends State<PaymentWebView> {
           if (mounted) Navigator.of(context).pop();
           return;
         }
-        if (await _controller.canGoBack()) {
+        final canGoBack = await _controller.canGoBack();
+        if (!mounted) return;
+        if (canGoBack) {
           await _controller.goBack();
-        } else if (mounted) {
+        } else {
           Navigator.of(context).pop();
         }
       },
